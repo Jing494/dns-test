@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================================
 # DNS完整版测试脚本
-# 功能：15项全面DNS测试，支持自定义DNS参数，默认使用云南电信DNS
+# 功能：16项全面DNS测试，支持自定义DNS参数，默认使用云南电信DNS
 # 用法：
 #   bash full.sh                                   # 测试默认DNS
 #   bash full.sh 8.8.8.8                           # 测试单个自定义DNS
@@ -48,6 +48,7 @@ fi
 # 打印头部
 print_header "DNS 地毯式综合测试 (完整版 v2026.08)"
 START_TIME=$(date +%s)
+print_env_info
 echo "待测DNS数量: ${#DNS_ADDR[@]} 个"
 echo "DNS列表:"
 for idx in "${!DNS_ADDR[@]}"; do

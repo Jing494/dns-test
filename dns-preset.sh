@@ -62,6 +62,7 @@ if [ "$VERSION" != "lite" ] && [ "$VERSION" != "full" ]; then
 fi
 
 echo "🎯 预设: $LABEL | 版本: $VERSION"
+print_env_info
 
 # 指定索引则只测第N个（避免超时）
 if [ "$IDX" -ge 0 ] 2>/dev/null && [ "$IDX" -lt "${#DNS_ADDR[@]}" ]; then

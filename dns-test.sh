@@ -28,6 +28,8 @@ if [ -t 0 ]; then
   echo "========================================"
   echo "  🌐 DNS测试工具集"
   echo "========================================"
+  print_env_info
+  echo ""
 
   # 无参数时先选择DNS组
   if [ $# -lt 1 ]; then
@@ -61,8 +63,8 @@ if [ -t 0 ]; then
     1)
       # 基础测试：直接问完整版还是精简版
       echo "请选择基础测试版本："
-      echo "1. 精简版（9项基础测试，约3-5分钟）"
-      echo "2. 完整版（15项全面测试，约8-10分钟）"
+      echo "1. 精简版（10项基础测试，约9秒/DNS）"
+      echo "2. 完整版（16项全面测试，约10秒/DNS）"
       read -t 30 -p "请输入选项(1/2): " version
       echo ""
 
@@ -123,7 +125,7 @@ if [ -t 0 ]; then
     2)
       # 专项测试：列出选项让用户选
       echo "可选专项测试："
-      echo "1. VoWiFi域名全解析测试（默认测试云南电信/联通等公共DNS，或传入自定义DNS）"
+      echo "1. VoWiFi域名全解析测试（mnc000-015全量探测，或传入自定义DNS）"
       echo "2. VoWiFi多DNS交叉验证（对比多个DNS的VoWiFi解析结果）"
       echo "3. 路由器DNS转发测试（测试路由器DNS是否转发到指定DNS）"
       echo "4. 端口连通性测试（测试ePDG/VoWiFi相关端口是否开放）"
@@ -134,7 +136,10 @@ if [ -t 0 ]; then
       case $professional_test in
         1)
           echo "开始VoWiFi域名全解析测试..."
-          if [ $# -ge 1 ]; then
+          if [ ${#DNS_LIST[@]} -gt 4 ]; then
+            echo "⚠️  ${#DNS_LIST[@]}个DNS跑全解析会超时，本次只测前4个"
+            perl tools/vowifi/01_resolve_vowifi.pl "${DNS_LIST[@]:0:4}"
+          elif [ $# -ge 1 ]; then
             perl tools/vowifi/01_resolve_vowifi.pl "${DNS_LIST[@]}"
           else
             perl tools/vowifi/01_resolve_vowifi.pl
@@ -142,20 +147,19 @@ if [ -t 0 ]; then
           ;;
         2)
           echo "开始VoWiFi多DNS交叉验证..."
-          if [ $# -ge 1 ]; then
+          if [ ${#DNS_LIST[@]} -gt 4 ]; then
+            echo "⚠️  ${#DNS_LIST[@]}个DNS跑交叉验证会慢，本次只测前4个"
+            perl tools/vowifi/02_vowifi_verify.pl "${DNS_LIST[@]:0:4}"
+          elif [ $# -ge 1 ]; then
             perl tools/vowifi/02_vowifi_verify.pl "${DNS_LIST[@]}"
           else
             perl tools/vowifi/02_vowifi_verify.pl
           fi
           ;;
         3)
-          echo "开始路由器DNS转发测试（对比云南电信省级DNS）..."
-          echo "提示: 传入的参数是【路由器网关IP】（如 192.168.1.1），不是DNS服务器地址"
-          if [ $# -ge 1 ]; then
-            perl tools/vowifi/03_test_router_dns.pl "${DNS_LIST[@]}"
-          else
-            perl tools/vowifi/03_test_router_dns.pl
-          fi
+          echo "开始路由器DNS转发测试（对比省级DNS）..."
+          echo "提示: 请直接传路由器网关IP，如: perl tools/vowifi/03_test_router_dns.pl 192.168.1.1"
+          perl tools/vowifi/03_test_router_dns.pl
           ;;
         4)
           echo "开始端口连通性测试（使用默认ePDG目标）..."
@@ -164,6 +168,11 @@ if [ -t 0 ]; then
           ;;
         5)
           echo "开始通用示例脚本演示..."
+          # 限制DNS数量避免示例脚本超时（示例2/3收多DNS会慢）
+          if [ ${#DNS_LIST[@]} -gt 4 ]; then
+            echo "⚠️  ${#DNS_LIST[@]}个DNS跑示例会慢，本次只取前4个"
+            DNS_LIST=("${DNS_LIST[@]:0:4}")
+          fi
           echo "1. 基础DNS查询"
           echo "2. 多DNS对比测试"
           echo "3. DNS64支持检测"

@@ -128,6 +128,26 @@ else
   PING_OPTS="-c 2 -W 2"
 fi
 
+# 环境自检：输出当前运行环境摘要（供入口脚本标注，让结果可回溯）
+print_env_info() {
+  local os="Linux"
+  [ "$(uname)" = "Darwin" ] && os="macOS"
+  local deps=""
+  command -v dig >/dev/null 2>&1 && deps="dig✅" || deps="dig❌"
+  command -v perl >/dev/null 2>&1 && deps="${deps} perl✅" || deps="${deps} perl❌"
+  command -v ping >/dev/null 2>&1 && deps="${deps} ping✅" || deps="${deps} ping❌"
+  # IPv6 可用性快测（平台区分 -W 单位）
+  local v6="不可用"
+  local v6opts="-c 1 -W 1"
+  [ "$(uname)" = "Darwin" ] && v6opts="-c 1 -W 1000"
+  if command -v ping6 >/dev/null 2>&1; then
+    ping6 $v6opts 2400:3200::1 >/dev/null 2>&1 && v6="可用"
+  elif command -v ping >/dev/null 2>&1; then
+    ping -6 $v6opts 2400:3200::1 >/dev/null 2>&1 && v6="可用"
+  fi
+  echo "  🌐 环境: ${os} | ${deps} | IPv6:${v6} | 端口测试需真机(UDP受限环境不可用)"
+}
+
 # DNS可达性预检函数：不可达返回1（快速跳过，避免59~90次查询白等）
 # 双域名探测：任一成功即可达（避免 baidu.com 在海外网络解析慢导致误判）
 dns_health_check() {
