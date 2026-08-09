@@ -7,19 +7,29 @@
 # 前置检查：dig 必需
 command -v dig >/dev/null 2>&1 || { echo "❌ 未找到 dig 命令，请先安装 dnsutils/bind-utils"; exit 1; }
 
-# 默认DNS列表（云南电信）
-DEFAULT_DNS_ADDR=(
-  "240e:52:4800::8888"
-  "240e:52:4000::8888"
-  "222.172.200.68"
-  "61.166.150.123"
-)
-DEFAULT_DNS_NAME=(
-  "云南电信IPv6-DNS-1"
-  "云南电信IPv6-DNS-2"
-  "云南电信IPv4-DNS-1"
-  "云南电信IPv4-DNS-2"
-)
+# 默认DNS组（云南电信，可用环境变量 DEFAULT_DNS_CSV 覆盖，逗号分隔地址；名称可用 DEFAULT_DNS_NAME_CSV 覆盖）
+if [ -n "$DEFAULT_DNS_CSV" ]; then
+  IFS=',' read -ra DEFAULT_DNS_ADDR <<< "$DEFAULT_DNS_CSV"
+  if [ -n "$DEFAULT_DNS_NAME_CSV" ]; then
+    IFS=',' read -ra DEFAULT_DNS_NAME <<< "$DEFAULT_DNS_NAME_CSV"
+  else
+    DEFAULT_DNS_NAME=()
+    for _a in "${DEFAULT_DNS_ADDR[@]}"; do DEFAULT_DNS_NAME+=("自定义DNS(${_a})"); done
+  fi
+else
+  DEFAULT_DNS_ADDR=(
+    "240e:52:4800::8888"
+    "240e:52:4000::8888"
+    "222.172.200.68"
+    "61.166.150.123"
+  )
+  DEFAULT_DNS_NAME=(
+    "云南电信IPv6-DNS-1"
+    "云南电信IPv6-DNS-2"
+    "云南电信IPv4-DNS-1"
+    "云南电信IPv4-DNS-2"
+  )
+fi
 
 # 阿里云公共DNS（官方地址）
 ALI_DNS_ADDR=(

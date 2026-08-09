@@ -19,6 +19,13 @@ PRESET="${1:-yunnan}"
 VERSION="${2:-lite}"
 IDX="${3:--1}"
 
+# 自定义预设优先（环境变量 PRESET_DNS_CSV，逗号分隔）
+if [ -n "$PRESET_DNS_CSV" ]; then
+  IFS=',' read -ra DNS_ADDR <<< "$PRESET_DNS_CSV"
+  DNS_NAME=()
+  for _a in "${DNS_ADDR[@]}"; do DNS_NAME+=("自定义DNS(${_a})"); done
+  LABEL="自定义（${#DNS_ADDR[@]}个）"
+else
 # 解析预设
 case $PRESET in
   yunnan|yn|1)
@@ -43,10 +50,11 @@ case $PRESET in
     ;;
   *)
     echo "❌ 未知预设: $PRESET"
-    echo "可选: yunnan(1) / ali(2) / tencent(3) / all(4)"
+    echo "可选: yunnan(1) / ali(2) / tencent(3) / all(4)，或用环境变量 PRESET_DNS_CSV 自定义"
     exit 1
     ;;
 esac
+fi
 
 if [ "$VERSION" != "lite" ] && [ "$VERSION" != "full" ]; then
   echo "❌ 未知版本: $VERSION (可选: lite / full)"

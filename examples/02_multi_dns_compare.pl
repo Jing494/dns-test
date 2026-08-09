@@ -13,6 +13,11 @@ if (@ARGV) {
     foreach my $addr (@ARGV) {
         push @DNS_SERVERS, { name => "自定义DNS", address => $addr };
     }
+} elsif ($ENV{DNS_LIST}) {
+    # 环境变量 DNS_LIST 逗号分隔
+    foreach my $addr (split(/,/, $ENV{DNS_LIST})) {
+        push @DNS_SERVERS, { name => "自定义DNS", address => $addr };
+    }
 } else {
     @DNS_SERVERS = (
         { name => "云南电信DNS 1", address => "222.172.200.68" },

@@ -19,13 +19,19 @@ if (@ARGV) {
     @router_dns_list = ("192.168.1.1", "192.168.2.1");
 }
 
-# 省级DNS对比基准（云南电信，与 core.sh 默认保持一致）
-my @province_dns = (
-    "61.166.150.123",
-    "222.172.200.68",
-    "240e:52:4800::8888",
-    "240e:52:4000::8888",
-);
+# 省级DNS对比基准（默认云南电信，可用环境变量 PROVINCE_DNS 覆盖，逗号分隔）
+my @province_dns;
+if ($ENV{PROVINCE_DNS}) {
+    @province_dns = split(/,/, $ENV{PROVINCE_DNS});
+    print "自定义省级基准: $ENV{PROVINCE_DNS}\n";
+} else {
+    @province_dns = (
+        "61.166.150.123",
+        "222.172.200.68",
+        "240e:52:4800::8888",
+        "240e:52:4000::8888",
+    );
+}
 
 # 测试域名（VoWiFi + 常用网站）
 my @domains = (
@@ -45,6 +51,7 @@ my %baseline;   # domain => [ip1, ip2, ...]
 print "--- 省级基准（云南电信）解析结果 ---\n";
 foreach my $domain (@domains) {
     my %seen;
+    $baseline{$domain} = [];  # 初始化，防止自定义基准全空时解引用报错
     foreach my $dns (@province_dns) {
         my $result = query_a($dns, $domain);
         foreach my $ip (split(/,/, $result)) {
@@ -65,7 +72,7 @@ foreach my $router_dns (@router_dns_list) {
     print "-" x 70 . "\n";
     foreach my $domain (@domains) {
         my $result = query_a($router_dns, $domain);
-        my $base = join(" ", @{$baseline{$domain}});
+        my $base = @{$baseline{$domain}} ? join(" ", @{$baseline{$domain}}) : "";
         if (!$result) {
             printf "  ❌ %-44s -> [无响应/超时]\n", $domain;
             next;

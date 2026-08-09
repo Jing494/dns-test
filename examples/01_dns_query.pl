@@ -8,7 +8,7 @@ use warnings;
 use Socket qw(:DEFAULT IPPROTO_UDP IPPROTO_TCP);
 
 # 配置
-my $DNS_SERVER = $ARGV[0] || "222.172.200.68";  # 默认云南电信DNS，支持传入自定义（v4/v6均可）
+my $DNS_SERVER = $ARGV[0] || $ENV{DNS_SERVER} || "222.172.200.68";  # 默认云南电信DNS，支持传参/环境变量DNS_SERVER（v4/v6均可）
 my @DOMAINS = ("www.baidu.com", "www.qq.com", "www.taobao.com");
 
 # IPv6地址转换函数 

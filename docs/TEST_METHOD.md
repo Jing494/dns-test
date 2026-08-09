@@ -247,4 +247,14 @@ perl /workspace/dns-test/tools/network/01_port_test.pl 192.0.2.1 4500 udp
 - 基础测试：`bash full.sh <DNS1> [DNS2] ... [索引]`
 - 专项测试：`perl tools/xxx.pl <DNS1> [DNS2] ...`
 
+**环境变量自定义（自己用最方便，不用改源码）：**
+
+| 环境变量 | 作用 | 示例 |
+|---------|------|------|
+| `DEFAULT_DNS_CSV` | 覆盖基础测试默认DNS组（逗号分隔） | `DEFAULT_DNS_CSV="219.141.136.10,219.141.140.10" bash lite.sh` |
+| `DEFAULT_DNS_NAME_CSV` | 覆盖默认DNS组显示名（可选） | `DEFAULT_DNS_NAME_CSV="北京电信1,北京电信2" bash lite.sh` |
+| `PROVINCE_DNS` | 覆盖路由器测试对比基准 | `PROVINCE_DNS="223.5.5.5" perl tools/vowifi/03_test_router_dns.pl 192.168.1.1` |
+| `PRESET_DNS_CSV` | dns-preset 自定义预设组 | `PRESET_DNS_CSV="1.2.4.8,8.8.8.8" bash dns-preset.sh custom lite 0` |
+| `DNS_SERVER` / `DNS_LIST` | examples 默认 DNS | `DNS_SERVER="8.8.8.8" perl examples/01_dns_query.pl` |
+
 如需调整默认测试目标（域名列表、稳定性轮次等），编辑 `lib/core.sh` 中的公共变量即可。

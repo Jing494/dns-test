@@ -101,7 +101,8 @@ bash /workspace/dns-test/dns-test.sh
 | 三家全对比 | `bash dns-preset.sh all lite`（11 个约 2 分钟） |
 | VoWiFi 域名全解析 | `perl tools/vowifi/01_resolve_vowifi.pl 222.172.200.68` |
 | VoWiFi 多 DNS 交叉验证 | `perl tools/vowifi/02_vowifi_verify.pl 222.172.200.68 223.5.5.5` |
-| 路由器是否转发到省级 DNS | `perl tools/vowifi/03_test_router_dns.pl 192.168.1.1` |
+| 路由器是否转发到省级 DNS | `perl tools/vowifi/03_test_router_dns.pl 192.168.1.1`（可用 `PROVINCE_DNS="223.5.5.5"` 换对比基准） |
+| 自定义默认 DNS 组 | `DEFAULT_DNS_CSV="219.141.136.10,219.141.140.10" bash lite.sh` |
 | 端口连通性 | `perl tools/network/01_port_test.pl 192.0.2.1 4500 udp` |
 | DNS64 检测 | `perl examples/03_dns64_check.pl` |
 | 反向解析（v4/v6） | `perl examples/04_reverse_dns.pl 222.172.200.68` |
