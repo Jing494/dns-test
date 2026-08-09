@@ -1,0 +1,127 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Socket qw(:DEFAULT IPPROTO_UDP IPPROTO_TCP);
+use POSIX qw(errno_h);
+use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
+
+my $TIMEOUT = 5;
+
+# 测试目标
+my @targets;
+if (@ARGV) {
+    # 传入参数格式：IP 端口 协议(tcp/udp)，必须是3的倍数
+    if (@ARGV % 3 != 0) {
+        print "警告: 参数个数 ${\scalar @ARGV} 不是3的倍数（应为 IP 端口 协议 的整数倍），多余参数将被忽略\n";
+    }
+    for (my $i=0; $i+2 < @ARGV; $i+=3) {
+        push @targets, {
+            ip => $ARGV[$i],
+            port => $ARGV[$i+1],
+            proto => $ARGV[$i+2] || "udp",
+            name => "自定义测试 $ARGV[$i]:$ARGV[$i+1]/$ARGV[$i+2]"
+        };
+    }
+} else {
+    @targets = (
+        { ip => "192.0.2.1", port => 4500, proto => "udp", name => "ePDG .253 UDP 4500" },
+        { ip => "192.0.2.1", port => 500, proto => "udp", name => "ePDG .253 UDP 500" },
+        { ip => "192.0.2.2", port => 4500, proto => "udp", name => "ePDG .125 UDP 4500" },
+        { ip => "192.0.2.2", port => 500, proto => "udp", name => "ePDG .125 UDP 500" },
+        { ip => "192.0.2.3", port => 80, proto => "tcp", name => "vowifi .85 TCP 80" },
+        { ip => "192.0.2.4", port => 80, proto => "tcp", name => "vowifi .36 TCP 80" },
+    );
+}
+
+print "=" x 70 . "\n";
+print "ePDG服务器端口连通性测试\n";
+print "=" x 70 . "\n\n";
+
+foreach my $t (@targets) {
+    printf "测试: %-30s %s://%s:%d\n", $t->{name}, $t->{proto}, $t->{ip}, $t->{port};
+    
+    my $addr = inet_aton($t->{ip});
+    if (!defined $addr) {
+        print "  [错误] 地址格式无效\n\n";
+        next;
+    }
+    
+    my $dest_addr = sockaddr_in($t->{port}, $addr);
+    
+    my $sock;
+    if ($t->{proto} eq "udp") {
+        # UDP测试
+        socket($sock, AF_INET, SOCK_DGRAM, IPPROTO_UDP) or do {
+            print "  [错误] 无法创建socket: $!\n\n";
+            next;
+        };
+        
+        # 设置接收超时，避免UDP无响应时永久阻塞
+        setsockopt($sock, SOL_SOCKET, SO_RCVTIMEO, pack("L!L!", $TIMEOUT, 0));
+        
+        # 发送一个空的UDP包
+        my $sent = send($sock, "", 0, $dest_addr);
+        
+        if (!$sent) {
+            print "  UDP: ❌ 发送失败 - $!\n\n";
+            close($sock);
+            next;
+        }
+        
+        # 等待响应
+        my $response;
+        my $from = recv($sock, $response, 512, 0);
+        
+        if ($from) {
+            print "  UDP: ✅ 收到响应 (" . length($response) . " bytes)\n";
+        } else {
+            print "  UDP: ⚠️  无响应/超时\n";
+            print "        （空UDP包探测：多数UDP服务对空包不回包，无法区分开放/过滤）\n";
+            print "        （如需确认，请用真实协议流量测试，如IKE/IPsec协商）\n";
+        }
+    } else {
+        # TCP测试（非阻塞connect，避免黑洞IP导致长时间卡死）
+        socket($sock, AF_INET, SOCK_STREAM, IPPROTO_TCP) or do {
+            print "  [错误] 无法创建socket: $!\n\n";
+            next;
+        };
+        
+        # 设置为非阻塞模式，connect立即返回，用select等待结果
+        my $flags = fcntl($sock, F_GETFL, 0);
+        fcntl($sock, F_SETFL, $flags | O_NONBLOCK);
+        
+        my $result = connect($sock, $dest_addr);
+        
+        if ($result) {
+            print "  TCP: ✅ 连接成功（端口开放）\n";
+        } else {
+            if ($! == EINPROGRESS || $! == EWOULDBLOCK) {
+                # 等待连接完成
+                my $rin = "";
+                vec($rin, fileno($sock), 1) = 1;
+                my $n = select(my $rout = $rin, undef, undef, $TIMEOUT);
+                if ($n > 0) {
+                    my $err = getsockopt($sock, SOL_SOCKET, SO_ERROR);
+                    if (defined $err && unpack("I", $err) == 0) {
+                        print "  TCP: ✅ 连接成功（端口开放）\n";
+                    } else {
+                        print "  TCP: ❌ 连接失败（端口关闭或过滤）\n";
+                    }
+                } else {
+                    print "  TCP: ❌ 连接超时（端口可能被过滤）\n";
+                }
+            } elsif ($! == ECONNREFUSED) {
+                print "  TCP: ❌ 连接被拒绝（端口关闭）\n";
+            } else {
+                print "  TCP: ❌ 连接失败 - $!\n";
+            }
+        }
+    }
+    
+    close($sock);
+    print "\n";
+}
+
+print "=" x 70 . "\n";
+print "测试完成\n";
+print "=" x 70 . "\n";
