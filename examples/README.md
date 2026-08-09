@@ -1,92 +1,101 @@
-# 示例脚本说明
+# 📦 示例脚本说明（examples/）
 
-> 所有脚本均经过测试，可直接运行
+> 通用示例脚本，演示 DNS 查询的各种玩法。
+> **所有脚本均支持命令行传自定义 DNS 参数**（v4/v6 均可），不传用默认值。
+> 更新：2026-08-09
 
 ---
 
-## 快速运行
+## 🚀 快速运行
 
 ```bash
-# 示例1: 基础DNS查询
-perl /workspace/scripts/examples/example_dns_query.pl
+cd /workspace/dns-test
 
-# 示例2: 多DNS对比
-perl /workspace/scripts/examples/example_multi_dns.pl
+# 示例1: 基础DNS查询（默认云南电信DNS）
+perl examples/01_dns_query.pl
 
-# 示例3: DNS64检测
-perl /workspace/scripts/examples/example_dns64_check.pl
+# 示例2: 多DNS对比（默认云南电信+114+阿里混合）
+perl examples/02_multi_dns_compare.pl
 
-# 示例4: 反向DNS解析
-perl /workspace/scripts/examples/example_reverse_dns.pl
+# 示例3: DNS64检测（默认Google/Cloudflare DNS64 + 云南电信对照）
+perl examples/03_dns64_check.pl
+
+# 示例4: 反向DNS解析（默认云南电信DNS）
+perl examples/04_reverse_dns.pl
 ```
 
 ---
 
-## Shell 脚本：云南电信 DNS 地毯式测试
+## 🎯 自定义参数用法（重点）
 
-```bash
-# 精简版（9 维度 66 项，约 3-5 分钟）
-bash /workspace/scripts/dns_test/yunnan_telecom_dns_benchmark_lite.sh
+| 脚本 | 参数 | 示例 | 默认值 |
+|------|------|------|--------|
+| `01_dns_query.pl` | `[DNS地址]` | `perl examples/01_dns_query.pl 8.8.8.8` | `222.172.200.68`（云南电信v4） |
+| `02_multi_dns_compare.pl` | `[DNS1] [DNS2] ...` | `perl examples/02_multi_dns_compare.pl 8.8.8.8 114.114.114.114` | 云南电信×2 + 114 + 阿里 + 云南v6 |
+| `03_dns64_check.pl` | `[DNS1] [DNS2] ...` | `perl examples/03_dns64_check.pl 2001:4860:4860::6464` | Google/Cloudflare DNS64 + 云南电信对照 |
+| `04_reverse_dns.pl` | `[DNS地址]` | `perl examples/04_reverse_dns.pl 114.114.114.114` | `222.172.200.68`（云南电信v4） |
 
-# 完整版（15 维度 79 项，约 8-10 分钟）
-bash /workspace/scripts/dns_test/yunnan_telecom_dns_benchmark_full.sh
-```
-
-**使用方式**：先询问用户选择版本
-
-```
-请选择测试版本：
-1. 精简版（9 项基础测试，约 3-5 分钟）
-2. 完整版（15 项全面测试，约 8-10 分钟）
-```
-
-功能对比：
-- 精简版: A/AAAA记录、3GPP域名、记录类型、稳定性、异常测试、连通性、一致性、运营商域名
-- 完整版: 精简版 + DNSSEC、ECS、PTR、TTL分析、劫持检测、递归查询
+> 💡 **v4/v6 任意混传**：传 `8.8.8.8`、`240e:52:4800::8888`、混合都可以，脚本自动识别双栈。
 
 ---
 
-## 脚本详情
+## 📖 脚本详情
 
-### example_dns_query.pl
-- **功能**: 查询单个域名的A记录和AAAA记录
-- **配置**: 修改 `$DNS_SERVER` 和 `@DOMAINS`
-- **输出**: 每个域名的A记录和AAAA记录列表
+### 01_dns_query.pl — 基础DNS查询
+- **功能**: 查询单个域名的 A 记录和 AAAA 记录
+- **默认域名**: www.baidu.com / www.qq.com / www.taobao.com
+- **用法**: `perl examples/01_dns_query.pl [DNS地址]`
+- **输出**: 每个域名的 A 记录 + AAAA 记录（IPv6 地址）
 
-### example_multi_dns.pl
-- **功能**: 同时查询多个DNS服务器，对比解析结果
-- **配置**: 修改 `@DNS_SERVERS` 和 `@DOMAINS`
-- **输出**: 各DNS解析结果 + 一致性检查报告
+### 02_multi_dns_compare.pl — 多DNS对比
+- **功能**: 同时查询多个 DNS 服务器，对比解析结果 + 一致性检查
+- **默认域名**: www.baidu.com / www.qq.com / vowifi.189.cn
+- **用法**: `perl examples/02_multi_dns_compare.pl [DNS1] [DNS2] ...`
+- **输出**: 各 DNS 解析结果 + ✅/⚠️ 一致性报告
 
-### example_dns64_check.pl
-- **功能**: 检测DNS服务器是否支持DNS64（合成AAAA记录）
-- **配置**: 修改 `@DNS_SERVERS` 和 `@DOMAINS`
-- **输出**: DNS64合成记录检测 + 嵌入IPv4提取
+### 03_dns64_check.pl — DNS64检测
+- **功能**: 检测 DNS 是否支持 DNS64（合成 AAAA 记录，前缀 64:ff9b::）
+- **默认域名**: v4.ipv6test.app / www.baidu.com / www.qq.com
+- **用法**: `perl examples/03_dns64_check.pl [DNS1] [DNS2] ...`
+- **输出**: 合成地址检测 + 嵌入 IPv4 提取（如 `64:ff9b:0:0:0:0:12f4:3c7c → 18.244.60.124`）
 
-### example_reverse_dns.pl
-- **功能**: 反向DNS解析（IP地址 → 域名）
-- **配置**: 修改 `$DNS_SERVER` 和 `@IPS`
-- **输出**: IP地址对应的PTR记录（如有）
+### 04_reverse_dns.pl — 反向DNS解析（PTR）
+- **功能**: IP 地址 → 域名（支持 IPv4 in-addr.arpa 和 IPv6 ip6.arpa）
+- **默认查询IP**: 8.8.8.8 / 114.114.114.114 / 223.5.5.5 / 192.0.2.1 / Google&阿里 IPv6
+- **用法**: `perl examples/04_reverse_dns.pl [DNS地址]`
+- **输出**: PTR 记录（如 `8.8.8.8 → dns.google`）
 
 ---
 
-## 自定义配置
+## ⚙️ 自定义默认配置（想改默认值时）
 
-每个脚本顶部都有配置区域，可以修改：
+每个脚本顶部有配置区，修改即可（不改也行，直接传参更简单）：
 
 ```perl
-# DNS服务器地址
-my $DNS_SERVER = "222.172.200.68";
+# 默认DNS服务器（01/04）
+my $DNS_SERVER = $ARGV[0] || "222.172.200.68";
 
-# 要测试的域名列表
-my @DOMAINS = ("www.baidu.com", "www.qq.com");
+# 默认DNS列表（02/03）
+@DNS_SERVERS = ( { name => "云南电信DNS", address => "222.172.200.68" }, ... );
+
+# 默认测试域名/IP（01/02/03/04）
+my @DOMAINS = ("www.baidu.com", ...);
 ```
 
 ---
 
-## 注意事项
+## ⚡ 效率说明
 
-1. **忽略 "uninitialized value" 警告** — 这是沙箱环境的正常现象
-2. **超时设置默认为5秒** — 可在 `setsockopt` 中调整
-3. **IPv4/IPv6 DNS地址** — 自动识别双栈，无需额外配置
-4. **Shell脚本** — 需要 bash 环境，测试需约 5-10 分钟
+- 每个域名查询超时 **2~3 秒**（01 为 2 秒，02/03/04 为 3 秒），无响应自动跳过
+- 单次运行通常 **1~5 秒** 完成（取决于 DNS 响应速度）
+- 测试均使用 UDP 53 标准 DNS 查询，无攻击性
+
+---
+
+## 📝 注意事项
+
+1. **v4/v6 双栈**：DNS 地址自动识别，IPv4/IPv6 混传均可
+2. **`uninitialized value` 警告**：已通过 `IPPROTO_UDP` 硬编码修复，正常环境不再出现
+3. **沙箱限制**：沙箱中 UDP 出站（非 53）受限，DNS 查询（53 端口）不受影响
+4. **想测运营商/批量场景**：用 `bash dns-preset.sh`（预设快捷）或 `bash full.sh/lite.sh`（完整测试）
+5. **完整方法论**：见 [docs/TEST_METHOD.md](../docs/TEST_METHOD.md)，AI 操作见 [docs/AI_GUIDE.md](../docs/AI_GUIDE.md)
