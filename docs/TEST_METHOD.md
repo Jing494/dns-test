@@ -43,7 +43,7 @@
 |------|------|---------|---------|
 | 1 | A 记录 | 25 个域名（15国内+10国际） | 100% 成功 |
 | 2 | AAAA 记录 | 8 个域名 | 100% 有记录 |
-| 3 | 3GPP/VoWiFi | 2 个域名（epdg.mnc011 / vowifi.189.cn） | **信息项，不计入评分** |
+| 3 | 3GPP/VoWiFi | 1 个域名（epdg.mnc011，运营商ePDG全量检测见专项carrier_epdg.pl） | **信息项，不计入评分** |
 | 4 | 记录类型 | MX/NS/TXT/CNAME/SOA | 全部支持 |
 | 5 | 稳定性 | 20 次连续查询（可用环境变量 `STAB_ROUNDS` 调整） | 100% 成功 |
 | 6 | 异常测试 | NXDOMAIN | 正确返回 |
@@ -108,7 +108,7 @@ VoWiFi 域名改为**信息项，不参与综合评分**：
 
 ### 2026-08-09 云南电信 DNS 可用性验证
 
-4 个云南电信 DNS 全部可达，v4/v6 均正常解析（www.baidu.com / www.qq.com / vowifi.189.cn）。
+4 个云南电信 DNS 全部可达，v4/v6 均正常解析（www.baidu.com / www.qq.com / epdg.mnc011）。
 
 ### 2026-08-09 云南电信 lite 版实测（[7b]前，63 项口径）
 
@@ -140,7 +140,7 @@ VoWiFi 域名改为**信息项，不参与综合评分**：
 | `192.168.1.1` | ✅ 5/5 域名与云南电信省级DNS一致 → **确认转发到省级DNS** |
 | `192.168.2.1` | ✅ 5/5 域名与云南电信省级DNS一致 → **确认转发到省级DNS** |
 
-> 测试域名：vowifi.189.cn / epdg.epc.mnc011 / www.baidu.com / www.qq.com / www.taobao.com
+> 测试域名：epdg.epc.mnc011 / www.baidu.com / www.qq.com / www.taobao.com
 
 ### 2026-08-08 历史记录（修复前）
 

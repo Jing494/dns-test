@@ -73,10 +73,11 @@ DOMAINS_GLOBAL=(
   "www.reddit.com"
 )
 
-# 3GPP/VoWiFi域名
+# 3GPP/VoWiFi域名（信息项：电信mnc011实测部署；移动mnc000/联通mnc001代表，全量检测见carrier_epdg.pl）
 DOMAINS_3GPP=(
   "epdg.epc.mnc011.mcc460.pub.3gppnetwork.org"
-  "vowifi.189.cn"
+  "epdg.epc.mnc000.mcc460.pub.3gppnetwork.org"
+  "epdg.epc.mnc001.mcc460.pub.3gppnetwork.org"
 )
 
 # CNAME测试域名

@@ -41,14 +41,6 @@ my @domains = (
     "epdg.epc.mnc013.mcc460.pub.3gppnetwork.org",
     "epdg.epc.mnc014.mcc460.pub.3gppnetwork.org",
     "epdg.epc.mnc015.mcc460.pub.3gppnetwork.org",
-    "epdg.epc.chinatelecom.cn",
-    "epdg.epc.chn",
-    "epdg.epc.telecom.cn",
-    "vowifi.chinatelecom.cn",
-    "vowifi.telecom.cn",
-    "vowifi.189.cn",
-    "epdg.epc.mcc460.mnc000.pub.3gppnetwork.org",
-    "epdg.epc.mcc460.mnc001.pub.3gppnetwork.org",
 );
 
 print "=" x 80 . "\n";
@@ -109,11 +101,12 @@ foreach my $dns (@dns_servers) {
             next;
         }
         
-        # 解析响应 - A记录
+        # 解析响应 - A记录（过滤127.0.0.1黑洞=未部署）
         my @ips = parse_dns_response($response, 1);
+        my @valid = grep { $_ ne "127.0.0.1" } @ips;
         
-        if (@ips) {
-            printf "  %-55s -> %s\n", $domain, join(", ", @ips);
+        if (@valid) {
+            printf "  %-55s -> %s\n", $domain, join(", ", @valid);
             $success_a++;
         }
     }
@@ -132,9 +125,10 @@ foreach my $dns (@dns_servers) {
         next if (!$from);
         
         my @ips = parse_dns_response($response, 28);
+        my @valid = grep { $_ ne "::1" && $_ ne "0:0:0:0:0:0:0:1" } @ips;  # 过滤IPv6黑洞
         
-        if (@ips) {
-            printf "  %-55s -> %s (AAAA)\n", $domain, join(", ", @ips);
+        if (@valid) {
+            printf "  %-55s -> %s (AAAA)\n", $domain, join(", ", @valid);
             $success_aaaa++;
         }
     }

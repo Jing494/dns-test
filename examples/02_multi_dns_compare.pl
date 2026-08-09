@@ -29,7 +29,7 @@ if (@ARGV) {
 }
 
 # 要测试的域名
-my @DOMAINS = ("www.baidu.com", "www.qq.com", "vowifi.189.cn");
+my @DOMAINS = ("www.baidu.com", "www.qq.com", "epdg.epc.mnc011.mcc460.pub.3gppnetwork.org");
 
 # IPv6地址转换 
 

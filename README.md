@@ -33,7 +33,8 @@ dns-test/
 │   ├── vowifi/                 # VoWiFi专项测试
 │   │   ├── 01_resolve_vowifi.pl    # VoWiFi全域名解析
 │   │   ├── 02_vowifi_verify.pl     # VoWiFi多DNS交叉验证
-│   │   └── 03_test_router_dns.pl   # 路由器DNS转发测试
+│   │   ├── 03_test_router_dns.pl   # 路由器DNS转发测试
+│   │   └── carrier_epdg.pl         # 运营商ePDG部署检测（电信/移动/联通/广电）
 │   └── network/                # 通用网络测试
 │       └── 01_port_test.pl         # 端口连通性测试
 └── results/                    # 测试结果存储目录（可选）
@@ -141,6 +142,7 @@ perl examples/04_reverse_dns.pl 8.8.8.8                     # 反向解析
 | VoWiFi交叉验证 | 对比多个DNS的VoWiFi解析结果，检查一致性 | 6个主流公共DNS |
 | 路由器DNS转发测试 | 验证路由器DNS是否将请求转发到省级DNS（云南电信） | 192.168.1.1/192.168.2.1 |
 | 端口连通性测试 | 测试ePDG/VoWiFi相关端口的TCP/UDP连通性 | ePDG服务器4500/500端口 |
+| 运营商ePDG部署检测 | 检测电信/移动/联通/广电的ePDG域名解析，判断各省份VoWiFi部署 | 云南电信DNS（可选家宽路由器） |
 | 通用示例 | 基础查询、多DNS对比、DNS64检测、反向解析 | 云南电信DNS |
 
 ---
@@ -179,6 +181,7 @@ perl examples/04_reverse_dns.pl 8.8.8.8                     # 反向解析
 ---
 
 ## 🔄 更新记录
+- 2026-08-09（第十六轮）：新增carrier_epdg.pl运营商ePDG部署检测（电信/移动/联通/广电，交互+传参双模式，支持省级DNS/家宽路由器，附免责声明）；删除vowifi.189.cn（01/02/03同步）；实测国内仅电信mnc011部署ePDG（192.0.2.x），移动/联通/广电无记录；专项菜单新增第6项
 - 2026-08-09（第十五轮）：自定义性增强——DEFAULT_DNS_CSV覆盖默认DNS组、PROVINCE_DNS覆盖路由器对比基准、PRESET_DNS_CSV自定义预设、examples支持DNS_SERVER/DNS_LIST环境变量；修复03自定义基准全空时数组解引用报错
 - 2026-08-09（第十四轮）：新增[7b]IPv6实际连通性测试（ping6，平台适配ping6/ping -6，无IPv6环境自动跳过不计分）；实测本机IPv6到百度/QQ/B站/腾讯全部通畅（30~76ms）；lite评分项63→64，full 77→78；云南电信完整版复测96~97%稳定
 - 2026-08-09（第十三轮）：AI_GUIDE新增"脚本排障与异常处理"（排查顺序/报错速查）+"环境差异与评分波动"（假失败清单/波动阈值/对比方法论）；云南电信完整版+路由器转发结果归档TEST_METHOD

@@ -35,7 +35,6 @@ if ($ENV{PROVINCE_DNS}) {
 
 # 测试域名（VoWiFi + 常用网站）
 my @domains = (
-    "vowifi.189.cn",
     "epdg.epc.mnc011.mcc460.pub.3gppnetwork.org",
     "www.baidu.com",
     "www.qq.com",

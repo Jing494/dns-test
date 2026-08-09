@@ -58,7 +58,7 @@ perl examples/04_reverse_dns.pl
 
 ### 02_multi_dns_compare.pl — 多DNS对比
 - **功能**: 同时查询多个 DNS 服务器，对比解析结果 + 一致性检查
-- **默认域名**: www.baidu.com / www.qq.com / vowifi.189.cn
+- **默认域名**: epdg.epc.mnc011.mcc460.pub.3gppnetwork.org
 - **用法**: `perl examples/02_multi_dns_compare.pl [DNS1] [DNS2] ...`
 - **输出**: 各 DNS 解析结果 + ✅/⚠️ 一致性报告
 
@@ -81,8 +81,8 @@ perl examples/04_reverse_dns.pl
 每个脚本顶部有配置区，修改即可（不改也行，直接传参更简单）：
 
 ```perl
-# 默认DNS服务器（01/04）
-my $DNS_SERVER = $ARGV[0] || "222.172.200.68";
+# 默认DNS服务器（01/04）——命令行参数 > 环境变量DNS_SERVER > 默认值
+my $DNS_SERVER = $ARGV[0] || $ENV{DNS_SERVER} || "222.172.200.68";
 
 # 默认DNS列表（02/03）
 @DNS_SERVERS = ( { name => "云南电信DNS", address => "222.172.200.68" }, ... );

@@ -128,7 +128,8 @@ if [ -t 0 ]; then
       echo "3. 路由器DNS转发测试（测试路由器DNS是否转发到指定DNS）"
       echo "4. 端口连通性测试（测试ePDG/VoWiFi相关端口是否开放）"
       echo "5. 通用示例脚本（基础查询/多DNS对比/DNS64检测/反向解析）"
-      read -t 30 -p "请输入选项(1-5): " professional_test
+      echo "6. 运营商ePDG部署检测（电信/移动/联通/广电，判断各省份VoWiFi部署情况）"
+      read -t 30 -p "请输入选项(1-6): " professional_test
       echo ""
       case $professional_test in
         1)
@@ -214,6 +215,11 @@ if [ -t 0 ]; then
               if [ $# -ge 1 ]; then perl examples/04_reverse_dns.pl "${DNS_LIST[@]}"; else perl examples/04_reverse_dns.pl; fi
               ;;
           esac
+          ;;
+        6)
+          echo "开始运营商ePDG部署检测..."
+          echo "提示: 直接运行也可传参: perl tools/vowifi/carrier_epdg.pl [ct/cmcc/cucc/cbn/all] [DNS或router]"
+          perl tools/vowifi/carrier_epdg.pl
           ;;
         *)
           echo "无效选项，返回主菜单..."

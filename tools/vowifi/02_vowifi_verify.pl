@@ -25,13 +25,11 @@ if (@ARGV) {
 
 # VoWiFi相关域名
 my @domains = (
-    "vowifi.189.cn",
     "epdg.epc.mnc011.mcc460.pub.3gppnetwork.org",
 );
 
 # 之前解析出的IP（用于对比）
 my %previous_ips = (
-    "vowifi.189.cn" => ["192.0.2.3", "192.0.2.4"],
     "epdg.epc.mnc011.mcc460.pub.3gppnetwork.org" => ["192.0.2.1", "192.0.2.2"],
 );
 

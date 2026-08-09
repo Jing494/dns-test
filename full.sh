@@ -26,6 +26,11 @@ if [ $# -ge 1 ]; then
     # 去掉最后一个参数（索引）
     DNS_ADDR=("${@:1:$#-1}")
     [ ${#DNS_ADDR[@]} -eq 0 ] && DNS_ADDR=("${DEFAULT_DNS_ADDR[@]}")
+    # 索引越界校验：超出范围则忽略索引，改为测试全部
+    if [ "$IDX" -ge "${#DNS_ADDR[@]}" ]; then
+      echo "⚠️  索引 $IDX 超出范围（共 ${#DNS_ADDR[@]} 个DNS），已忽略索引"
+      IDX=-1
+    fi
   else
     DNS_ADDR=("$@")
     IDX=-1  # -1表示跑所有
