@@ -101,5 +101,6 @@ echo "  bash dns-test.sh               # 交互引导（选DNS组/版本/专项�
 echo "  bash lite.sh 223.5.5.5 0       # 快速测一个DNS"
 echo "  bash dns-preset.sh ali lite 0  # 预设测试（阿里/腾讯/云南电信）"
 echo "  bash full.sh 240e:52:4800::8888 0  # 完整版测试"
+echo "  bash compare.sh 223.5.5.5 119.29.29.29  # 多DNS横向对比"
 echo "  bash trends.sh --html --csv        # DNS趋势洞察（需先积累compare数据）"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

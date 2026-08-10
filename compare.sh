@@ -1,6 +1,7 @@
 #!/bin/bash
 # ============================================================================
-# 多DNS对比模式（v2：并行 + 延迟中位数 + 结构化JSON + HTML报告）
+# 多DNS对比模式（v3：并行 + 延迟中位数 + 结构化JSON + HTML报告）
+# 兼容性: bash 3.2+（无关联数组依赖，macOS 默认 bash 可直接运行）
 # 用法: bash compare.sh DNS1 [DNS2] ... [--html] [--no-save]
 #   例: bash compare.sh 223.5.5.5 119.29.29.29 222.172.200.68
 #       bash compare.sh 223.5.5.5 119.29.29.29 --html   # 生成 results/report.html
@@ -37,17 +38,19 @@ for a in "$@"; do
   esac
 done
 
-# ---------- 校验 + 去重 ----------
-declare -A SEEN
+# ---------- 校验 + 去重（普通数组线性查重，兼容bash 3.2） ----------
+SEEN_LIST=()
 UNIQ=()
 for d in "${DNS_ARGS[@]}"; do
   if ! valid_dns_addr "$d"; then
     echo "❌ 非法DNS地址: $d"; exit 1
   fi
-  if [ -n "${SEEN[$d]:-}" ]; then
+  dup=0
+  for s in "${SEEN_LIST[@]}"; do [ "$s" = "$d" ] && dup=1; done
+  if [ "$dup" = "1" ]; then
     echo "  ⚠️  重复DNS跳过: $d"
   else
-    SEEN[$d]=1; UNIQ+=("$d")
+    SEEN_LIST+=("$d"); UNIQ+=("$d")
   fi
 done
 DNS_ARGS=("${UNIQ[@]}")
@@ -56,15 +59,16 @@ if [ ${#DNS_ARGS[@]} -eq 0 ]; then
   exit 1
 fi
 
-print_header "多DNS对比测试 (v2) — lite精简版 ${LITE_ITEMS}项/DNS"
+print_header "多DNS对比测试 (v3) — lite精简版 ${LITE_ITEMS}项/DNS"
 echo "  对比DNS: ${DNS_ARGS[*]}"
 echo "  lite并发: ${COMPARE_MAX_CONCURRENCY:-3}（设1为串行最稳）"
 T0=$(date +%s)
 
 # ============================================================================
 # 1) 延迟探测：每DNS 3次dig（par_run并行），取中位数
+#    平行数组 DELAY_VAL[i] 对应 DNS_ARGS[i]
 # ============================================================================
-declare -A DELAY
+DELAY_VAL=()
 echo ""
 echo "  ━━━ [0] 延迟探测（每DNS 3次dig → 中位数） ━━━"
 PARR_CMDS=()
@@ -84,10 +88,10 @@ for d in "${DNS_ARGS[@]}"; do
   done
   if [ ${#vals[@]} -gt 0 ]; then
     sorted=$(printf '%s\n' "${vals[@]}" | sort -n)
-    DELAY[$d]=$(echo "$sorted" | sed -n "$(( (${#vals[@]} / 2) + 1 ))p")
-    printf "     ✅ %-42s 延迟中位 %sms (样本%d)\n" "$d" "${DELAY[$d]}" "${#vals[@]}"
+    DELAY_VAL+=("$(echo "$sorted" | sed -n "$(( (${#vals[@]} / 2) + 1 ))p")")
+    printf "     ✅ %-42s 延迟中位 %sms (样本%d)\n" "$d" "${DELAY_VAL[${#DELAY_VAL[@]}-1]}" "${#vals[@]}"
   else
-    DELAY[$d]=""
+    DELAY_VAL+=("")
     printf "     ❌ %-42s 不可达（3次dig均无响应）\n" "$d"
   fi
 done
@@ -95,8 +99,10 @@ rm -rf "$PARR_TMPDIR"
 
 # ============================================================================
 # 2) lite 测试（批次并发，上限 MAXC）
+#    平行数组 SCORE_VAL[i] / STAB_VAL[i] 对应 DNS_ARGS[i]
 # ============================================================================
-declare -A SCORE STAB
+SCORE_VAL=()
+STAB_VAL=()
 MAXC="${COMPARE_MAX_CONCURRENCY:-3}"
 [[ "$MAXC" =~ ^[1-9][0-9]*$ ]] || MAXC=3
 echo ""
@@ -105,19 +111,19 @@ TMPD=$(mktemp -d)
 trap 'rm -rf "$TMPD"' EXIT INT TERM
 
 IDX_MAP=()
-for d in "${DNS_ARGS[@]}"; do
-  if [ -z "${DELAY[$d]:-}" ]; then
-    SCORE[$d]="不可达"; STAB[$d]="-"
-    echo "     ⏭️  $d 不可达，跳过lite测试"
+for i in "${!DNS_ARGS[@]}"; do
+  if [ -z "${DELAY_VAL[$i]}" ]; then
+    SCORE_VAL[$i]="不可达"; STAB_VAL[$i]="-"
+    echo "     ⏭️  ${DNS_ARGS[$i]} 不可达，跳过lite测试"
     continue
   fi
-  echo "     ⏳ $d 测试中..."
-  IDX_MAP+=("$d")
+  echo "     ⏳ ${DNS_ARGS[$i]} 测试中..."
+  IDX_MAP+=("$i")
 done
 
 pids=(); n=0
-for d in "${IDX_MAP[@]}"; do
-  bash lite.sh "$d" 0 > "$TMPD/$n.out" 2>&1 &
+for i in "${IDX_MAP[@]}"; do
+  bash lite.sh "${DNS_ARGS[$i]}" 0 > "$TMPD/$n.out" 2>&1 &
   pids+=($!)
   n=$((n+1))
   if [ $((n % MAXC)) -eq 0 ]; then
@@ -127,15 +133,15 @@ for d in "${IDX_MAP[@]}"; do
 done
 for p in "${pids[@]}"; do wait "$p" 2>/dev/null; done
 
-i=0
-for d in "${IDX_MAP[@]}"; do
-  out=$(cat "$TMPD/$i.out")
-  SCORE[$d]=$(echo "$out" | grep -oE "综合评分: [0-9]+" | grep -oE "[0-9]+")
-  STAB[$d]=$(echo "$out" | grep -oE "稳定性: [0-9]+%" | grep -oE "[0-9]+")
-  [ -z "${SCORE[$d]}" ] && SCORE[$d]="不可达"
-  [ -z "${STAB[$d]}" ] && STAB[$d]="-"
-  printf "     ✅ %-42s 评分%s 稳定性%s%%\n" "$d" "${SCORE[$d]}%" "${STAB[$d]}"
-  i=$((i+1))
+n=0
+for i in "${IDX_MAP[@]}"; do
+  out=$(cat "$TMPD/$n.out")
+  SCORE_VAL[$i]=$(echo "$out" | grep -oE "综合评分: [0-9]+" | grep -oE "[0-9]+")
+  STAB_VAL[$i]=$(echo "$out" | grep -oE "稳定性: [0-9]+%" | grep -oE "[0-9]+")
+  [ -z "${SCORE_VAL[$i]}" ] && SCORE_VAL[$i]="不可达"
+  [ -z "${STAB_VAL[$i]}" ] && STAB_VAL[$i]="-"
+  printf "     ✅ %-42s 评分%s 稳定性%s%%\n" "${DNS_ARGS[$i]}" "${SCORE_VAL[$i]}%" "${STAB_VAL[$i]}"
+  n=$((n+1))
 done
 
 T1=$(date +%s)
@@ -148,23 +154,23 @@ echo ""
 echo "════ 对比结果（总耗时 ${COST}s） ════"
 printf "  %-3s %-42s %-9s %-10s %-8s\n" "#" "DNS" "评分" "延迟ms" "稳定性"
 rank=0
-for d in "${DNS_ARGS[@]}"; do
+for i in "${!DNS_ARGS[@]}"; do
   rank=$((rank+1))
-  sv="${SCORE[$d]}"; [ "$sv" != "不可达" ] && sv="${sv}%"
-  tv="${STAB[$d]}"; [ "$tv" != "-" ] && tv="${tv}%"
-  printf "  %-3d %-42s %-9s %-10s %-8s\n" "$rank" "$d" "$sv" "${DELAY[$d]:-—}" "$tv"
+  sv="${SCORE_VAL[$i]}"; [ "$sv" != "不可达" ] && sv="${sv}%"
+  tv="${STAB_VAL[$i]}"; [ "$tv" != "-" ] && tv="${tv}%"
+  printf "  %-3d %-42s %-9s %-10s %-8s\n" "$rank" "${DNS_ARGS[$i]}" "$sv" "${DELAY_VAL[$i]:-—}" "$tv"
 done
 
-BEST=""; BEST_SCORE=-1; BEST_DELAY=99999
-for d in "${DNS_ARGS[@]}"; do
-  [ "${SCORE[$d]}" = "不可达" ] && continue
-  s="${SCORE[$d]}"; [ -z "$s" ] && continue
-  dl="${DELAY[$d]:-99999}"
+BEST=""; BEST_IDX=-1; BEST_SCORE=-1; BEST_DELAY=99999
+for i in "${!DNS_ARGS[@]}"; do
+  [ "${SCORE_VAL[$i]}" = "不可达" ] && continue
+  s="${SCORE_VAL[$i]}"; [ -z "$s" ] && continue
+  dl="${DELAY_VAL[$i]:-99999}"
   if [ "$s" -gt "$BEST_SCORE" ] || { [ "$s" -eq "$BEST_SCORE" ] && [ "$dl" -lt "$BEST_DELAY" ]; }; then
-    BEST="$d"; BEST_SCORE=$s; BEST_DELAY=$dl
+    BEST="${DNS_ARGS[$i]}"; BEST_IDX=$i; BEST_SCORE=$s; BEST_DELAY=$dl
   fi
 done
-if [ -n "$BEST" ]; then
+if [ "$BEST_IDX" -ge 0 ]; then
   echo ""
   echo "  🏆 综合推荐: $BEST （评分${BEST_SCORE}% 延迟${BEST_DELAY}ms）"
 else
@@ -189,9 +195,9 @@ if [ "$SAVE_JSON" = "1" ]; then
     echo "  \"dns\": ["
     i=0
     for d in "${DNS_ARGS[@]}"; do
-      [ "${SCORE[$d]}" = "不可达" ] && reachable=false || reachable=true
+      [ "${SCORE_VAL[$i]}" = "不可达" ] && reachable=false || reachable=true
       comma=""; [ $i -lt $(( ${#DNS_ARGS[@]} - 1 )) ] && comma=","
-      echo "    {\"addr\": \"${d}\", \"score\": \"${SCORE[$d]}\", \"stab\": \"${STAB[$d]}\", \"delay_ms\": ${DELAY[$d]:-0}, \"reachable\": ${reachable}}${comma}"
+      echo "    {\"addr\": \"${d}\", \"score\": \"${SCORE_VAL[$i]}\", \"stab\": \"${STAB_VAL[$i]}\", \"delay_ms\": ${DELAY_VAL[$i]:-0}, \"reachable\": ${reachable}}${comma}"
       i=$((i+1))
     done
     echo "  ]"
@@ -233,7 +239,7 @@ if [ "$GEN_HTML" = "1" ]; then
     echo "<div class='wrap'>"
     echo "<div class='card'><h1>🌐 DNS 对比报告</h1>"
     echo "<div class='meta'>$(date '+%Y-%m-%d %H:%M:%S') ｜ lite精简版 ${LITE_ITEMS}项/DNS ｜ dns-test ${VERSION} ｜ 耗时${COST}s</div>"
-    if [ -n "$BEST" ]; then
+    if [ "$BEST_IDX" -ge 0 ]; then
       echo "<div class='rec'>🏆 综合推荐: <b>$BEST</b> — 评分${BEST_SCORE}% ｜ 延迟${BEST_DELAY}ms</div>"
     else
       echo "<div class='rec' style='background:#fef2f2;border-color:#fecaca;color:#991b1b'>💀 全部DNS不可达，请检查网络/加速器状态后重试</div>"
@@ -242,26 +248,26 @@ if [ "$GEN_HTML" = "1" ]; then
     # 汇总表
     echo "<div class='card'><h2>对比明细</h2>"
     echo "<table><tr><th>DNS</th><th>评分</th><th>延迟(ms)</th><th>稳定性</th><th>状态</th></tr>"
-    for d in "${DNS_ARGS[@]}"; do
-      sv="${SCORE[$d]}"; [ "$sv" != "不可达" ] && sv="${sv}%"
-      tv="${STAB[$d]}"; [ "$tv" != "-" ] && tv="${tv}%"
-      if [ "${SCORE[$d]}" = "不可达" ]; then
+    for i in "${!DNS_ARGS[@]}"; do
+      sv="${SCORE_VAL[$i]}"; [ "$sv" != "不可达" ] && sv="${sv}%"
+      tv="${STAB_VAL[$i]}"; [ "$tv" != "-" ] && tv="${tv}%"
+      if [ "${SCORE_VAL[$i]}" = "不可达" ]; then
         st="<span class='bad'>不可达</span>"
       else
         st="<span class='ok'>可达</span>"
       fi
-      echo "<tr><td>$d</td><td>$sv</td><td>${DELAY[$d]:-—}</td><td>$tv</td><td>$st</td></tr>"
+      echo "<tr><td>${DNS_ARGS[$i]}</td><td>$sv</td><td>${DELAY_VAL[$i]:-—}</td><td>$tv</td><td>$st</td></tr>"
     done
     echo "</table></div>"
     # 评分柱状
     echo "<div class='card'><h2>综合评分</h2>"
-    for d in "${DNS_ARGS[@]}"; do
-      s="${SCORE[$d]}"; [ "$s" = "不可达" ] && s=0
+    for i in "${!DNS_ARGS[@]}"; do
+      s="${SCORE_VAL[$i]}"; [ "$s" = "不可达" ] && s=0
       color="b-green"; [ "$s" -lt 80 ] && color="b-amber"; [ "$s" -lt 60 ] && color="b-red"
       echo "<div style='display:flex;align-items:center;margin:8px 0;flex-wrap:wrap'>"
-      echo "<span style='width:190px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>$d</span>"
+      echo "<span style='width:190px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>${DNS_ARGS[$i]}</span>"
       echo "<div class='bar ${color}' style='width:${s}%;max-width:420px'></div>"
-      sv="${SCORE[$d]}"; [ "$sv" != "不可达" ] && sv="${sv}%"
+      sv="${SCORE_VAL[$i]}"; [ "$sv" != "不可达" ] && sv="${sv}%"
       echo "<span style='margin-left:10px;font-size:13px;min-width:48px'>$sv</span>"
       echo "</div>"
     done
@@ -269,21 +275,21 @@ if [ "$GEN_HTML" = "1" ]; then
     # 延迟柱状（越低越好）
     echo "<div class='card'><h2>延迟 (ms) — 越低越好</h2>"
     maxd=1
-    for d in "${DNS_ARGS[@]}"; do
-      dl="${DELAY[$d]:-0}"
+    for i in "${!DNS_ARGS[@]}"; do
+      dl="${DELAY_VAL[$i]:-0}"
       [ "$dl" -gt "$maxd" ] 2>/dev/null && maxd="$dl"
     done
-    for d in "${DNS_ARGS[@]}"; do
-      dl="${DELAY[$d]:-0}"
+    for i in "${!DNS_ARGS[@]}"; do
+      dl="${DELAY_VAL[$i]:-0}"
       w=0; [ "$maxd" -gt 0 ] && w=$(( dl * 100 / maxd ))
       color="b-green"
       [ "$dl" -ge 100 ] && color="b-amber"
       [ "$dl" -ge 300 ] && color="b-red"
-      [ "${SCORE[$d]}" = "不可达" ] && color="b-red"
+      [ "${SCORE_VAL[$i]}" = "不可达" ] && color="b-red"
       echo "<div style='display:flex;align-items:center;margin:8px 0;flex-wrap:wrap'>"
-      echo "<span style='width:190px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>$d</span>"
+      echo "<span style='width:190px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>${DNS_ARGS[$i]}</span>"
       echo "<div class='bar ${color}' style='width:${w}%;max-width:420px'></div>"
-      echo "<span style='margin-left:10px;font-size:13px;min-width:48px'>${DELAY[$d]:-—}ms</span>"
+      echo "<span style='margin-left:10px;font-size:13px;min-width:48px'>${DELAY_VAL[$i]:-—}ms</span>"
       echo "</div>"
     done
     echo "<div class='meta'>颜色: 绿&lt;100ms ｜ 黄100~300ms ｜ 红≥300ms或不可达</div>"
@@ -299,8 +305,8 @@ fi
 echo ""
 echo "  💡 想看历史趋势？ → bash trends.sh --html   （数据已自动积累，评分/延迟随时间变化一目了然）"
 REACH=0
-for d in "${DNS_ARGS[@]}"; do
-  [ "${SCORE[$d]}" != "不可达" ] && REACH=1
+for i in "${!DNS_ARGS[@]}"; do
+  [ "${SCORE_VAL[$i]}" != "不可达" ] && REACH=1
 done
 [ "$REACH" = "0" ] && exit 2
 exit 0
