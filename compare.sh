@@ -296,6 +296,8 @@ if [ "$GEN_HTML" = "1" ]; then
 fi
 
 # ---------- 退出码 ----------
+echo ""
+echo "  💡 想看历史趋势？ → bash trends.sh --html   （数据已自动积累，评分/延迟随时间变化一目了然）"
 REACH=0
 for d in "${DNS_ARGS[@]}"; do
   [ "${SCORE[$d]}" != "不可达" ] && REACH=1

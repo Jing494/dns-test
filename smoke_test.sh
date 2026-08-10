@@ -90,6 +90,9 @@ COMPARE_RESULTS_DIR="$TMPR" TRENDS_DIR="$TMPR/out" timeout 10 bash trends.sh --h
 ls "$TMPR/out/report.html" "$TMPR/out/trends.csv" >/dev/null 2>&1 && check "trends产物" 0 || check "trends产物" 1
 rm -rf "$TMPR"
 
+echo "--- 21. compare 多DNS对比"
+timeout 60 bash compare.sh 223.5.5.5 119.29.29.29 2>&1 | grep -q "对比结果" && check "compare多DNS对比" 0 || check "compare多DNS对比" 1
+
 echo ""
 echo "════ 结果: $PASS 通过 / $FAIL 失败 ════"
 echo ""

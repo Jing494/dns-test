@@ -97,4 +97,7 @@ echo "║                       地毯式测试完成 ✓                       
 echo "╚════════════════════════════════════════════════════════════════════════════╝"
 
 # 退出码约定：0=测试完成(至少1个DNS测过)；2=所有DNS不可达
-[ "$tested" -gt 0 ] && exit 0 || exit 2
+[ "$tested" -gt 0 ] && { echo ""
+  echo "  💡 想对比多个DNS？ → bash compare.sh DNS1 DNS2   （横向对比评分/延迟，可生成HTML报告）"
+  echo "  💡 想看历史趋势？   → bash trends.sh --html      （先积累 compare 数据，长期观察）"
+  exit 0; } || exit 2
