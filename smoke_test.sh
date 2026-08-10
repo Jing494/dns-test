@@ -60,6 +60,21 @@ echo "--- 13. 环境依赖报告（curl可选，仅报告不判失败）"
 if command -v curl >/dev/null 2>&1; then echo "  ℹ️ curl可用（DoH可实测）"; else echo "  ℹ️ 无curl（DoH将端口级探测）"; fi
 check "环境依赖报告" 0
 
+echo "--- 14. VoWiFi解析（专项1）"
+timeout 40 perl tools/vowifi/01_resolve_vowifi.pl 222.172.200.68 2>&1 | grep -q "成功解析" && check "VoWiFi解析" 0 || check "VoWiFi解析" 1
+
+echo "--- 15. 交叉验证（专项2）"
+timeout 30 perl tools/vowifi/02_vowifi_verify.pl 222.172.200.68 2>&1 | grep -qE "A   |→" && check "交叉验证" 0 || check "交叉验证" 1
+
+echo "--- 16. 端口测试（专项4）"
+timeout 15 perl tools/network/01_port_test.pl 223.5.5.5 53 udp 2>&1 | grep -q "测试:" && check "端口测试" 0 || check "端口测试" 1
+
+echo "--- 17. 示例01 基础查询"
+timeout 15 perl examples/01_dns_query.pl 223.5.5.5 2>&1 | grep -q "A记录" && check "示例01" 0 || check "示例01" 1
+
+echo "--- 18. 示例02 多DNS对比"
+timeout 20 perl examples/02_multi_dns_compare.pl 223.5.5.5 119.29.29.29 2>&1 | grep -q "一致性" && check "示例02" 0 || check "示例02" 1
+
 echo ""
 echo "════ 结果: $PASS 通过 / $FAIL 失败 ════"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

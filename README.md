@@ -209,6 +209,15 @@ perl examples/04_reverse_dns.pl 8.8.8.8                     # 反向解析
 
 ---
 
+## 📋 已知限制（诚实说明）
+
+- **DoH 检测**：无 curl 环境降级为端口级探测（非真实 DoH 验证）；有 curl 才实测
+- **DoT 检测**：需要 bind 9.18+ 的 dig（`+tls` 支持），旧版 dig 无法实测
+- **Windows**：不支持原生运行，需 WSL / Git Bash（详见 FAQ）
+- **IPv6 相关**（[7b] 连通性 / v6 DNS 测试）：依赖本机 IPv6 网络，无 IPv6 时自动跳过（环境标注会说明）
+- **运营商 ePDG 检测**：公共 DNS 查不到运营商内部记录属正常（需用省级 DNS）；仅反映解析/部署，实际可用性需自测
+- **网络波动**：加速器/代理环境会导致延迟偏高、国际域名解析不稳——测试结果以真实网络为准
+
 ## 📖 文档说明
 - 英文简介见：[README.en.md](./README.en.md)（English overview）
 - 详细的测试方法论和评分标准见：[docs/TEST_METHOD.md](./docs/TEST_METHOD.md)
