@@ -45,6 +45,7 @@ dns-test/
 │       ├── 01_port_test.pl         # 端口连通性测试
 │       └── doh_dot_check.sh        # DoH/DoT 支持检测
 └── results/                    # 测试结果存储目录（可选）
+└── LICENSE                     # MIT 开源许可证
 ```
 
 ---
