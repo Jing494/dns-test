@@ -54,13 +54,17 @@ dns-test/
 
 ### 0. 获取与安装
 
-**获取代码**（二选一）：
+**获取代码**（三种方式）：
 ```bash
-# 方式1: git clone
+# 方式1: git clone（推荐，含完整提交历史）
 git clone https://github.com/Jing494/dns-test.git
 cd dns-test
 
-# 方式2: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
+# 方式2: Releases 下载（免 git，直接拿成品包）
+#   前往 https://github.com/Jing494/dns-test/releases
+#   下载 dns-test-v2026.08.tar.gz 后解压即可
+
+# 方式3: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
 ```
 
 **依赖安装**（按你的系统执行）：
