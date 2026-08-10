@@ -548,7 +548,9 @@ run_full_test() {
   local ecs_no_subnet=$(cat "${PARR_TMPDIR}/1.out" | tail -1)
   if is_valid_response "$ecs_result"; then
     echo "     ✅ ECS 查询响应正常"
-    [ "$ecs_result" != "$ecs_no_subnet" ] && echo "     📝 ECS 返回不同结果" || echo "     📝 ECS 返回相同结果"
+    # 两边都取最后一行（IP）再比较，避免多行 vs 单行误判恒"不同"
+    local ecs_one=$(echo "$ecs_result" | tail -1)
+    [ "$ecs_one" != "$ecs_no_subnet" ] && echo "     📝 ECS 返回不同结果" || echo "     📝 ECS 返回相同结果"
     total_all=$((total_all+1)); success_all=$((success_all+1))
   else
     echo "     ❌ ECS 查询失败"; total_all=$((total_all+1));
