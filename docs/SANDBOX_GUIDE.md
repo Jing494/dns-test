@@ -111,9 +111,14 @@ sub dns_sockaddr {
 ```
 dns-test/
 ├── README.md                   # 总说明文档
+├── README.en.md                # English overview（精简英文简介）
 ├── dns-test.sh                 # 统一入口（交互引导，非交互自动降级防超时）
 ├── dns-preset.sh               # DNS预设快捷测试（云南电信/阿里/腾讯）
-├── smoke_test.sh               # 自动化冒烟测试
+├── compare.sh                  # 多DNS对比（并行+延迟中位数+HTML报告+JSON结果）
+├── trends.sh                   # DNS趋势洞察（聚合compare历史：趋势/CSV/SVG折线图/cron采集）
+├── install.sh                  # 一键安装依赖（缺失才装）
+├── release.sh                  # 打包发布脚本
+├── smoke_test.sh               # 自动化冒烟测试（22项）
 ├── full.sh / lite.sh           # 基础测试入口（完整版/精简版）
 ├── lib/core.sh                 # 公共核心库（变量/函数/测试逻辑）
 ├── docs/
@@ -134,7 +139,9 @@ dns-test/
 │   └── network/
 │       ├── 01_port_test.pl         # 端口连通性测试（真机可用）
 │       └── doh_dot_check.sh        # DoH/DoT 支持检测
-└── results/                    # 测试结果存储目录（可选）
+├── CONTRIBUTING.md             # 贡献指南
+├── .github/workflows/          # CI（ubuntu + macOS 冒烟矩阵）
+├── results/                    # 测试结果存储目录（可选）
 └── LICENSE                     # MIT 开源许可证
 ```
 
