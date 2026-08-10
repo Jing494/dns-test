@@ -28,10 +28,8 @@ my @domains = (
     "epdg.epc.mnc011.mcc460.pub.3gppnetwork.org",
 );
 
-# 之前解析出的IP（用于对比）
-my %previous_ips = (
-    "epdg.epc.mnc011.mcc460.pub.3gppnetwork.org" => ["192.0.2.1", "192.0.2.2"],
-);
+# 历史对比基准（初始为空；如需对比历史，可手动填入之前解析出的真实IP）
+my %previous_ips = ();
 
 print "=" x 80 . "\n";
 print "VoWiFi域名正向解析验证 (A记录 + AAAA记录)\n";
