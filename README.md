@@ -294,6 +294,7 @@ wsl -d Ubuntu -- bash smoke_test.sh               # 验证
 ---
 
 ## 🔄 更新记录
+- 2026-08-10（第六十三轮）：文档一致性彻查——AI_GUIDE初始化章节smoke项数19→22修正；TEST_METHOD 3GPP域名数1/2→3个（与core.sh DOMAINS_3GPP对齐，mnc011/mnc000/mnc001）；边界测试矩阵全过（无参数/注入/缺值/未知参数/超长参数/混合v4-v6，退出码1均正确）
 - 2026-08-10（第六十二轮）：macOS timeout命令兼容——core.sh/smoke_test/doh_dot_check 三处加兼容函数（macOS 默认无 timeout，仅 coreutils 有；函数版后台sleep+kill模拟，正常/超时/管道三场景实测通过）；doh_dot_check 去冗余 timeout 包装（dig 用自带 +time、curl 用 --max-time，仅端口级保留）；网络环境矩阵实测：DEFAULT_DNS_CSV/PRESET_DNS_CSV/STAB_ROUNDS/ECS_SUBNET/PROVINCE_DNS 环境变量回退全部生效
 - 2026-08-10（第六十一轮）：macOS bash 3.2 兼容性修复——compare.sh v3 / trends.sh 全部去掉 declare -A 关联数组（改平行数组+索引映射，macOS 默认 bash 3.2 可直跑）；install.sh 重构为"缺失才装+装完强制校验"（依赖已齐零sudo直达冒烟）；smoke下一步指引补compare行；README徽章 Bash 4+→3.2+；CI注释补macOS兼容提醒
 - 2026-08-10（第六十轮）：全链路丝滑衔接——lite/full完成横幅加"对比/趋势"下一步提示、compare尾部加趋势提示（出口=入口闭环）；dns-test.sh专项菜单新增 8.多DNS对比 9.趋势洞察（带DNS引导输入）；install.sh下一步指引补compare/trends；smoke补第21项compare对比（21→22项）；非交互传多DNS时提示可用compare；AI_GUIDE命令映射表补两行
