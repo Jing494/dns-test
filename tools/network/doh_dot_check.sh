@@ -11,7 +11,8 @@
 DNS_LIST="${1:-223.5.5.5}"
 
 # 平台兼容层（timeout 兼容函数，macOS 无 timeout 命令；仅端口级探测用）
-source "$(cd "$(dirname "$0")" && pwd)/../../lib/compat.sh"
+# 用 BASH_SOURCE 定位（$0 在非标准调用方式下可能失真）
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../lib/compat.sh"
 
 # 环境能力：是否有 curl
 HAS_CURL=0
