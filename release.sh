@@ -12,7 +12,7 @@ cd "$SCRIPT_DIR"
 OUT="dns-test-${VERSION}.tar.gz"
 rm -f "$OUT"
 
-tar czf "$OUT" --exclude='.git' --exclude='results/*' --exclude='*.tar.gz' . 2>/dev/null
+tar czf "$OUT" --exclude='.git' --exclude='results/*' --exclude='trends' --exclude='*.tar.gz' . 2>/dev/null
 
 echo "════ 打包完成 ════"
 echo "  文件: $OUT ($(du -h "$OUT" | cut -f1))"
