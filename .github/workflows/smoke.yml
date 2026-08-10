@@ -14,7 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y dnsutils perl curl
+        # macOS runner 自带 dig/perl/curl，无需 brew；Linux 用 apt 装
+        continue-on-error: true
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            command -v dig || brew install bind
+          else
+            sudo apt-get update && sudo apt-get install -y dnsutils perl curl
+          fi
       - name: Syntax check
         run: |
           for f in *.sh tools/network/*.sh; do bash -n "$f" || exit 1; done
