@@ -10,6 +10,22 @@
 # ============================================================================
 DNS_LIST="${1:-223.5.5.5}"
 
+# macOS 默认无 timeout 命令（coreutils 才有），提供兼容实现（仅端口级探测用）
+if ! command -v timeout >/dev/null 2>&1; then
+  timeout() {
+    local sec="$1"; shift
+    "$@" &
+    local pid=$!
+    ( sleep "$sec"; kill "$pid" 2>/dev/null ) &
+    local wp=$!
+    wait "$pid" 2>/dev/null
+    local rc=$?
+    kill "$wp" 2>/dev/null
+    return $rc
+  }
+  export -f timeout 2>/dev/null
+fi
+
 # 环境能力：是否有 curl
 HAS_CURL=0
 command -v curl >/dev/null 2>&1 && HAS_CURL=1
@@ -20,8 +36,8 @@ for DNS in "${DNS_ARR[@]}"; do
   # 合法地址校验（v4/v6）
   if [[ "$DNS" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || [[ "$DNS" =~ ^[0-9a-fA-F:]+$ && "$DNS" == *":"* ]]; then
     echo "════ DoH/DoT 检测: $DNS ════"
-    # ===== DoT: dig +tls 实测 =====
-    if timeout 6 dig +tls=dot @$DNS www.baidu.com A +short +time=3 +tries=1 2>/dev/null | grep -qE "\."; then
+    # ===== DoT: dig +tls 实测（dig 自带 +time 超时，无需外部 timeout） =====
+    if dig +tls=dot @$DNS www.baidu.com A +short +time=3 +tries=1 2>/dev/null | grep -qE "\."; then
       echo "  DoT: ✅ dig +tls=dot 实测成功（提供DoT）"
     else
       echo "  DoT: ⚠️ dig +tls 失败（未提供DoT / 网络不通）"
@@ -31,7 +47,7 @@ for DNS in "${DNS_ARR[@]}"; do
       # IPv6 地址需要方括号
       local_url="$DNS"
       [[ "$DNS" == *":"* ]] && local_url="[$DNS]"
-      code=$(timeout 8 curl -s --doh-url "https://$local_url/dns-query" -o /dev/null -w "%{http_code}" https://www.baidu.com 2>/dev/null)
+      code=$(curl -s --max-time 8 --doh-url "https://$local_url/dns-query" -o /dev/null -w "%{http_code}" https://www.baidu.com 2>/dev/null)
       if [ "$code" = "200" ]; then
         echo "  DoH: ✅ curl --doh-url 实测成功（提供DoH）"
       else

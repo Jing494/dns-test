@@ -8,6 +8,23 @@
 command -v dig >/dev/null 2>&1 || { echo "❌ 未找到 dig 命令，请先安装 dnsutils/bind-utils"; exit 1; }
 command -v perl >/dev/null 2>&1 || { echo "❌ 未找到 perl 命令，请先安装 perl（专项测试需要）"; exit 1; }
 
+# macOS 默认无 timeout 命令（coreutils 才有 gtimeout），提供兼容实现：
+# 后台运行 + sleep 到期 kill（返回码：超时被kill≈137，GNU timeout为124，调用方按非0处理即可）
+if ! command -v timeout >/dev/null 2>&1; then
+  timeout() {
+    local sec="$1"; shift
+    "$@" &
+    local pid=$!
+    ( sleep "$sec"; kill "$pid" 2>/dev/null ) &
+    local wp=$!
+    wait "$pid" 2>/dev/null
+    local rc=$?
+    kill "$wp" 2>/dev/null
+    return $rc
+  }
+  export -f timeout 2>/dev/null
+fi
+
 # 默认DNS组（云南电信，可用环境变量 DEFAULT_DNS_CSV 覆盖，逗号分隔地址；名称可用 DEFAULT_DNS_NAME_CSV 覆盖）
 if [ -n "$DEFAULT_DNS_CSV" ]; then
   IFS=',' read -ra DEFAULT_DNS_ADDR <<< "$DEFAULT_DNS_CSV"
