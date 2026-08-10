@@ -20,6 +20,7 @@
 ```
 dns-test/
 ├── README.md                   # 总说明文档（你当前看的这个）
+├── README.en.md                # English overview（精简英文简介）
 ├── dns-test.sh                 # 统一入口脚本（推荐使用）
 ├── dns-preset.sh               # DNS预设快捷测试（云南电信/阿里/腾讯一键测）
 ├── smoke_test.sh               # 自动化冒烟测试（一键验证核心功能）
@@ -201,6 +202,7 @@ perl examples/04_reverse_dns.pl 8.8.8.8                     # 反向解析
 ---
 
 ## 📖 文档说明
+- 英文简介见：[README.en.md](./README.en.md)（English overview）
 - 详细的测试方法论和评分标准见：[docs/TEST_METHOD.md](./docs/TEST_METHOD.md)
 - **AI助手操作手册（先问DNS/版本/专项，交互提问工具两种模式（命名因agent而异：ask_user等），**日志截断处理见第八章**）见：[docs/AI_GUIDE.md](./docs/AI_GUIDE.md)**
 - 沙箱环境使用说明、限制见：[docs/SANDBOX_GUIDE.md](./docs/SANDBOX_GUIDE.md)
