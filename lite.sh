@@ -57,7 +57,7 @@ for _a in "${DNS_ADDR[@]}"; do
   valid_dns_addr "$_a" || { echo "❌ 非法DNS地址: $_a（仅支持IPv4/IPv6格式）"; exit 1; }
 done
 
-print_header "DNS 基础测试 (精简版 v2026.08.2)"
+print_header "DNS 基础测试 (精简版 v2026.08.3)"
 START_TIME=$(date +%s)
 print_env_info
 echo "待测DNS数量: ${#DNS_ADDR[@]} 个"
