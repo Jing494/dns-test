@@ -17,7 +17,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "$SCRIPT_DIR"
 source lib/core.sh
 
-VERSION="v2026.08.2"
+VERSION="v2026.08.3"
 GEN_HTML=0
 SAVE_JSON=1
 # lite默认计分点（无IPv6环境=63；IPv6可用时7b项参与计分=64，环境相关）
