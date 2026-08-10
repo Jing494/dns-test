@@ -1,5 +1,7 @@
 # DNS / Network Testing Toolkit
 
+> 🌐 **中文**：[README.md](./README.md) ｜ **English**: This document
+
 A unified toolkit for DNS benchmarking and network diagnostics, with a focus on China's telecom networks (Yunnan Telecom DNS as the default baseline, plus Alibaba/Tencent public DNS for comparison).
 
 > 📄 Full documentation is in Chinese: [README.md](./README.md). This English file is a concise overview.
