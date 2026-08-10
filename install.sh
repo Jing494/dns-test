@@ -31,4 +31,13 @@ if command -v perl >/dev/null 2>&1; then echo "  ✅ perl: $(perl -v 2>/dev/null
 if command -v curl >/dev/null 2>&1; then echo "  ✅ curl: $(curl --version | head -1)"; else echo "  ⚠️  curl 未安装（DoH检测将降级为端口级，不影响主功能）"; fi
 
 echo ""
-echo "✅ 完成！接下来运行: bash smoke_test.sh"
+if [ "$1" = "--smoke" ]; then
+  echo "════ 运行冒烟测试 ════"
+  bash smoke_test.sh
+else
+  echo "✅ 依赖安装完成！下一步（任选）:"
+  echo "  bash smoke_test.sh               # 验证环境（19项自动化）"
+  echo "  bash dns-test.sh                 # 交互引导测试（选DNS/版本/专项）"
+  echo "  bash lite.sh 223.5.5.5 0         # 快速测一个DNS"
+  echo "  bash install.sh --smoke          # 或装完直接跑冒烟"
+fi
