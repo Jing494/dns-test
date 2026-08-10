@@ -33,6 +33,7 @@ dns-test/
 ├── dns-test.sh                 # 统一入口脚本（推荐使用）
 ├── dns-preset.sh               # DNS预设快捷测试（云南电信/阿里/腾讯一键测）
 ├── compare.sh                  # 多DNS对比模式（并行+延迟中位数+HTML报告+JSON结果）
+├── trends.sh                   # DNS趋势洞察（聚合compare历史JSON：趋势总览/CSV/HTML折线图/定时采集）
 ├── smoke_test.sh               # 自动化冒烟测试（一键验证核心功能）
 ├── install.sh                  # 一键安装（依赖检查+快捷方式）
 ├── release.sh                  # 打包发布脚本（生成 tar.gz + 上传指引）
@@ -154,6 +155,16 @@ bash compare.sh 223.5.5.5 119.29.29.29 --html               # 生成 results/rep
 bash compare.sh 223.5.5.5 --no-save                         # 不保存JSON结果
 #   环境变量: COMPARE_MAX_CONCURRENCY=3  lite并行数（设1串行最稳）
 #   输出: results/compare-<时间戳>.json 结构化结果（历史趋势积累用）
+
+# DNS趋势洞察（基于compare历史JSON聚合，需先积累至少2次compare数据）
+bash trends.sh                              # 全部DNS趋势总览（文本）
+bash trends.sh --html --csv                 # 生成 trends/report.html（SVG折线图）+ trends.csv
+bash trends.sh --detail --limit 5           # 每个DNS列最近5条明细
+bash trends.sh --since 2026-08-01           # 只看该日期后的数据
+bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合——crontab自动积累用
+#   定时采集示例（每天凌晨2:30自动测并更新趋势）:
+#   crontab -e 加一行:  30 2 * * * cd /path/to/dns-test && bash trends.sh --cron 223.5.5.5 119.29.29.29 >> trends/cron.log 2>&1
+#   环境变量: TRENDS_DIR(默认trends/)  COMPARE_RESULTS_DIR(默认results/)
 ```
 
 ### 默认DNS列表
@@ -283,6 +294,7 @@ wsl -d Ubuntu -- bash smoke_test.sh               # 验证
 ---
 
 ## 🔄 更新记录
+- 2026-08-10（第五十九轮）：新增 trends.sh DNS趋势洞察——聚合 results/compare-*.json（按DNS分组、按时间排序），线性回归斜率为主+首尾对比为辅的趋势判定（评分↑=变好/延迟↑=变好，箭头=好坏方向）；输出文本总览表+trends.csv+trends/report.html（纯SVG折线图，无JS依赖，响应式手机可看）；--detail/--limit/--since/DNS过滤；--cron 定时采集模式（先跑compare再聚合，附crontab示例）；环境变量 TRENDS_DIR/COMPARE_RESULTS_DIR；smoke补19/20项；README/AI_GUIDE同步
 - 2026-08-10（第五十八轮）：compare.sh v2 重构——延迟改3次dig中位数（去掉名不副实的"平均"）；lite批次并发（默认3，COMPARE_MAX_CONCURRENCY可调，3 DNS从45s+降至~20s）；DNS去重；不可达DNS跳过lite；结构化JSON结果 results/compare-<ts>.json（供趋势积累）；HTML报告响应式（手机可看）+综合推荐结论+延迟颜色分级（绿<100ms 黄100~300ms 红≥300ms）+汇总表；退出码0/1/2（全不可达=2）；README目录结构/用法/更新记录同步
 - 2026-08-10（第五十七轮）：compare.sh 延迟改为独立dig测量（lite版不输出延迟，避免无数据硬填）
 - 2026-08-10（第五十六轮）：新增 compare.sh 多DNS对比模式（任意数量DNS + --html 生成 results/report.html）

@@ -323,3 +323,32 @@ bash lite.sh 192.0.2.1 0; echo $? # 2=全部不可达（192.0.2.1为TEST-NET保�
 | DNS 全部不可达 | 报告网络问题，不修脚本 |
 | 脚本语法/逻辑错误 | 自行修复（走排障流程）或报告 |
 | 工具缺失（dig/perl） | 提示安装，不硬跑 |
+
+## 十二、趋势洞察（trends.sh，历史数据聚合）
+
+### 何时用
+- 用户问"这个DNS最近稳不稳/变慢没有" → 有趋势数据就直接答
+- 数据来源：compare.sh 每次运行自动存 `results/compare-<时间戳>.json`（至少 2 次才能出趋势，建议积累 7+ 天）
+
+### 常用命令
+```bash
+bash trends.sh                    # 全部DNS趋势总览（文本，含均值/趋势箭头）
+bash trends.sh --html --csv       # 生成 trends/report.html（SVG折线图）+ trends.csv
+bash trends.sh 223.5.5.5          # 只看指定DNS
+bash trends.sh --detail --limit 5 # 每个DNS列最近5条明细
+bash trends.sh --since 2026-08-01 # 只看该日期后数据
+bash trends.sh --cron 223.5.5.5 119.29.29.29  # 先采集(跑compare)再聚合，配crontab自动积累
+```
+- 环境变量：`TRENDS_DIR`（产物目录，默认 trends/）、`COMPARE_RESULTS_DIR`（数据源，默认 results/）
+
+### 趋势箭头语义（重要，别读反）
+- **评分**: `↑ 变好` / `↓ 变差` / `→ 平稳` / `↗ 微升` / `↘ 微降`
+- **延迟**: 同样箭头代表"好坏方向"——`↑ 变好` = 延迟在下降（变快了），`↓ 变差` = 延迟在上升（变慢了）
+- 判定方法：线性回归斜率为主（≥3 样本），首尾对比为辅（2 样本）
+
+### 常见坑
+- `trends.sh` 显示"无数据" → 先跑过 compare.sh 吗？results/ 下有 compare-*.json 吗？
+- 样本含"不可达"会被跳过统计但显示"含N次不可达"——多次不可达本身就是重要信号（网络不稳）
+- 数据是累加的：不要删 results/compare-*.json（除非想清空历史）
+- 沙箱开加速器时单次采集评分会波动 → 趋势线出现尖刺，属正常，看长期方向即可
+

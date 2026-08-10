@@ -75,6 +75,21 @@ timeout 15 perl examples/01_dns_query.pl 223.5.5.5 2>&1 | grep -q "A记录" && c
 echo "--- 18. 示例02 多DNS对比"
 timeout 20 perl examples/02_multi_dns_compare.pl 223.5.5.5 119.29.29.29 2>&1 | grep -q "一致性" && check "示例02" 0 || check "示例02" 1
 
+echo "--- 19. trends 趋势聚合"
+TMPR=$(mktemp -d)
+cat > "$TMPR/compare-20260810-090000.json" <<'EOF'
+{"tool":"x","version":"v2026.08","timestamp":"2026-08-10 09:00:00 +0800","mode":"lite(63项)","cost_s":1,"dns":[{"addr":"223.5.5.5","score":"96","stab":"100","delay_ms":60,"reachable":true}]}
+EOF
+cat > "$TMPR/compare-20260811-090000.json" <<'EOF'
+{"tool":"x","version":"v2026.08","timestamp":"2026-08-11 09:00:00 +0800","mode":"lite(63项)","cost_s":1,"dns":[{"addr":"223.5.5.5","score":"98","stab":"100","delay_ms":50,"reachable":true}]}
+EOF
+COMPARE_RESULTS_DIR="$TMPR" TRENDS_DIR="$TMPR/out" timeout 10 bash trends.sh 223.5.5.5 2>&1 | grep -q "趋势" && check "trends聚合" 0 || check "trends聚合" 1
+
+echo "--- 20. trends 产物（HTML/CSV）"
+COMPARE_RESULTS_DIR="$TMPR" TRENDS_DIR="$TMPR/out" timeout 10 bash trends.sh --html --csv 223.5.5.5 >/dev/null 2>&1
+ls "$TMPR/out/report.html" "$TMPR/out/trends.csv" >/dev/null 2>&1 && check "trends产物" 0 || check "trends产物" 1
+rm -rf "$TMPR"
+
 echo ""
 echo "════ 结果: $PASS 通过 / $FAIL 失败 ════"
 echo ""
@@ -83,4 +98,5 @@ echo "  bash dns-test.sh               # 交互引导（选DNS组/版本/专项�
 echo "  bash lite.sh 223.5.5.5 0       # 快速测一个DNS"
 echo "  bash dns-preset.sh ali lite 0  # 预设测试（阿里/腾讯/云南电信）"
 echo "  bash full.sh 240e:52:4800::8888 0  # 完整版测试"
+echo "  bash trends.sh --html --csv        # DNS趋势洞察（需先积累compare数据）"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
