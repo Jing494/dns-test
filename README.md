@@ -32,7 +32,10 @@ dns-test/
 ├── README.en.md                # English overview（精简英文简介）
 ├── dns-test.sh                 # 统一入口脚本（推荐使用）
 ├── dns-preset.sh               # DNS预设快捷测试（云南电信/阿里/腾讯一键测）
+├── compare.sh                  # 多DNS对比模式（并行+延迟中位数+HTML报告+JSON结果）
 ├── smoke_test.sh               # 自动化冒烟测试（一键验证核心功能）
+├── install.sh                  # 一键安装（依赖检查+快捷方式）
+├── release.sh                  # 打包发布脚本（生成 tar.gz + 上传指引）
 ├── full.sh/lite.sh             # DNS基础测试入口
 ├── lib/core.sh                 # 公共核心库（变量/函数/测试逻辑）
 ├── docs/                       # 详细技术文档
@@ -54,7 +57,9 @@ dns-test/
 │   └── network/                # 通用网络测试
 │       ├── 01_port_test.pl         # 端口连通性测试
 │       └── doh_dot_check.sh        # DoH/DoT 支持检测
-└── results/                    # 测试结果存储目录（可选）
+├── .github/workflows/          # CI（ubuntu + macOS 双平台冒烟矩阵）
+├── CONTRIBUTING.md             # 贡献指南
+├── results/                    # 测试结果存储目录（可选，不入库）
 └── LICENSE                     # MIT 开源许可证
 ```
 
@@ -142,6 +147,13 @@ perl examples/01_dns_query.pl 8.8.8.8                      # 基础查询
 perl examples/02_multi_dns_compare.pl 8.8.8.8 114.114.114.114 # 多DNS对比
 perl examples/03_dns64_check.pl 2001:4860:4860::6464        # DNS64检测
 perl examples/04_reverse_dns.pl 8.8.8.8                     # 反向解析
+
+# 多DNS对比（根目录compare.sh，推荐：并行+延迟中位数+推荐结论）
+bash compare.sh 223.5.5.5 119.29.29.29                     # 纯文本对比
+bash compare.sh 223.5.5.5 119.29.29.29 --html               # 生成 results/report.html（响应式）
+bash compare.sh 223.5.5.5 --no-save                         # 不保存JSON结果
+#   环境变量: COMPARE_MAX_CONCURRENCY=3  lite并行数（设1串行最稳）
+#   输出: results/compare-<时间戳>.json 结构化结果（历史趋势积累用）
 ```
 
 ### 默认DNS列表
@@ -271,7 +283,19 @@ wsl -d Ubuntu -- bash smoke_test.sh               # 验证
 ---
 
 ## 🔄 更新记录
-- 2026-08-09（第四十五轮）：perl前置检查（core.sh 统一检查dig+perl）；smoke_test补full完整版测试（14项）；分支完整性/文件齐全/命令引用全复核通过
+- 2026-08-10（第五十八轮）：compare.sh v2 重构——延迟改3次dig中位数（去掉名不副实的"平均"）；lite批次并发（默认3，COMPARE_MAX_CONCURRENCY可调，3 DNS从45s+降至~20s）；DNS去重；不可达DNS跳过lite；结构化JSON结果 results/compare-<ts>.json（供趋势积累）；HTML报告响应式（手机可看）+综合推荐结论+延迟颜色分级（绿<100ms 黄100~300ms 红≥300ms）+汇总表；退出码0/1/2（全不可达=2）；README目录结构/用法/更新记录同步
+- 2026-08-10（第五十七轮）：compare.sh 延迟改为独立dig测量（lite版不输出延迟，避免无数据硬填）
+- 2026-08-10（第五十六轮）：新增 compare.sh 多DNS对比模式（任意数量DNS + --html 生成 results/report.html）
+- 2026-08-10（第五十五轮）：CI双平台矩阵（ubuntu+macOS）；macOS依赖安装改平台条件（自带dig/perl/curl）；流程连贯（install→smoke/下一步指引/AI_GUIDE初始化章节）
+- 2026-08-10（第五十四轮）：新增 install.sh 一键安装脚本；README加CI徽章
+- 2026-08-10（第五十三轮）：smoke专项覆盖补至18项、README补已知限制；CI加固（smoke workflow限main分支、网络敏感项容错）；release.sh自动查Release ID
+- 2026-08-10（第五十二轮）：新增打包脚本 release.sh（自动排除.git/results内容/日志，防遗漏新文件，打印上传指引）+ CONTRIBUTING.md 贡献指南 + CI冒烟上线 + dig版本说明
+- 2026-08-10（第五十一轮）：README加徽章（License/Release/Platform/Bash/Perl/CI）；smoke网络项超时加宽；AI_GUIDE补Windows/WSL环境说明
+- 2026-08-10（第五十轮）：新增Windows使用指引（WSL推荐/GitBash注意事项）；README补ECS_SUBNET环境变量说明
+- 2026-08-10（第四十九轮）：新增英文README（README.en.md精简版）+ README顶部中英互跳；新增Releases下载方式；gitignore排除tar.gz
+- 2026-08-10（第四十八轮）：README结构整理——新增"获取与安装"章节、删除重复环境指引章节、补回效率提示标题
+- 2026-08-10（第四十七轮）：目录结构补AI_GUIDE.md/LICENSE条目，同步交互工具表述
+- 2026-08-10（第四十六轮）：md总审与更新记录去重修复；占位IP隐私说明（RFC 5737示例地址统一）；AI交互工具表述通用化
 - 2026-08-09（第四十四轮）：安全加固——.gitignore补*.log/*报告*/*.tmp；SAVE_LOG日志与测试报告确认不随git上传；敏感IP残留清零（仅私网示例）
 - 2026-08-09（第四十三轮）：安全加固——移除示例中的运营商基础设施IP（端口测试默认目标换公共DNS/私网、专项4引导示例、README/TEST_METHOD/AI_GUIDE/SANDBOX/examples文档示例全部清理）；仅保留02检测对比数据
 - 2026-08-09（第四十二轮）：专项4端口测试/专项7 DoH-DoT 加交互引导（可自定义目标/DNS，回车用默认）；非交互与直接传参完全兼容（read仅交互模式）
