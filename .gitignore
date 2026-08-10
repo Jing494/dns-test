@@ -1,1 +1,4 @@
 /results/
+*.log
+*报告*
+*.tmp

@@ -131,7 +131,8 @@ if [ -t 0 ]; then
       echo "4. 端口连通性测试（测试ePDG/VoWiFi相关端口是否开放）"
       echo "5. 通用示例脚本（基础查询/多DNS对比/DNS64检测/反向解析）"
       echo "6. 运营商ePDG部署检测（电信/移动/联通/广电，判断各省份VoWiFi部署情况）"
-      read -t 30 -p "请输入选项(1-6): " professional_test
+      echo "7. DoH/DoT支持检测（判断DNS是否提供加密解析）"
+      read -t 30 -p "请输入选项(1-7): " professional_test
       echo ""
       case $professional_test in
         1)
@@ -158,13 +159,28 @@ if [ -t 0 ]; then
           ;;
         3)
           echo "开始路由器DNS转发测试（对比省级DNS）..."
-          echo "提示: 请直接传路由器网关IP，如: perl tools/vowifi/03_test_router_dns.pl 192.168.1.1"
-          perl tools/vowifi/03_test_router_dns.pl
+          echo "━━ 引导式配置（直接回车用默认值，不锁省级DNS） ━━"
+          read -t 30 -p "路由器网关IP（逗号分隔，默认192.168.1.1,192.168.2.1）: " router_input
+          read -t 30 -p "省级DNS对比基准（回车默认云南电信，如219.141.136.10）: " province_input
+          if [ -n "$router_input" ] && [ -n "$province_input" ]; then
+            perl tools/vowifi/03_test_router_dns.pl "$router_input" -- "$province_input"
+          elif [ -n "$router_input" ]; then
+            perl tools/vowifi/03_test_router_dns.pl "$router_input"
+          elif [ -n "$province_input" ]; then
+            PROVINCE_DNS="$province_input" perl tools/vowifi/03_test_router_dns.pl
+          else
+            perl tools/vowifi/03_test_router_dns.pl
+          fi
           ;;
         4)
-          echo "开始端口连通性测试（使用默认ePDG目标）..."
-          echo "提示: 自定义目标请直接运行: perl tools/network/01_port_test.pl <IP> <端口> <tcp|udp>"
-          perl tools/network/01_port_test.pl
+          echo "开始端口连通性测试..."
+          echo "━━ 引导式配置（回车用默认ePDG目标） ━━"
+          read -t 30 -p "目标 IP 端口 协议（如 223.5.5.5 53 udp）: " port_input
+          if [ -n "$port_input" ]; then
+            perl tools/network/01_port_test.pl $port_input
+          else
+            perl tools/network/01_port_test.pl
+          fi
           ;;
         5)
           echo "开始通用示例脚本演示..."
@@ -229,6 +245,18 @@ if [ -t 0 ]; then
           echo "开始运营商ePDG部署检测..."
           echo "提示: 直接运行也可传参: perl tools/vowifi/carrier_epdg.pl [ct/cmcc/cucc/cbn/all] [DNS或router]"
           perl tools/vowifi/carrier_epdg.pl
+          ;;
+        7)
+          echo "开始DoH/DoT支持检测（环境自适应：有curl则实测，无则端口级）..."
+          read -t 30 -p "检测DNS（逗号分隔，回车用当前组/默认）: " doh_input
+          if [ -n "$doh_input" ]; then
+            bash tools/network/doh_dot_check.sh "$doh_input"
+          elif [ ${#DNS_LIST[@]} -ge 1 ]; then
+            doh_list=$(IFS=','; echo "${DNS_LIST[*]}")
+            bash tools/network/doh_dot_check.sh "${doh_list}"
+          else
+            bash tools/network/doh_dot_check.sh
+          fi
           ;;
         *)
           echo "无效选项，返回主菜单..."

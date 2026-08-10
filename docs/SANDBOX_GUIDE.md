@@ -113,6 +113,7 @@ sub dns_sockaddr {
 ├── README.md                   # 总说明文档
 ├── dns-test.sh                 # 统一入口（交互引导，非交互自动降级防超时）
 ├── dns-preset.sh               # DNS预设快捷测试（云南电信/阿里/腾讯）
+├── smoke_test.sh               # 自动化冒烟测试
 ├── full.sh / lite.sh           # 基础测试入口（完整版/精简版）
 ├── lib/core.sh                 # 公共核心库（变量/函数/测试逻辑）
 ├── docs/
@@ -128,9 +129,11 @@ sub dns_sockaddr {
 │   ├── vowifi/
 │   │   ├── 01_resolve_vowifi.pl    # VoWiFi全域名解析（v4/v6）
 │   │   ├── 02_vowifi_verify.pl     # VoWiFi多DNS交叉验证
-│   │   └── 03_test_router_dns.pl   # 路由器DNS转发测试（对比云南电信省级DNS）
+│   │   ├── 03_test_router_dns.pl   # 路由器DNS转发测试（对比省级DNS）
+│   │   └── carrier_epdg.pl         # 运营商ePDG部署检测
 │   └── network/
-│       └── 01_port_test.pl         # 端口连通性测试（真机可用）
+│       ├── 01_port_test.pl         # 端口连通性测试（真机可用）
+│       └── doh_dot_check.sh        # DoH/DoT 支持检测
 └── results/                    # 测试结果存储目录（可选）
 ```
 
@@ -177,7 +180,7 @@ dig @222.172.200.68 www.baidu.com A
 dig @240e:52:4800::8888 www.baidu.com AAAA
 
 # 反向解析
-dig @222.172.200.68 -x 192.0.2.1
+dig @222.172.200.68 -x 223.5.5.5
 
 # 查看DNS64合成
 dig @2001:4860:4860::6464 www.example.com AAAA

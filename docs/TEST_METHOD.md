@@ -205,6 +205,10 @@ bash /workspace/dns-test/dns-preset.sh ali lite 0
 - **可达性预检**：测试前 dig 探测（2秒超时），不可达 DNS 直接跳过，避免无效白等
 - **A记录并行**：25 个域名 8 并发查询，单次 dig 同时提取 IP 和延迟
 - **快速模式**：`STAB_ROUNDS=5 bash lite.sh 8.8.8.8`（稳定性轮次从 20 降到 5）
+- **自动化回归**：`bash smoke_test.sh` 一键验证核心功能（改动后必跑）
+- **域名外置**：`CONFIG_DOMAINS=配置 bash lite.sh` 可覆盖测试域名列表
+- **日志保存**：`SAVE_LOG=1 bash lite.sh 8.8.8.8 0` 自动存 `results/lite-YYYYMMDD-HHMMSS.log`（Linux tee 同步终端+文件 / macOS 写文件；也可手动 `| tee results/x.log`）
+- **DoH/DoT**：`bash tools/network/doh_dot_check.sh [DNS1,DNS2]`——**环境自适应**：DoT 用 `dig +tls=dot` 实测；DoH 有 curl 则 `curl --doh-url` 实测，无 curl 回退 443 端口级探测（实测结果受网络环境影响）
 
 ### 直接运行
 
@@ -234,12 +238,13 @@ perl /workspace/dns-test/tools/vowifi/01_resolve_vowifi.pl 8.8.8.8
 # VoWiFi 多DNS交叉验证
 perl /workspace/dns-test/tools/vowifi/02_vowifi_verify.pl 8.8.8.8 114.114.114.114
 
-# 路由器DNS转发测试（对比省级DNS: 云南电信）
+# 路由器DNS转发测试（对比省级DNS，支持--分隔自定义基准）
 perl /workspace/dns-test/tools/vowifi/03_test_router_dns.pl 192.168.1.1
-# 说明: 对比路由器与云南电信DNS的解析结果，一致=路由器将请求转发到省级DNS
+perl /workspace/dns-test/tools/vowifi/03_test_router_dns.pl 192.168.1.1 -- 223.5.5.5
+# 说明: --前=路由器IP，--后=省级对比基准(逗号分隔)；默认云南电信；也可用 PROVINCE_DNS 环境变量
 
 # 端口连通性测试
-perl /workspace/dns-test/tools/network/01_port_test.pl 192.0.2.1 4500 udp
+perl /workspace/dns-test/tools/network/01_port_test.pl 223.5.5.5 53 udp
 ```
 
 ### 自定义 DNS

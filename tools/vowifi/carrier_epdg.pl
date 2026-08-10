@@ -59,8 +59,14 @@ my %carriers = (
     },
 );
 
-# 默认 DNS（云南电信）
-my @default_dns = ("222.172.200.68", "61.166.150.123", "240e:52:4800::8888", "240e:52:4000::8888");
+# 默认 DNS（云南电信，可用环境变量 PROVINCE_DNS 覆盖——用你所在省份的省级DNS测当地ePDG部署）
+my @default_dns;
+if ($ENV{PROVINCE_DNS}) {
+    @default_dns = split(/,/, $ENV{PROVINCE_DNS});
+    print "自定义省级DNS(环境变量): $ENV{PROVINCE_DNS}\n";
+} else {
+    @default_dns = ("222.172.200.68", "61.166.150.123", "240e:52:4800::8888", "240e:52:4000::8888");
+}
 # 家宽路由器 DNS
 my @router_dns = ("192.168.1.1", "192.168.2.1");
 

@@ -7,12 +7,12 @@ use strict;
 use warnings;
 use Socket qw(:DEFAULT IPPROTO_UDP IPPROTO_TCP);
 
-# 配置: 待反向解析的IP地址（v4/v6 混合）
+# 配置: 待反向解析的IP地址（v4/v6 混合，仅公共DNS/私网地址）
 my @IPS = (
     "8.8.8.8",              # Google DNS
     "114.114.114.114",      # 114 DNS
     "223.5.5.5",            # 阿里云DNS
-    "192.0.2.1",       # 云南电信ePDG
+    "119.29.29.29",         # 腾讯DNSPod
     "2001:4860:4860::8888", # Google DNS (IPv6)
     "2400:3200::1",         # 阿里云DNS (IPv6)
 );

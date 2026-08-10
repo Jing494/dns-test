@@ -4,14 +4,20 @@
 # 功能：公共变量、辅助函数、测试逻辑入口
 # ============================================================================
 
-# 前置检查：dig 必需
+# 前置检查：dig + perl 必需（perl 用于专项测试）
 command -v dig >/dev/null 2>&1 || { echo "❌ 未找到 dig 命令，请先安装 dnsutils/bind-utils"; exit 1; }
+command -v perl >/dev/null 2>&1 || { echo "❌ 未找到 perl 命令，请先安装 perl（专项测试需要）"; exit 1; }
 
 # 默认DNS组（云南电信，可用环境变量 DEFAULT_DNS_CSV 覆盖，逗号分隔地址；名称可用 DEFAULT_DNS_NAME_CSV 覆盖）
 if [ -n "$DEFAULT_DNS_CSV" ]; then
   IFS=',' read -ra DEFAULT_DNS_ADDR <<< "$DEFAULT_DNS_CSV"
   if [ -n "$DEFAULT_DNS_NAME_CSV" ]; then
     IFS=',' read -ra DEFAULT_DNS_NAME <<< "$DEFAULT_DNS_NAME_CSV"
+    # 名称数量不足时自动补齐（防显示为空）
+    while [ ${#DEFAULT_DNS_NAME[@]} -lt ${#DEFAULT_DNS_ADDR[@]} ]; do
+      _ni=${#DEFAULT_DNS_NAME[@]}
+      DEFAULT_DNS_NAME+=("自定义DNS(${DEFAULT_DNS_ADDR[$_ni]})")
+    done
   else
     DEFAULT_DNS_NAME=()
     for _a in "${DEFAULT_DNS_ADDR[@]}"; do DEFAULT_DNS_NAME+=("自定义DNS(${_a})"); done
@@ -110,6 +116,11 @@ DOMAINS_TTL=(
   "www.github.com" "www.google.com"
 )
 
+# 域名列表外置覆盖（可用 CONFIG_DOMAINS 环境变量指定配置文件，格式同本文件变量定义，如 DOMAINS_MAIN=("a.com" "b.com")）
+if [ -n "$CONFIG_DOMAINS" ] && [ -f "$CONFIG_DOMAINS" ]; then
+  source "$CONFIG_DOMAINS"
+fi
+
 # CDN多节点域名（劫持检测时用于判定，含国内常见负载均衡域名）
 CDN_DOMAINS="www.bilibili.com www.douyin.com www.iqiyi.com www.youku.com www.google.com www.youtube.com www.qq.com www.taobao.com www.jd.com www.163.com www.sina.com.cn www.zhihu.com www.baidu.com"
 
@@ -146,6 +157,20 @@ print_env_info() {
     ping -6 $v6opts 2400:3200::1 >/dev/null 2>&1 && v6="可用"
   fi
   echo "  🌐 环境: ${os} | ${deps} | IPv6:${v6} | 端口测试需真机(UDP受限环境不可用)"
+}
+
+# DNS地址格式校验（IPv4/IPv6），非法返回1（防命令注入/误传）
+valid_dns_addr() {
+  local addr="$1"
+  # IPv4 格式
+  if [[ "$addr" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+    return 0
+  fi
+  # IPv6 格式（含冒号、仅hex和冒号）
+  if [[ "$addr" =~ ^[0-9a-fA-F:]+$ ]] && [[ "$addr" == *":"* ]]; then
+    return 0
+  fi
+  return 1
 }
 
 # DNS可达性预检函数：不可达返回1（快速跳过，避免59~90次查询白等）
@@ -638,6 +663,7 @@ run_full_test() {
   local overall=$((success_all * 100 / total_all))
   printf "  ┃ 📊 综合评分: %d%% (%d/%d 项通过)\n" "$overall" "$success_all" "$total_all"
   printf "  ┃ ⏱️  平均延迟: %dms | 稳定性: %d%%\n" "$avg_t" "$stab_rate"
+  printf "  ┃ 🔑 关键指标: A记录%d%% 稳定性%d%% 劫持%d/%d\n" "$a_rate" "$stab_rate" "$hijack_safe" "$hijack_judged"
   echo "  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
 }
 
@@ -872,5 +898,6 @@ run_lite_test() {
   local overall=$((success_all * 100 / total_all))
   printf "  ┃ 📊 综合评分: %d%% (%d/%d 项通过)\n" "$overall" "$success_all" "$total_all"
   printf "  ┃ ⏱️  稳定性: %d%%\n" "$stab_rate"
+  printf "  ┃ 🔑 关键指标: A记录%d%% 稳定性%d%%\n" "$a_rate" "$stab_rate"
   echo "  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
 }

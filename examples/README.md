@@ -71,7 +71,7 @@ perl examples/04_reverse_dns.pl
 
 ### 04_reverse_dns.pl — 反向DNS解析（PTR）
 - **功能**: IP 地址 → 域名（支持 IPv4 in-addr.arpa 和 IPv6 ip6.arpa）
-- **默认查询IP**: 8.8.8.8 / 114.114.114.114 / 223.5.5.5 / 192.0.2.1 / Google&阿里 IPv6
+- **默认查询IP**: 8.8.8.8 / 114.114.114.114 / 223.5.5.5 / 119.29.29.29 / Google&阿里 IPv6
 - **用法**: `perl examples/04_reverse_dns.pl [DNS地址]`
 - **输出**: PTR 记录（如 `8.8.8.8 → dns.google`）
 

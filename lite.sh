@@ -10,6 +10,18 @@ source "${SCRIPT_DIR}/lib/core.sh"
 # 异常退出时清理并行临时目录
 trap 'rm -rf "$PARR_TMPDIR"' EXIT INT TERM
 
+# 自动保存日志（SAVE_LOG=1 时写入 results/，Linux tee到终端+文件 / macOS写文件）
+if [ -n "$SAVE_LOG" ]; then
+  mkdir -p "${SCRIPT_DIR}/results"
+  LOG_FILE="${SCRIPT_DIR}/results/$(basename "$0" .sh)-$(date +%Y%m%d-%H%M%S).log"
+  if [ "$(uname)" = "Darwin" ]; then
+    exec > "$LOG_FILE" 2>&1
+  else
+    exec > >(tee "$LOG_FILE") 2>&1
+  fi
+  echo "📄 日志保存: $LOG_FILE"
+fi
+
 # 处理参数
 # 支持传入索引参数指定测试第几个DNS，避免超时
 # 用法：bash lite.sh [DNS1] [DNS2] ... [索引]
@@ -40,6 +52,11 @@ else
   IDX=-1
 fi
 
+# DNS地址格式校验（防命令注入/误传）
+for _a in "${DNS_ADDR[@]}"; do
+  valid_dns_addr "$_a" || { echo "❌ 非法DNS地址: $_a（仅支持IPv4/IPv6格式）"; exit 1; }
+done
+
 print_header "DNS 基础测试 (精简版 v2026.08)"
 START_TIME=$(date +%s)
 print_env_info
@@ -50,13 +67,15 @@ for idx in "${!DNS_ADDR[@]}"; do
 done
 echo ""
 
+tested=0
 if [ $IDX -ge 0 ]; then
   # 测试指定索引的DNS
-  run_lite_test "${DNS_ADDR[$IDX]}" "${DNS_NAME[$IDX]}"
+  run_lite_test "${DNS_ADDR[$IDX]}" "${DNS_NAME[$IDX]}" && tested=1
 else
   # 测试所有DNS
   for idx in "${!DNS_ADDR[@]}"; do
     if run_lite_test "${DNS_ADDR[$idx]}" "${DNS_NAME[$idx]}"; then
+      tested=$((tested + 1))
       # 最后一个不休息
       [ $idx -lt $((${#DNS_ADDR[@]} - 1)) ] && sleep 3
     fi
@@ -69,3 +88,6 @@ echo "  ⏱️  总耗时: $((elapsed / 60))分 $((elapsed % 60))秒"
 echo "╔════════════════════════════════════════════════════════════════════════════╗"
 echo "║                       基础测试完成 ✓                                      ║"
 echo "╚════════════════════════════════════════════════════════════════════════════╝"
+
+# 退出码约定：0=测试完成(至少1个DNS测过)；2=所有DNS不可达
+[ "$tested" -gt 0 ] && exit 0 || exit 2

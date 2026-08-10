@@ -11,26 +11,45 @@ use Socket qw(:DEFAULT IPPROTO_UDP IPPROTO_TCP);
 
 my $TIMEOUT = 3;
 
-# 被测路由器DNS
+# 被测路由器DNS（-- 前）与省级对比基准（-- 后，逗号分隔）
 my @router_dns_list;
-if (@ARGV) {
-    @router_dns_list = @ARGV;
-} else {
-    @router_dns_list = ("192.168.1.1", "192.168.2.1");
+my @province_dns;
+my $sep_idx = -1;
+for (my $i = 0; $i < @ARGV; $i++) {
+    if ($ARGV[$i] eq "--") { $sep_idx = $i; last; }
 }
 
-# 省级DNS对比基准（默认云南电信，可用环境变量 PROVINCE_DNS 覆盖，逗号分隔）
-my @province_dns;
-if ($ENV{PROVINCE_DNS}) {
-    @province_dns = split(/,/, $ENV{PROVINCE_DNS});
-    print "自定义省级基准: $ENV{PROVINCE_DNS}\n";
+if ($sep_idx >= 0) {
+    # -- 分隔：前=路由器IP（可多个），后=省级对比基准（逗号分隔）
+    @router_dns_list = @ARGV[0 .. $sep_idx - 1];
+    my @ref = @ARGV[$sep_idx + 1 .. $#ARGV];
+    @province_dns = split(/,/, join(",", @ref));
+    print "自定义省级基准(--): " . join(", ", @province_dns) . "\n";
+} elsif (@ARGV) {
+    @router_dns_list = @ARGV;
+    if ($ENV{PROVINCE_DNS}) {
+        @province_dns = split(/,/, $ENV{PROVINCE_DNS});
+        print "自定义省级基准(环境变量): $ENV{PROVINCE_DNS}\n";
+    } else {
+        @province_dns = (
+            "61.166.150.123",
+            "222.172.200.68",
+            "240e:52:4800::8888",
+            "240e:52:4000::8888",
+        );
+    }
 } else {
+    @router_dns_list = ("192.168.1.1", "192.168.2.1");
     @province_dns = (
         "61.166.150.123",
         "222.172.200.68",
         "240e:52:4800::8888",
         "240e:52:4000::8888",
     );
+    print "用法: perl 03_test_router_dns.pl [路由器IP1] [路由器IP2] [-- 省级DNS1,省级DNS2]\n";
+    print "  例: perl 03_test_router_dns.pl 192.168.1.1              # 默认对比云南电信\n";
+    print "  例: perl 03_test_router_dns.pl 192.168.1.1 -- 223.5.5.5  # 自定义省级基准\n";
+    print "  也可用环境变量 PROVINCE_DNS=\"223.5.5.5\" 指定基准\n\n";
 }
 
 # 测试域名（VoWiFi + 常用网站）

@@ -20,6 +20,7 @@ dns-test/
 ├── README.md                   # 总说明文档（你当前看的这个）
 ├── dns-test.sh                 # 统一入口脚本（推荐使用）
 ├── dns-preset.sh               # DNS预设快捷测试（云南电信/阿里/腾讯一键测）
+├── smoke_test.sh               # 自动化冒烟测试（一键验证核心功能）
 ├── full.sh/lite.sh             # DNS基础测试入口
 ├── lib/core.sh                 # 公共核心库（变量/函数/测试逻辑）
 ├── docs/                       # 详细技术文档
@@ -38,7 +39,8 @@ dns-test/
 │   │   ├── 03_test_router_dns.pl   # 路由器DNS转发测试
 │   │   └── carrier_epdg.pl         # 运营商ePDG部署检测（电信/移动/联通/广电）
 │   └── network/                # 通用网络测试
-│       └── 01_port_test.pl         # 端口连通性测试
+│       ├── 01_port_test.pl         # 端口连通性测试
+│       └── doh_dot_check.sh        # DoH/DoT 支持检测
 └── results/                    # 测试结果存储目录（可选）
 ```
 
@@ -84,7 +86,7 @@ bash lite.sh            # 精简版基础测试
 perl tools/vowifi/01_resolve_vowifi.pl 8.8.8.8              # VoWiFi解析
 perl tools/vowifi/02_vowifi_verify.pl 8.8.8.8 114.114.114.114 # VoWiFi交叉验证
 perl tools/vowifi/03_test_router_dns.pl 192.168.1.1        # 路由器DNS测试
-perl tools/network/01_port_test.pl 192.0.2.1 4500 udp # 端口测试
+perl tools/network/01_port_test.pl 223.5.5.5 53 udp # 端口测试
 
 # 通用示例
 perl examples/01_dns_query.pl 8.8.8.8                      # 基础查询
@@ -172,6 +174,7 @@ perl examples/04_reverse_dns.pl 8.8.8.8                     # 反向解析
 | 路由器DNS转发测试 | 验证路由器DNS是否将请求转发到省级DNS（云南电信） | 192.168.1.1/192.168.2.1 |
 | 端口连通性测试 | 测试ePDG/VoWiFi相关端口的TCP/UDP连通性 | ePDG服务器4500/500端口 |
 | 运营商ePDG部署检测 | 检测电信/移动/联通/广电的ePDG域名解析，判断各省份VoWiFi部署 | 云南电信DNS（可选家宽路由器） |
+| DoH/DoT支持检测 | 判断DNS是否提供加密解析（有curl实测/无则端口级） | 223.5.5.5 等 |
 | 通用示例 | 基础查询、多DNS对比、DNS64检测、反向解析 | 云南电信DNS |
 
 ---
@@ -202,7 +205,7 @@ perl examples/04_reverse_dns.pl 8.8.8.8                     # 反向解析
 运行路由器DNS转发测试（`perl tools/vowifi/03_test_router_dns.pl 192.168.1.1`），脚本会先取云南电信省级DNS的解析结果作为基准，再对比路由器DNS的解析结果——完全一致则说明路由器将DNS请求转发到了省级DNS；不一致则可能是自建DNS或转发了其他DNS。
 
 ### Q: 支持哪些操作系统？
-支持所有安装了`dig`、`ping`工具的Linux/macOS系统，Perl脚本需要Perl 5.10+环境。
+支持所有安装了`dig`、`ping`工具的Linux/macOS系统（WSL亦可，需装 dnsutils/bind-utils），Perl脚本需要Perl 5.10+环境。
 
 ### Q: 可以测试多少个DNS？
 支持任意数量的DNS。单个DNS可完整跑完；多个DNS建议用索引参数逐个测（`bash full.sh A B 0`、`bash full.sh A B 1`），避免单次调用超时。
@@ -210,7 +213,24 @@ perl examples/04_reverse_dns.pl 8.8.8.8                     # 反向解析
 ---
 
 ## 🔄 更新记录
-- 2026-08-09（第十六轮）：新增carrier_epdg.pl运营商ePDG部署检测（电信/移动/联通/广电，交互+传参双模式，支持省级DNS/家宽路由器，附免责声明）；删除vowifi.189.cn（01/02/03同步）；实测国内仅电信mnc011部署ePDG（192.0.2.x），移动/联通/广电无记录；专项菜单新增第6项
+- 2026-08-09（第四十五轮）：perl前置检查（core.sh 统一检查dig+perl）；smoke_test补full完整版测试（14项）；分支完整性/文件齐全/命令引用全复核通过
+- 2026-08-09（第四十四轮）：安全加固——.gitignore补*.log/*报告*/*.tmp；SAVE_LOG日志与测试报告确认不随git上传；敏感IP残留清零（仅私网示例）
+- 2026-08-09（第四十三轮）：安全加固——移除示例中的运营商基础设施IP（端口测试默认目标换公共DNS/私网、专项4引导示例、README/TEST_METHOD/AI_GUIDE/SANDBOX/examples文档示例全部清理）；仅保留02检测对比数据
+- 2026-08-09（第四十二轮）：专项4端口测试/专项7 DoH-DoT 加交互引导（可自定义目标/DNS，回车用默认）；非交互与直接传参完全兼容（read仅交互模式）
+- 2026-08-09（第四十一轮）：专项3路由器测试交互引导（入口进入可输入路由器IP+省级DNS，不锁省级）；专项菜单↔脚本对应复核全通过
+- 2026-08-09（第四十轮）：DoH/DoT加入专项菜单第7项（入口可测）；README专项表补行；smoke补环境依赖报告(13项)
+- 2026-08-09（第三十九轮）：DoH/DoT环境自适应——DoT v4/v6均dig+tls实测；DoH有curl则curl --doh-url实测(阿里200✅)无则端口级；沙箱装curl；md更新DoH描述；smoke补环境依赖报告(13项)
+- 2026-08-09（第三十八轮）：DoH/DoT方法边界诚实化——DoT实测可区分支持与否、DoH仅端口级标注；md补SAVE_LOG详细说明(触发/位置/格式)
+- 2026-08-09（第三十七轮）：DoH/DoT检测IPv6分支升级为实际dig +tls验证（不再假阳性）；smoke_test补SAVE_LOG项
+- 2026-08-09（第三十六轮）：DoH/DoT检测修复——IPv6目标不再假阳性（/dev/tcp不可靠，改dig+tls验证）、支持多DNS逗号分隔、smoke补DoH/DoT项
+- 2026-08-09（第三十五轮）：md全面同步——README/SANDBOX目录结构补smoke_test/doh_dot_check/carrier_epdg，AI_GUIDE命令映射、TEST_METHOD效率机制更新
+- 2026-08-09（第三十四轮）：工程化——新增smoke_test.sh自动化冒烟(10项)；评分加关键指标行🔑；SAVE_LOG日志自动保存；退出码约定(0完成/1错误/2全不可达)；AI_GUIDE报告模板；域名列表CONFIG_DOMAINS外置；DoH/DoT检测脚本
+- 2026-08-09（第三十三轮）：安全——DNS地址格式校验防命令注入（full/lite/preset入口拦截）；DEFAULT_DNS_NAME数量自动补齐；README补WSL支持
+- 2026-08-09（第三十二轮）：端口测试补IPv6目标支持（dns_sockaddr双栈），全工具v4/v6齐
+- 2026-08-09（第三十一轮）：carrier_epdg支持PROVINCE_DNS环境变量覆盖默认DNS
+- 2026-08-09（第三十轮）：03路由器测试支持--分隔符直传省级基准；无参数打印用法提示
+- 2026-08-09（第二十九轮）：路由器测试支持 -- 分隔符命令行直传省级基准（`perl 03.pl 192.168.1.1 -- 223.5.5.5`），优先级 -- > PROVINCE_DNS > 默认云南电信；无参数时打印用法提示；5份文档加路径可放置说明
+- 2026-08-09（第二十八轮）：环境感知——print_env_info环境自检标注（full/lite/dns-test/dns-preset头部）、专项1/2/5加>4 DNS超时保护、专项3忽略DNS_LIST、README环境指引与AI_GUIDE环境行解读
 - 2026-08-09（第十五轮）：自定义性增强——DEFAULT_DNS_CSV覆盖默认DNS组、PROVINCE_DNS覆盖路由器对比基准、PRESET_DNS_CSV自定义预设、examples支持DNS_SERVER/DNS_LIST环境变量；修复03自定义基准全空时数组解引用报错
 - 2026-08-09（第十四轮）：新增[7b]IPv6实际连通性测试（ping6，平台适配ping6/ping -6，无IPv6环境自动跳过不计分）；实测本机IPv6到百度/QQ/B站/腾讯全部通畅（30~76ms）；lite评分项63→64，full 77→78；云南电信完整版复测96~97%稳定
 - 2026-08-09（第十三轮）：AI_GUIDE新增"脚本排障与异常处理"（排查顺序/报错速查）+"环境差异与评分波动"（假失败清单/波动阈值/对比方法论）；云南电信完整版+路由器转发结果归档TEST_METHOD
