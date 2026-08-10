@@ -26,6 +26,7 @@ dns-test/
 ├── full.sh/lite.sh             # DNS基础测试入口
 ├── lib/core.sh                 # 公共核心库（变量/函数/测试逻辑）
 ├── docs/                       # 详细技术文档
+│   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
 │   ├── TEST_METHOD.md          # DNS测试方法论/评分标准
 │   └── SANDBOX_GUIDE.md        # 沙箱环境使用指南
 ├── examples/                   # 通用示例脚本
