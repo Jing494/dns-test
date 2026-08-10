@@ -5,6 +5,23 @@
 # ============================================================================
 cd "$(dirname "$0")"
 PASS=0; FAIL=0
+
+# macOS 默认无 timeout 命令（coreutils 才有），提供兼容实现（函数版）
+if ! command -v timeout >/dev/null 2>&1; then
+  timeout() {
+    local sec="$1"; shift
+    "$@" &
+    local pid=$!
+    ( sleep "$sec"; kill "$pid" 2>/dev/null ) &
+    local wp=$!
+    wait "$pid" 2>/dev/null
+    local rc=$?
+    kill "$wp" 2>/dev/null
+    return $rc
+  }
+  export -f timeout 2>/dev/null
+fi
+
 check() {
   if [ "$2" -eq 0 ]; then echo "  ✅ $1"; PASS=$((PASS+1));
   else echo "  ❌ $1"; FAIL=$((FAIL+1)); fi
