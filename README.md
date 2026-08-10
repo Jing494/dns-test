@@ -2,6 +2,12 @@
 
 > 🌐 **English**：[README.en.md](./README.en.md) ｜ **中文**：本文档
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Release: v2026.08](https://img.shields.io/badge/Release-v2026.08-blue.svg)
+![Platform: Linux/macOS/WSL](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20WSL-green.svg)
+![Bash 4+](https://img.shields.io/badge/Bash-4%2B-blue.svg)
+![Perl 5.10+](https://img.shields.io/badge/Perl-5.10%2B-blue.svg)
+
 > 📍 **目录可自由放置**：脚本全部相对定位（`BASH_SOURCE`），拉取/复制到任意目录都能运行。文档示例中的 `dns-test/` 路径请按你的实际目录替换。
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。

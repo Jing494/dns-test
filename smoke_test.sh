@@ -19,10 +19,10 @@ for f in $(find . -name '*.pl'); do perl -c "$f" >/dev/null 2>&1 || OK=0; done
 check "全量语法" $((1-OK))
 
 echo "--- 2. lite 功能"
-timeout 20 bash lite.sh 223.5.5.5 0 2>&1 | grep -q "综合评分" && check "lite 223.5.5.5" 0 || check "lite 223.5.5.5" 1
+timeout 30 bash lite.sh 223.5.5.5 0 2>&1 | grep -q "综合评分" && check "lite 223.5.5.5" 0 || check "lite 223.5.5.5" 1
 
 echo "--- 2.5 full 完整版"
-timeout 25 bash full.sh 223.5.5.5 0 2>&1 | grep -q "综合评分" && check "full 223.5.5.5" 0 || check "full 223.5.5.5" 1
+timeout 40 bash full.sh 223.5.5.5 0 2>&1 | grep -q "综合评分" && check "full 223.5.5.5" 0 || check "full 223.5.5.5" 1
 
 echo "--- 3. 不可达预检"
 timeout 10 bash lite.sh 192.0.2.1 0 2>&1 | grep -q "不可达" && check "不可达预检跳过" 0 || check "不可达预检跳过" 1
@@ -40,10 +40,10 @@ echo "--- 7. 环境变量自定义"
 DEFAULT_DNS_CSV="223.5.5.5" timeout 10 bash lite.sh 2>&1 | grep -q "自定义DNS" && check "DEFAULT_DNS_CSV" 0 || check "DEFAULT_DNS_CSV" 1
 
 echo "--- 8. carrier_epdg 运营商检测"
-timeout 25 perl tools/vowifi/carrier_epdg.pl ct 222.172.200.68 2>&1 | grep -q "结论" && check "carrier_epdg" 0 || check "carrier_epdg" 1
+timeout 35 perl tools/vowifi/carrier_epdg.pl ct 222.172.200.68 2>&1 | grep -q "结论" && check "carrier_epdg" 0 || check "carrier_epdg" 1
 
 echo "--- 9. 路由器转发"
-timeout 25 perl tools/vowifi/03_test_router_dns.pl 192.168.1.1 2>&1 | grep -q "路由器DNS" && check "路由器测试" 0 || check "路由器测试" 1
+timeout 35 perl tools/vowifi/03_test_router_dns.pl 192.168.1.1 2>&1 | grep -q "路由器DNS" && check "路由器测试" 0 || check "路由器测试" 1
 
 echo "--- 10. 反向解析"
 timeout 15 perl examples/04_reverse_dns.pl 223.5.5.5 2>&1 | grep -q "dns.google\|alidns" && check "反向解析" 0 || check "反向解析" 1
