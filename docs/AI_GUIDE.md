@@ -288,6 +288,7 @@ bash lite.sh 192.0.2.1 0; echo $? # 2=全部不可达（192.0.2.1为TEST-NET保�
 ### 环境差异导致的"假失败"清单
 | 现象 | 真实原因（不是脚本问题） |
 |------|------------------------|
+| Windows 下脚本无法运行 | 需 WSL/Git Bash（脚本依赖 bash 特性与 GNU 工具，不支持原生 cmd/PowerShell）；详见 README FAQ |
 | 端口测试 UDP "发送失败/无响应" | 沙箱 UDP 出站（非 53）受限 → 真机才能测端口 |
 | IPv6 DNS 全部"不可达跳过" | 当前网络无 IPv6 → 预检自动跳过，正常 |
 | baidu.com 预检失败但其他 DNS 正常 | 海外网络 baidu.com 解析慢 → 预检已改双域名（alidns.com 兜底） |
