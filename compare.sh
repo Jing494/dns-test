@@ -20,6 +20,7 @@ source lib/core.sh
 VERSION="v2026.08"
 GEN_HTML=0
 SAVE_JSON=1
+# lite默认计分点（无IPv6环境=63；IPv6可用时7b项参与计分=64，环境相关）
 LITE_ITEMS="63"
 
 # ---------- 参数解析 ----------
