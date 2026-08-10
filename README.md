@@ -294,6 +294,7 @@ wsl -d Ubuntu -- bash smoke_test.sh               # 验证
 ---
 
 ## 🔄 更新记录
+- 2026-08-10（第六十轮）：全链路丝滑衔接——lite/full完成横幅加"对比/趋势"下一步提示、compare尾部加趋势提示（出口=入口闭环）；dns-test.sh专项菜单新增 8.多DNS对比 9.趋势洞察（带DNS引导输入）；install.sh下一步指引补compare/trends；smoke补第21项compare对比（21→22项）；非交互传多DNS时提示可用compare；AI_GUIDE命令映射表补两行
 - 2026-08-10（第五十九轮）：新增 trends.sh DNS趋势洞察——聚合 results/compare-*.json（按DNS分组、按时间排序），线性回归斜率为主+首尾对比为辅的趋势判定（评分↑=变好/延迟↑=变好，箭头=好坏方向）；输出文本总览表+trends.csv+trends/report.html（纯SVG折线图，无JS依赖，响应式手机可看）；--detail/--limit/--since/DNS过滤；--cron 定时采集模式（先跑compare再聚合，附crontab示例）；环境变量 TRENDS_DIR/COMPARE_RESULTS_DIR；smoke补19/20项；README/AI_GUIDE同步
 - 2026-08-10（第五十八轮）：compare.sh v2 重构——延迟改3次dig中位数（去掉名不副实的"平均"）；lite批次并发（默认3，COMPARE_MAX_CONCURRENCY可调，3 DNS从45s+降至~20s）；DNS去重；不可达DNS跳过lite；结构化JSON结果 results/compare-<ts>.json（供趋势积累）；HTML报告响应式（手机可看）+综合推荐结论+延迟颜色分级（绿<100ms 黄100~300ms 红≥300ms）+汇总表；退出码0/1/2（全不可达=2）；README目录结构/用法/更新记录同步
 - 2026-08-10（第五十七轮）：compare.sh 延迟改为独立dig测量（lite版不输出延迟，避免无数据硬填）

@@ -132,7 +132,9 @@ if [ -t 0 ]; then
       echo "5. 通用示例脚本（基础查询/多DNS对比/DNS64检测/反向解析）"
       echo "6. 运营商ePDG部署检测（电信/移动/联通/广电，判断各省份VoWiFi部署情况）"
       echo "7. DoH/DoT支持检测（判断DNS是否提供加密解析）"
-      read -t 30 -p "请输入选项(1-7): " professional_test
+      echo "8. 多DNS对比（compare.sh，横向对比评分/延迟，可生成HTML报告）"
+      echo "9. DNS趋势洞察（trends.sh，聚合历史compare数据看趋势，需先积累）"
+      read -t 30 -p "请输入选项(1-9): " professional_test
       echo ""
       case $professional_test in
         1)
@@ -258,6 +260,29 @@ if [ -t 0 ]; then
             bash tools/network/doh_dot_check.sh
           fi
           ;;
+        8)
+          echo "开始多DNS对比（compare.sh，lite精简版63项/DNS，并行）..."
+          if [ ${#DNS_LIST[@]} -ge 2 ]; then
+            echo "  使用当前DNS列表: ${DNS_LIST[*]}"
+            bash compare.sh "${DNS_LIST[@]}"
+          else
+            echo "  对比至少需要2个DNS（当前: ${DNS_LIST[*]:-无}）"
+            read -t 30 -p "  请输入要对比的DNS（逗号分隔，回车默认 223.5.5.5,119.29.29.29）: " cmp_input
+            if [ -n "$cmp_input" ]; then
+              # 逗号/空格分隔都兼容
+              cmp_list=($(echo "$cmp_input" | tr ',' ' '))
+              bash compare.sh "${cmp_list[@]}"
+            else
+              echo "  未输入，默认对比 223.5.5.5 与 119.29.29.29"
+              bash compare.sh 223.5.5.5 119.29.29.29
+            fi
+          fi
+          ;;
+        9)
+          echo "开始DNS趋势洞察（trends.sh，聚合 results/compare-*.json）..."
+          echo "  提示: 需先积累compare数据（跑过第8项或直接跑compare.sh即自动保存）"
+          bash trends.sh --html
+          ;;
         *)
           echo "无效选项，返回主菜单..."
           ;;
@@ -271,6 +296,9 @@ if [ -t 0 ]; then
 else
   # 非交互模式：为避免超时，默认只跑精简版+第1个DNS
   echo "非交互模式，为避免超时，默认运行精简版测试（仅第1个DNS）..."
+  if [ ${#DNS_LIST[@]} -ge 2 ]; then
+    echo "  💡 检测到 ${#DNS_LIST[@]} 个DNS：横向对比可用 bash compare.sh ${DNS_LIST[*]}"
+  fi
   source "${SCRIPT_DIR}/lib/core.sh"
   local_dns="${DNS_LIST[0]:-${DEFAULT_DNS_ADDR[0]}}"
   bash lite.sh "$local_dns"

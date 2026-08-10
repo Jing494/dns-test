@@ -127,6 +127,8 @@ bash dns-test.sh
 | DoH/DoT 支持检测 | `bash tools/network/doh_dot_check.sh 223.5.5.5`（环境自适应：DoT=dig+tls实测，DoH=有curl实测/无则端口级） |
 | DNS64 检测 | `perl examples/03_dns64_check.pl` |
 | 反向解析（v4/v6） | `perl examples/04_reverse_dns.pl 222.172.200.68` |
+| 多DNS横向对比 | `bash compare.sh 223.5.5.5 119.29.29.29`（`--html` 生成响应式报告；`COMPARE_MAX_CONCURRENCY=1` 串行最稳） |
+| DNS历史趋势洞察 | `bash trends.sh --html --csv`（需先积累 compare 数据；`--cron DNS列表` 配 crontab 定时采集） |
 
 ---
 

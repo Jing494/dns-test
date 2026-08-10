@@ -36,8 +36,10 @@ if [ "$1" = "--smoke" ]; then
   bash smoke_test.sh
 else
   echo "✅ 依赖安装完成！下一步（任选）:"
-  echo "  bash smoke_test.sh               # 验证环境（19项自动化）"
+  echo "  bash smoke_test.sh               # 验证环境（22项自动化）"
   echo "  bash dns-test.sh                 # 交互引导测试（选DNS/版本/专项）"
   echo "  bash lite.sh 223.5.5.5 0         # 快速测一个DNS"
+  echo "  bash compare.sh 223.5.5.5 119.29.29.29  # 多DNS横向对比"
+  echo "  bash trends.sh --html            # 趋势洞察（积累compare数据后）"
   echo "  bash install.sh --smoke          # 或装完直接跑冒烟"
 fi
