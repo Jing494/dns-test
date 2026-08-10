@@ -183,13 +183,13 @@ AI 使用本工具集时，请遵循 [AI_GUIDE.md](./AI_GUIDE.md) 的完整操�
 
 ```bash
 # 交互式引导（推荐，可先选DNS组：1云南电信/2阿里/3腾讯/4全部）
-bash /workspace/dns-test/dns-test.sh
+bash dns-test.sh
 
 # 非交互（自动精简版+单DNS，防超时）
-bash /workspace/dns-test/dns-test.sh 8.8.8.8 </dev/null
+bash dns-test.sh 8.8.8.8 </dev/null
 
 # 预设快捷测试（云南电信/阿里/腾讯）
-bash /workspace/dns-test/dns-preset.sh ali lite 0
+bash dns-preset.sh ali lite 0
 ```
 
 ### 对照DNS（阿里/腾讯，官方地址）
@@ -214,37 +214,37 @@ bash /workspace/dns-test/dns-preset.sh ali lite 0
 
 ```bash
 # 精简版（默认云南电信4个DNS）
-bash /workspace/dns-test/lite.sh
+bash lite.sh
 
 # 完整版（自定义DNS）
-bash /workspace/dns-test/full.sh 8.8.8.8
+bash full.sh 8.8.8.8
 
 # 多DNS只测第1个（避免超时）
-bash /workspace/dns-test/full.sh 8.8.8.8 114.114.114.114 0
+bash full.sh 8.8.8.8 114.114.114.114 0
 
 # 稳定性轮次自定义
-STAB_ROUNDS=5 bash /workspace/dns-test/lite.sh 8.8.8.8
+STAB_ROUNDS=5 bash lite.sh 8.8.8.8
 
 # 保存测试结果到 results/ 目录
-bash /workspace/dns-test/full.sh 8.8.8.8 0 | tee /workspace/dns-test/results/full-$(date +%Y%m%d).log
+bash full.sh 8.8.8.8 0 | tee dns-test/results/full-$(date +%Y%m%d).log
 ```
 
 ### 专项测试
 
 ```bash
 # VoWiFi 全域名解析（v4/v6 均可）
-perl /workspace/dns-test/tools/vowifi/01_resolve_vowifi.pl 8.8.8.8
+perl tools/vowifi/01_resolve_vowifi.pl 8.8.8.8
 
 # VoWiFi 多DNS交叉验证
-perl /workspace/dns-test/tools/vowifi/02_vowifi_verify.pl 8.8.8.8 114.114.114.114
+perl tools/vowifi/02_vowifi_verify.pl 8.8.8.8 114.114.114.114
 
 # 路由器DNS转发测试（对比省级DNS，支持--分隔自定义基准）
-perl /workspace/dns-test/tools/vowifi/03_test_router_dns.pl 192.168.1.1
-perl /workspace/dns-test/tools/vowifi/03_test_router_dns.pl 192.168.1.1 -- 223.5.5.5
+perl tools/vowifi/03_test_router_dns.pl 192.168.1.1
+perl tools/vowifi/03_test_router_dns.pl 192.168.1.1 -- 223.5.5.5
 # 说明: --前=路由器IP，--后=省级对比基准(逗号分隔)；默认云南电信；也可用 PROVINCE_DNS 环境变量
 
 # 端口连通性测试
-perl /workspace/dns-test/tools/network/01_port_test.pl 223.5.5.5 53 udp
+perl tools/network/01_port_test.pl 223.5.5.5 53 udp
 ```
 
 ### 自定义 DNS

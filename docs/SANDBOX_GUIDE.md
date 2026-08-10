@@ -106,10 +106,10 @@ sub dns_sockaddr {
 
 ---
 
-## 五、工具集结构（/workspace/dns-test/）
+## 五、工具集结构（dns-test/）
 
 ```
-/workspace/dns-test/
+dns-test/
 ├── README.md                   # 总说明文档
 ├── dns-test.sh                 # 统一入口（交互引导，非交互自动降级防超时）
 ├── dns-preset.sh               # DNS预设快捷测试（云南电信/阿里/腾讯）
@@ -144,31 +144,31 @@ sub dns_sockaddr {
 ### 统一入口
 ```bash
 # 交互引导（推荐）
-bash /workspace/dns-test/dns-test.sh
+bash dns-test.sh
 
 # 非交互（自动精简版+单DNS，防超时）
-bash /workspace/dns-test/dns-test.sh 8.8.8.8 </dev/null
+bash dns-test.sh 8.8.8.8 </dev/null
 ```
 
 ### 云南电信 DNS 测试（默认目标）
 ```bash
 # 精简版（默认测云南电信4个DNS；注意多DNS会串行跑，建议加索引参数）
-bash /workspace/dns-test/lite.sh 222.172.200.68 0
+bash lite.sh 222.172.200.68 0
 
 # 完整版（单DNS，避免超时）
-bash /workspace/dns-test/full.sh 222.172.200.68 0
+bash full.sh 222.172.200.68 0
 ```
 
 ### 专项测试
 ```bash
 # VoWiFi 全域名解析
-perl /workspace/dns-test/tools/vowifi/01_resolve_vowifi.pl 222.172.200.68
+perl tools/vowifi/01_resolve_vowifi.pl 222.172.200.68
 
 # 路由器DNS转发测试（对比云南电信省级DNS）
-perl /workspace/dns-test/tools/vowifi/03_test_router_dns.pl 192.168.1.1
+perl tools/vowifi/03_test_router_dns.pl 192.168.1.1
 
 # 示例：反向解析（v4/v6均可）
-perl /workspace/dns-test/examples/04_reverse_dns.pl
+perl examples/04_reverse_dns.pl
 ```
 
 ### 使用dig快速验证

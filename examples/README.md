@@ -10,7 +10,7 @@
 ## 🚀 快速运行
 
 ```bash
-cd /workspace/dns-test
+cd dns-test   # 或你 clone 的目录
 
 # 示例1: 基础DNS查询（默认云南电信DNS）
 perl examples/01_dns_query.pl
