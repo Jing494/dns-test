@@ -33,7 +33,8 @@ for d in "${DNS_ARGS[@]}"; do
   printf "  ⏳ 测试 %s ...\n" "$d"
   out=$(bash lite.sh "$d" 0 2>&1)
   SCORE[$d]=$(echo "$out" | grep -oE "综合评分: [0-9]+" | grep -oE "[0-9]+")
-  DELAY[$d]=$(echo "$out" | grep -oE "平均延迟: [0-9]+" | grep -oE "[0-9]+")
+  # lite版不输出平均延迟，单独dig测一次
+  DELAY[$d]=$(dig @$d www.baidu.com A +time=3 +tries=1 2>/dev/null | sed -n 's/.*Query time: \([0-9]*\).*/\1/p' | head -1)
   STAB[$d]=$(echo "$out" | grep -oE "稳定性: [0-9]+%" | grep -oE "[0-9]+")
   [ -z "${SCORE[$d]}" ] && SCORE[$d]="不可达"
 done
