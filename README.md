@@ -3,13 +3,16 @@
 > 🌐 **English**：[README.en.md](./README.en.md) ｜ **中文**：本文档
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Release: v2026.08](https://img.shields.io/badge/Release-v2026.08-blue.svg)
+![Release: v1.5](https://img.shields.io/badge/Release-v1.5-blue.svg)
+![Version: v2026.08.2](https://img.shields.io/badge/Version-v2026.08.2-blue.svg)
 ![Platform: Linux/macOS/WSL](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20WSL-green.svg)
 ![Bash 3.2+](https://img.shields.io/badge/Bash-3.2%2B-blue.svg)
 ![Perl 5.10+](https://img.shields.io/badge/Perl-5.10%2B-blue.svg)
 [![CI](https://github.com/Jing494/dns-test/actions/workflows/smoke.yml/badge.svg)](https://github.com/Jing494/dns-test/actions)
 
 > 📍 **目录可自由放置**：脚本全部相对定位（`BASH_SOURCE`），拉取/复制到任意目录都能运行。文档示例中的 `dns-test/` 路径请按你的实际目录替换。
+
+> 🏷️ **版本号规则（双轨制）**：`vYYYY.MM.N` 日期式（N=当月发布序号）↔ 语义 `vX.Y`（X=主版本，重大重构才升；Y=次版本，功能更新）。当前 **v1.5 = v2026.08.2**（功能大更新：compare/trends/macOS兼容）；v1.0 = v2026.08（初始发布）。补丁级修复仅递增日期式 N。
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
@@ -78,7 +81,7 @@ cd dns-test
 
 # 方式2: Releases 下载（免 git，直接拿成品包）
 #   前往 https://github.com/Jing494/dns-test/releases
-#   下载 dns-test-v2026.08.tar.gz 后解压即可
+#   下载 dns-test-v2026.08.2.tar.gz 后解压即可
 
 # 方式3: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
 ```
@@ -294,6 +297,7 @@ wsl -d Ubuntu -- bash smoke_test.sh               # 验证
 ---
 
 ## 🔄 更新记录
+- 2026-08-10（第六十四轮）：版本号升级 **v1.5 (v2026.08.2)**——双轨制版本规则落地（日期式 vYYYY.MM.N ↔ 语义 vX.Y，README 顶部注明）；代码 VERSION 统一更新（lite/full/compare/trends/release.sh）；README 徽章/下载名同步
 - 2026-08-10（第六十三轮）：文档一致性彻查——AI_GUIDE初始化章节smoke项数19→22修正；TEST_METHOD 3GPP域名数1/2→3个（与core.sh DOMAINS_3GPP对齐，mnc011/mnc000/mnc001）；边界测试矩阵全过（无参数/注入/缺值/未知参数/超长参数/混合v4-v6，退出码1均正确）
 - 2026-08-10（第六十二轮）：macOS timeout命令兼容——core.sh/smoke_test/doh_dot_check 三处加兼容函数（macOS 默认无 timeout，仅 coreutils 有；函数版后台sleep+kill模拟，正常/超时/管道三场景实测通过）；doh_dot_check 去冗余 timeout 包装（dig 用自带 +time、curl 用 --max-time，仅端口级保留）；网络环境矩阵实测：DEFAULT_DNS_CSV/PRESET_DNS_CSV/STAB_ROUNDS/ECS_SUBNET/PROVINCE_DNS 环境变量回退全部生效
 - 2026-08-10（第六十一轮）：macOS bash 3.2 兼容性修复——compare.sh v3 / trends.sh 全部去掉 declare -A 关联数组（改平行数组+索引映射，macOS 默认 bash 3.2 可直跑）；install.sh 重构为"缺失才装+装完强制校验"（依赖已齐零sudo直达冒烟）；smoke下一步指引补compare行；README徽章 Bash 4+→3.2+；CI注释补macOS兼容提醒
