@@ -28,6 +28,9 @@ jobs:
           for f in $(find . -name '*.pl'); do perl -c "$f" >/dev/null 2>&1 || exit 1; done
       - name: Run smoke test
         # 网络敏感项（ePDG等用省级DNS）在GitHub runner海外环境可能偶发超时，
-        # 故 continue-on-error：失败不阻塞CI，输出仍可见
+        # 故 continue-on-error：失败不阻塞CI，输出仍可见。
+        # 注意：macOS runner 默认 /bin/bash 是 3.2（无关联数组），
+        # 全部脚本已按 bash 3.2 兼容编写（compare/trends 用平行数组），
+        # 若冒烟出现语法/运行报错请先检查是否引入了 bash 4+ 专属语法。
         continue-on-error: true
         run: bash smoke_test.sh

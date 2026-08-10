@@ -1,6 +1,7 @@
 #!/bin/bash
 # ============================================================================
 # DNS 趋势洞察：聚合 compare.sh 的历史 JSON 结果，输出趋势总览/CSV/HTML报告
+# 兼容性: bash 3.2+（无关联数组依赖，macOS 默认 bash 可直接运行）
 # 用法: bash trends.sh [DNS地址...] [--html] [--csv] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD]
 #   例: bash trends.sh                              # 全部DNS趋势总览（文本）
 #       bash trends.sh 223.5.5.5                    # 只看223.5.5.5
@@ -80,11 +81,23 @@ fi
 
 # ============================================================================
 # 解析: 拉平为 时间|addr|score|stab|delay 行
-# RAW[addr]  = 每行 "ts|score|stab|delay"（UNREACH行: ts|不可达|-|0|UNREACH）
+# 平行数组（兼容bash 3.2）:
+#   RAW_ADDR[i] = DNS地址（出现顺序）
+#   RAW_VAL[i]  = 该地址的多行数据（每行 ts|score|stab|delay，不可达行尾标UNREACH）
 # ============================================================================
-declare -A RAW=()
-declare -A ORDER=()      # addr → 出现序号
-order_n=0
+RAW_ADDR=()
+RAW_VAL=()
+
+# 查找 addr 在 RAW_ADDR 的下标（-1=不存在）
+raw_idx() {
+  local d="$1" k=0
+  for a in "${RAW_ADDR[@]}"; do
+    [ "$a" = "$d" ] && { echo "$k"; return 0; }
+    k=$((k+1))
+  done
+  echo "-1"
+}
+
 rec_total=0
 for f in $FILES; do
   ts=$(grep -oE '"timestamp": ?"[^"]+"' "$f" | head -1 | sed 's/"timestamp": *"//;s/"$//')
@@ -102,12 +115,16 @@ for f in $FILES; do
       for fd in "${FILTER[@]}"; do [ "$fd" = "$addr" ] && in=1; done
       [ "$in" = "0" ] && continue
     fi
-    [ -z "${ORDER[$addr]:-}" ] && ORDER[$addr]=$order_n && order_n=$((order_n+1))
+    ix=$(raw_idx "$addr")
+    if [ "$ix" = "-1" ]; then
+      RAW_ADDR+=("$addr"); RAW_VAL+=("")
+      ix=$(( ${#RAW_ADDR[@]} - 1 ))
+    fi
     if [ "$score" = "不可达" ]; then
-      RAW[$addr]="${RAW[$addr]}${ts}|不可达|-|${delay}|UNREACH
+      RAW_VAL[$ix]="${RAW_VAL[$ix]}${ts}|不可达|-|${delay}|UNREACH
 "
     else
-      RAW[$addr]="${RAW[$addr]}${ts}|${score}|${stab}|${delay}
+      RAW_VAL[$ix]="${RAW_VAL[$ix]}${ts}|${score}|${stab}|${delay}
 "
       rec_total=$((rec_total+1))
     fi
@@ -118,11 +135,6 @@ if [ "$rec_total" -eq 0 ]; then
   echo "❌ 无可用数据（所有记录均为不可达，或已被 --since/过滤条件排除）"
   exit 2
 fi
-
-# 按出现顺序排 DNS 列表（不用mapfile，macOS bash3.2兼容）
-SORTED_ADDR=()
-while IFS= read -r a; do SORTED_ADDR+=("$a"); done \
-  < <(for a in "${!ORDER[@]}"; do echo "${ORDER[$a]} $a"; done | sort -n | awk '{print $2}')
 
 T0_TS=$(echo "$FILES" | head -1 | sed 's/.*compare-//;s/.json//' | sed 's/\(....\)\(..\)\(..\)-\(..\)\(..\)\(..\)/\1-\2-\3 \4:\5/')
 T1_TS=$(echo "$FILES" | tail -1 | sed 's/.*compare-//;s/.json//' | sed 's/\(....\)\(..\)\(..\)-\(..\)\(..\)\(..\)/\1-\2-\3 \4:\5/')
@@ -196,7 +208,7 @@ trend_stats() {
 
 # ============================================================================
 # SVG 折线图（纯bash生成，无JS依赖）
-# 用法: svg_chart "addr" "数据行" "score|delay" "趋势文字" "单位"
+# 用法: svg_chart "addr" "数据行" "score|delay" "趋势文字" "单位" "最新值" "均值"
 # ============================================================================
 svg_chart() {
   local addr="$1" data="$2" metric="$3" trend="$4" unit="$5" last_disp="$6" mean_disp="$7"
@@ -220,29 +232,24 @@ svg_chart() {
   maxv=$(printf '%s\n' "$data" | awk -F'|' -v c=$col 'NR==1{m=$c} {if($c>m)m=$c} END{print m}')
   [ "$minv" = "$maxv" ] && maxv=$((minv + 1))
   local pts="" dots="" labels="" i=0
-  local maxlabels=10
   while IFS='|' read -r ts sc st dl; do
     local v=""; [ "$metric" = "score" ] && v=$sc || v=$dl
     local x=$((pad_l + i * plot_w / (n - 1)))
     local y=$((pad_t + (maxv - v) * plot_h / (maxv - minv)))
     pts="$pts $x,$y"
     dots="$dots<circle cx='$x' cy='$y' r='3' fill='$color'/>"
-    # X轴标签（最多maxlabels个，首尾必标）
-    if [ $i -eq 0 ] || [ $i -eq $((n - 1)) ] || [ $n -le $maxlabels ]; then
+    if [ $i -eq 0 ] || [ $i -eq $((n - 1)) ] || [ $n -le 10 ]; then
       labels="$labels<text x='$x' y='$((h - 8))' font-size='10' fill='#999' text-anchor='middle'>${ts:5:11}</text>"
     fi
     i=$((i+1))
   done <<< "$data"
-  # Y轴刻度（min/max）
-  local ymin_label="$minv" ymax_label="$maxv"
-  local y1=$((pad_t + (maxv - minv) * plot_h / (maxv - minv)))
   echo "<div class='card'><h2>$addr — $title</h2>"
   echo "<div class='meta'>最新: $last_disp$unit ｜ 均值: $mean_disp$unit ｜ 趋势: $trend</div>"
   echo "<div class='sc'><svg viewBox='0 0 $w $h' style='min-width:${w}px;max-width:100%'>"
   echo "<line x1='$pad_l' y1='$pad_t' x2='$pad_l' y2='$((pad_t + plot_h))' stroke='#ddd'/>"
   echo "<line x1='$pad_l' y1='$((pad_t + plot_h))' x2='$((pad_l + plot_w))' y2='$((pad_t + plot_h))' stroke='#ddd'/>"
-  echo "<text x='6' y='$((pad_t + 4))' font-size='10' fill='#999'>$ymax_label</text>"
-  echo "<text x='6' y='$((pad_t + plot_h + 4))' font-size='10' fill='#999'>$ymin_label</text>"
+  echo "<text x='6' y='$((pad_t + 4))' font-size='10' fill='#999'>$maxv</text>"
+  echo "<text x='6' y='$((pad_t + plot_h + 4))' font-size='10' fill='#999'>$minv</text>"
   echo "<polyline points='$pts' fill='none' stroke='$color' stroke-width='2' stroke-linejoin='round'/>"
   echo "$dots"
   echo "$labels"
@@ -252,8 +259,9 @@ svg_chart() {
 # ============================================================================
 # 主循环：每个DNS统计 + 输出
 # ============================================================================
-for addr in "${SORTED_ADDR[@]}"; do
-  lines="${RAW[$addr]}"
+for k in "${!RAW_ADDR[@]}"; do
+  addr="${RAW_ADDR[$k]}"
+  lines="${RAW_VAL[$k]}"
   stats=$(trend_stats "$lines")
   score_t=$(echo "$stats" | cut -d'|' -f1)
   delay_t=$(echo "$stats" | cut -d'|' -f2)
