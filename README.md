@@ -52,6 +52,32 @@ dns-test/
 
 ## 🚀 快速使用
 
+### 0. 获取与安装
+
+**获取代码**（二选一）：
+```bash
+# 方式1: git clone
+git clone https://github.com/Jing494/dns-test.git
+cd dns-test
+
+# 方式2: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
+```
+
+**依赖安装**（按你的系统执行）：
+| 系统 | 命令 | 需要什么 |
+|------|------|---------|
+| Ubuntu/Debian/WSL | `sudo apt install dnsutils curl` | dig + curl（curl 可选，用于 DoH 实测） |
+| CentOS/RHEL/Fedora | `sudo yum install bind-utils curl` | 同上 |
+| macOS | `brew install bind curl` | 同上 |
+
+> dig 必需（来自 dnsutils/bind-utils）；perl 一般系统自带（专项测试需要）；curl 可选（无 curl 时 DoH 检测降级为端口级）。
+
+**快速验证（5 分钟确认可用）**：
+```bash
+bash smoke_test.sh         # 自动化 14 项验证，全绿 = 环境 OK
+bash lite.sh 223.5.5.5 0   # 测一个 DNS 看看输出
+```
+
 ### 1. 使用统一入口（推荐）
 直接运行入口脚本，按引导选择即可：
 ```bash
