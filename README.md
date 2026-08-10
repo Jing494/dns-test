@@ -7,6 +7,7 @@
 ![Platform: Linux/macOS/WSL](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20WSL-green.svg)
 ![Bash 4+](https://img.shields.io/badge/Bash-4%2B-blue.svg)
 ![Perl 5.10+](https://img.shields.io/badge/Perl-5.10%2B-blue.svg)
+[![CI](https://github.com/Jing494/dns-test/actions/workflows/smoke.yml/badge.svg)](https://github.com/Jing494/dns-test/actions)
 
 > 📍 **目录可自由放置**：脚本全部相对定位（`BASH_SOURCE`），拉取/复制到任意目录都能运行。文档示例中的 `dns-test/` 路径请按你的实际目录替换。
 
@@ -74,6 +75,11 @@ cd dns-test
 #   下载 dns-test-v2026.08.tar.gz 后解压即可
 
 # 方式3: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
+```
+
+**自动安装依赖**（可选，替代手动命令）：
+```bash
+bash install.sh    # 自动检测 apt/yum/dnf/brew 并安装 dig + perl + curl
 ```
 
 **依赖安装**（按你的系统执行）：
