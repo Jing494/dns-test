@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 use Socket qw(:DEFAULT IPPROTO_UDP IPPROTO_TCP);
-
+$| = 1;  # 立即刷新输出（管道/CI 下防块缓冲导致输出丢失误判）
 
 my $TIMEOUT = 5;
 
