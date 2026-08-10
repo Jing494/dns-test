@@ -6,7 +6,42 @@ on:
   pull_request:
 
 jobs:
+  # 严格层：纯确定性项（语法/注入拦截/不可达预检/本地数据聚合），失败即红
+  # 不依赖网络，海外 runner 不会误红 —— 真实回归会被拦截
+  strict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Strict checks (deterministic, no network)
+        run: |
+          echo "--- 1. 全量语法检查"
+          for f in *.sh tools/network/*.sh; do bash -n "$f" || { echo "❌ $f"; exit 1; }; done
+          for f in $(find . -name '*.pl'); do perl -c "$f" >/dev/null 2>&1 || { echo "❌ $f"; exit 1; }; done
+          echo "  ✅ 语法OK"
+          echo "--- 2. 注入拦截"
+          bash lite.sh '1.1.1.1;id' 2>&1 | grep -q "非法" || { echo "❌ 注入拦截失败"; exit 1; }
+          echo "  ✅ 注入拦截"
+          echo "--- 3. 不可达预检"
+          bash lite.sh 192.0.2.1 0 2>&1 | grep -q "不可达" || { echo "❌ 不可达预检失败"; exit 1; }
+          echo "  ✅ 不可达预检"
+          echo "--- 4. trends 本地数据聚合（无网络）"
+          TMPR=$(mktemp -d)
+          cat > "$TMPR/compare-20260810-090000.json" <<'EOF'
+          {"tool":"x","version":"v2026.08.2","timestamp":"2026-08-10 09:00:00 +0800","mode":"lite(63项)","cost_s":1,"dns":[{"addr":"223.5.5.5","score":"96","stab":"100","delay_ms":60,"reachable":true}]}
+          EOF
+          cat > "$TMPR/compare-20260811-090000.json" <<'EOF'
+          {"tool":"x","version":"v2026.08.2","timestamp":"2026-08-11 09:00:00 +0800","mode":"lite(63项)","cost_s":1,"dns":[{"addr":"223.5.5.5","score":"98","stab":"100","delay_ms":50,"reachable":true}]}
+          EOF
+          COMPARE_RESULTS_DIR="$TMPR" TRENDS_DIR="$TMPR/out" bash trends.sh 223.5.5.5 --html --csv >/dev/null || { echo "❌ trends聚合失败"; exit 1; }
+          ls "$TMPR/out/report.html" "$TMPR/out/trends.csv" >/dev/null 2>&1 || { echo "❌ trends产物缺失"; exit 1; }
+          rm -rf "$TMPR"
+          echo "  ✅ trends 聚合+产物"
+          echo "════ Strict checks 全部通过 ════"
+
+  # 容错层：完整冒烟（含网络敏感项：ePDG/路由器/省级DNS等）
+  # 海外 runner 网络波动可能偶发超时，故 continue-on-error：失败不阻塞，日志仍可见
   smoke:
+    needs: strict
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -27,8 +62,6 @@ jobs:
           for f in *.sh tools/network/*.sh; do bash -n "$f" || exit 1; done
           for f in $(find . -name '*.pl'); do perl -c "$f" >/dev/null 2>&1 || exit 1; done
       - name: Run smoke test
-        # 网络敏感项（ePDG等用省级DNS）在GitHub runner海外环境可能偶发超时，
-        # 故 continue-on-error：失败不阻塞CI，输出仍可见。
         # 注意：macOS runner 默认 /bin/bash 是 3.2（无关联数组），
         # 全部脚本已按 bash 3.2 兼容编写（compare/trends 用平行数组），
         # 若冒烟出现语法/运行报错请先检查是否引入了 bash 4+ 专属语法。

@@ -296,7 +296,19 @@ wsl -d Ubuntu -- bash smoke_test.sh               # 验证
 
 ---
 
+## 🗺️ Roadmap（未来计划）
+
+按优先级排序，暂未实施（记录自 longcat 代码审查建议）：
+
+- **单元测试**：优先 Perl 函数级测试（`parse_dns_response`/`dns_sockaddr`/`build_dns_query` 用 Test::More，perl 自带零依赖）；bash 层视需要引入 bats
+- **par_run 通用化**：封装可配置并发数 + 更优雅的结果收集（当前 8 并发 + 临时文件方案够用，核心库重构需谨慎）
+- **trends svg_chart 模板化**：HTML/SVG 内联字符串改 heredoc/独立模板文件（当前功能正常，纯可读性优化）
+- **JSON 序列化增强**：compare 结果结构复杂化时引入 jq（当前 JSON 自产自销且格式固定，echo 拼接足够，避免增加依赖）
+
+---
+
 ## 🔄 更新记录
+- 2026-08-10（第六十五轮）：代码审查建议落地——① timeout 兼容函数抽离到 lib/compat.sh（core.sh/smoke_test/doh_dot_check 三处统一 source，消除重复，compat 为纯函数文件无前置检查依赖）② CI 分层：新增 strict job（语法/注入拦截/不可达预检/trends本地聚合，无网络依赖，**失败即红**，真实回归不再被掩盖），原 smoke 保持容错并 needs strict；③ README 新增 Roadmap（单测/par_run通用化/svg模板化/jq，按优先级记录待实施）
 - 2026-08-10（第六十四轮）：版本号升级 **v1.5 (v2026.08.2)**——双轨制版本规则落地（日期式 vYYYY.MM.N ↔ 语义 vX.Y，README 顶部注明）；代码 VERSION 统一更新（lite/full/compare/trends/release.sh）；README 徽章/下载名同步
 - 2026-08-10（第六十三轮）：文档一致性彻查——AI_GUIDE初始化章节smoke项数19→22修正；TEST_METHOD 3GPP域名数1/2→3个（与core.sh DOMAINS_3GPP对齐，mnc011/mnc000/mnc001）；边界测试矩阵全过（无参数/注入/缺值/未知参数/超长参数/混合v4-v6，退出码1均正确）
 - 2026-08-10（第六十二轮）：macOS timeout命令兼容——core.sh/smoke_test/doh_dot_check 三处加兼容函数（macOS 默认无 timeout，仅 coreutils 有；函数版后台sleep+kill模拟，正常/超时/管道三场景实测通过）；doh_dot_check 去冗余 timeout 包装（dig 用自带 +time、curl 用 --max-time，仅端口级保留）；网络环境矩阵实测：DEFAULT_DNS_CSV/PRESET_DNS_CSV/STAB_ROUNDS/ECS_SUBNET/PROVINCE_DNS 环境变量回退全部生效
