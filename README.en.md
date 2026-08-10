@@ -14,8 +14,10 @@ A unified toolkit for DNS benchmarking and network diagnostics, with a focus on 
 - **Router DNS Forwarding Test** — verify if your home router forwards DNS to the provincial DNS (custom baseline supported)
 - **DoH / DoT Support Check** — adaptive: real test via `dig +tls` / `curl --doh-url` when available, port-level probe otherwise
 - **IPv6 support** — v4/v6 dual-stack everywhere, IPv6 connectivity test (ping6)
-- **AI Operator Manual** — 11-chapter guide teaching AI agents how to interact with users properly (ask DNS → pick version → guide to specialty tests)
-- **Automated Smoke Test** — `smoke_test.sh` validates all core paths in one run (14 checks)
+- **AI Operator Manual** — 12-chapter guide teaching AI agents how to interact with users properly (ask DNS → pick version → guide to specialty tests)
+- **DNS Comparison** — `compare.sh` compares multiple DNS side-by-side (score / latency median / stability), optional responsive HTML report + structured JSON results
+- **Trend Insight** — `trends.sh` aggregates historical compare results (linear-regression trend arrows, CSV export, SVG line charts, optional cron collection)
+- **Automated Smoke Test** — `smoke_test.sh` validates all core paths in one run (22 checks)
 
 ## Quick Start
 
@@ -30,7 +32,7 @@ cd dns-test
 #   macOS:             brew install bind curl
 
 # 3. Verify (5 minutes)
-bash smoke_test.sh          # automated 14-item validation
+bash smoke_test.sh          # automated 22-item validation
 bash lite.sh 223.5.5.5 0    # benchmark a DNS
 ```
 
@@ -40,6 +42,8 @@ bash lite.sh 223.5.5.5 0    # benchmark a DNS
 bash lite.sh                      # default: Yunnan Telecom DNS (lite)
 bash full.sh 8.8.8.8 0            # full test, single DNS (index param to avoid timeout)
 bash dns-preset.sh ali lite 0     # Alibaba DNS preset
+bash compare.sh 223.5.5.5 119.29.29.29 --html  # DNS comparison + HTML report
+bash trends.sh --html --csv       # trend insight (needs accumulated compare data)
 perl tools/vowifi/carrier_epdg.pl all   # carrier ePDG deployment check
 perl tools/vowifi/03_test_router_dns.pl 192.168.1.1   # router forwarding check
 bash tools/network/doh_dot_check.sh 223.5.5.5          # DoH/DoT check
