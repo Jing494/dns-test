@@ -83,7 +83,7 @@ cd dns-test
 | CentOS/RHEL/Fedora | `sudo yum install bind-utils curl` | 同上 |
 | macOS | `brew install bind curl` | 同上 |
 
-> dig 必需（来自 dnsutils/bind-utils）；perl 一般系统自带（专项测试需要）；curl 可选（无 curl 时 DoH 检测降级为端口级）。
+> dig 必需（来自 dnsutils/bind-utils；**DoT 检测需 bind 9.18+** 才支持 `dig +tls`）；perl 一般系统自带（专项测试需要）；curl 可选（无 curl 时 DoH 检测降级为端口级）。
 
 **快速验证（5 分钟确认可用）**：
 ```bash

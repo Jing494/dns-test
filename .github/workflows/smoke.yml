@@ -1,0 +1,19 @@
+name: Smoke Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y dnsutils perl curl
+      - name: Syntax check
+        run: |
+          for f in *.sh tools/network/*.sh; do bash -n "$f" || exit 1; done
+          for f in $(find . -name '*.pl'); do perl -c "$f" >/dev/null 2>&1 || exit 1; done
+      - name: Run smoke test
+        run: bash smoke_test.sh
