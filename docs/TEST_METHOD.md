@@ -261,6 +261,7 @@ perl tools/network/01_port_test.pl 223.5.5.5 53 udp
 | `DEFAULT_DNS_CSV` | 覆盖基础测试默认DNS组（逗号分隔） | `DEFAULT_DNS_CSV="219.141.136.10,219.141.140.10" bash lite.sh` |
 | `DEFAULT_DNS_NAME_CSV` | 覆盖默认DNS组显示名（可选） | `DEFAULT_DNS_NAME_CSV="北京电信1,北京电信2" bash lite.sh` |
 | `PROVINCE_DNS` | 覆盖路由器测试对比基准 | `PROVINCE_DNS="223.5.5.5" perl tools/vowifi/03_test_router_dns.pl 192.168.1.1` |
+| `ECS_SUBNET` | 覆盖 ECS 测试的 subnet（默认云南电信IPv6前缀） | `ECS_SUBNET="223.5.5.0/24" bash full.sh 8.8.8.8 0` |
 | `PRESET_DNS_CSV` | dns-preset 自定义预设组 | `PRESET_DNS_CSV="1.2.4.8,8.8.8.8" bash dns-preset.sh custom lite 0` |
 | `DNS_SERVER` / `DNS_LIST` | examples 默认 DNS | `DNS_SERVER="8.8.8.8" perl examples/01_dns_query.pl` |
 
