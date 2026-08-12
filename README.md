@@ -27,6 +27,8 @@ bash smoke_test.sh     # 23 项自动化验证环境
 bash dns-test.sh       # 交互引导测试（或 bash lite.sh 223.5.5.5 0 快速测）
 ```
 
+**快速全量自检**（真机推荐）：`bash verify.sh`——语法+shellcheck+单测+冒烟+compare+trends+专项 一键跑完，输出汇总报告（约 5 分钟）。
+
 **典型输出**（`bash lite.sh 223.5.5.5 0` 结尾）：
 
 ```
@@ -59,6 +61,7 @@ dns-test/
 ├── dns-preset.sh               # DNS预设快捷测试（云南电信/阿里/腾讯一键测）
 ├── compare.sh                  # 多DNS对比模式（并行+延迟中位数+HTML报告+JSON结果）
 ├── trends.sh                   # DNS趋势洞察（聚合compare历史JSON：趋势总览/CSV/HTML折线图/定时采集）
+├── verify.sh                   # 一键全面验证（语法+shellcheck+单测+冒烟+compare+trends+专项）
 ├── smoke_test.sh               # 自动化冒烟测试（一键验证核心功能）
 ├── install.sh                  # 一键安装（依赖检查+快捷方式）
 ├── release.sh                  # 打包发布脚本（生成 tar.gz + 上传指引）

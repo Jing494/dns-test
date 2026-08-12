@@ -2,6 +2,7 @@
 
 > 完整轮次变更历史（从第 46 轮起有 git 提交可追溯；更早轮次为仓库建立前的开发记录）。
 
+- 2026-08-10（第七十一轮）：新增 verify.sh 一键全面验证（语法+shellcheck+单测+冒烟+compare+trends+专项，真机/沙箱通用，退出码0/1；trends 无数据/超时友好提示）；新增 GitHub issue(Bug报告模板)/PR 模板（含验证清单与兼容性检查项）；README.en 补 --full/--help；README 目录树与 TL;DR 提 verify.sh
 - 2026-08-10（第七十轮）：compare.sh 支持 `--full` 模式（完整版 77~78项/DNS 对比，标题/JSON/HTML 全部模式化）；examples 01-04 脚本加 `--help`/`-h` 用法提示；文档同步（README compare 用法/AI_GUIDE 单测用例数 18/examples README）
 - 2026-08-10（第六十九轮）：**DNSUtil 全量迁移**——其余 7 个 perl 脚本（02/03/carrier_epdg/port_test/examples 01-04）函数副本迁移到 lib/DNSUtil.pm（消除 ~700 行重复代码，统一维护+单测覆盖）；check_ips 改纯函数（prev 引用参数）并入 DNSUtil；**迁移过程状态机一度误删主逻辑**（sub{ 双重计数致花括号配平失效），已定位修复并全量回归；单测扩至 13 用例；smoke 加第 22 项单元测试（22→23 项）；README.en 补 FAQ/CHANGELOG 链接
 
