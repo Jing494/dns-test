@@ -29,120 +29,12 @@ my $DNS_SERVER = $ARGV[0] || $ENV{DNS_SERVER} || "222.172.200.68";  # 默认云�
 
 
 # 构建PTR查询
-sub build_ptr_query {
-    my ($reverse) = @_;
-    my $tid = int(rand(65535));
-    my $header = pack("n6", $tid, 0x0100, 1, 0, 0, 0);
-    my $qname = "";
-    foreach my $label (split(/\./, $reverse)) {
-        my $len = length($label);
-        $len = 63 if ($len > 63);
-        $qname .= pack("C", $len) . substr($label, 0, $len);
-    }
-    $qname .= pack("C", 0);
-    my $qtype_class = pack("nn", 12, 1);  # Type PTR = 12
-    return $header . $qname . $qtype_class;
-}
 
 # 简化版PTR响应解析（仅提取第一个域名）
-sub parse_ptr_response_simple {
-    my ($response) = @_;
-    
-    return () if (length($response) < 12);
-    
-    my ($id, $flags, $qdcount, $ancount) = unpack("n4", substr($response, 0, 12));
-    my $rcode = $flags & 0x000F;
-    my $qr = ($flags >> 15) & 1;
-    return () if (!$qr || $rcode != 0);
-    
-    my $offset = 12;
-    
-    # Skip question section
-    for (my $i = 0; $i < $qdcount && $offset < length($response); $i++) {
-        while ($offset < length($response)) {
-            my $byte = unpack("C", substr($response, $offset, 1));
-            $offset++;
-            last if ($byte == 0);
-            if ($byte >= 192) { $offset++; last; }
-            $offset += $byte;
-        }
-        $offset += 4;
-    }
-    
-    # Parse answer section（PTR的rdata才是目标域名，需解析rdata）
-    my @names;
-    for (my $i = 0; $i < $ancount && $offset < length($response); $i++) {
-        # 跳过 owner name（可能含压缩指针）
-        my $pos = $offset;
-        my $guard = 0;
-        while ($pos < length($response) && $guard < 20) {
-            my $byte = unpack("C", substr($response, $pos, 1));
-            if ($byte == 0) { $pos++; last; }
-            if ($byte >= 192) { $pos += 2; last; }
-            $pos += $byte + 1;
-            $guard++;
-        }
-        $offset = $pos;
-        last if ($offset + 10 > length($response));
-        my ($type, $class, $ttl, $rdlength) = unpack("nnNn", substr($response, $offset, 10));
-        $offset += 10;
-        last if ($offset + $rdlength > length($response));
-        
-        if ($type == 12) {
-            # PTR的rdata是压缩域名，解引用完整解析
-            my $rdata_name = "";
-            my $rpos = $offset;
-            my $rguard = 0;
-            while ($rpos < length($response) && $rguard < 20) {
-                my $byte = unpack("C", substr($response, $rpos, 1));
-                if ($byte == 0) { $rpos++; last; }
-                if ($byte >= 192) {
-                    # rdata内的压缩指针：跳到目标偏移继续
-                    last if ($rpos + 1 >= length($response));
-                    my $ptr = (($byte & 0x3F) << 8) | unpack("C", substr($response, $rpos + 1, 1));
-                    last if ($ptr >= length($response));
-                    $rpos = $ptr;
-                    $rguard++;
-                    next;
-                }
-                $rpos++;
-                if ($rpos + $byte <= length($response)) {
-                    $rdata_name .= substr($response, $rpos, $byte) . "." if $byte > 0;
-                    $rpos += $byte;
-                }
-            }
-            $rdata_name =~ s/\.$//;
-            push @names, $rdata_name if $rdata_name;
-        }
-        
-        $offset += $rdlength;
-    }
-    
-    return @names;
-}
 
 # 构造反向解析域名（v4→in-addr.arpa，v6→ip6.arpa）
-sub build_reverse_name {
-    my ($ip) = @_;
-    if ($ip =~ /:/) {
-        my $expanded = expand_ipv6($ip);
-        return undef unless defined $expanded;
-        my $rev = join(".", reverse split(//, $expanded)) . ".ip6.arpa";
-        return $rev;
-    } else {
-        my @octets = split(/\./, $ip);
-        return undef unless @octets == 4;
-        return join(".", reverse @octets) . ".in-addr.arpa";
-    }
-}
 
 # 展开IPv6为32个hex字符
-sub expand_ipv6 {
-    my ($addr) = @_;
-    my $bytes = inet_pton_ipv6($addr);
-    return undef unless defined $bytes;
-    return join("", map { sprintf("%04x", $_) } unpack("n8", $bytes));
-}
 
 # 主程序
 print "=" x 70 . "\n";

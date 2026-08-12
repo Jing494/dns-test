@@ -22,6 +22,14 @@ A unified toolkit for DNS benchmarking and network diagnostics, with a focus on 
 ## Quick Start
 
 ```bash
+# TL;DR: clone → install → verify
+git clone https://github.com/Jing494/dns-test.git && cd dns-test
+bash install.sh            # install dig/perl/curl only if missing
+bash smoke_test.sh         # 23-item automated validation
+bash dns-test.sh           # interactive guided testing
+```
+
+```bash
 # 1. Get the code
 git clone https://github.com/Jing494/dns-test.git
 cd dns-test
