@@ -51,10 +51,12 @@ bash lite.sh                      # default: Yunnan Telecom DNS (lite)
 bash full.sh 8.8.8.8 0            # full test, single DNS (index param to avoid timeout)
 bash dns-preset.sh ali lite 0     # Alibaba DNS preset
 bash compare.sh 223.5.5.5 119.29.29.29 --html  # DNS comparison + HTML report
+bash compare.sh 223.5.5.5 119.29.29.29 --full   # full-mode comparison (77~78 checks/DNS)
 bash trends.sh --html --csv       # trend insight (needs accumulated compare data)
 perl tools/vowifi/carrier_epdg.pl all   # carrier ePDG deployment check
 perl tools/vowifi/03_test_router_dns.pl 192.168.1.1   # router forwarding check
 bash tools/network/doh_dot_check.sh 223.5.5.5          # DoH/DoT check
+perl examples/01_dns_query.pl --help     # print usage (all examples support --help)
 ```
 
 ## Environment Notes
