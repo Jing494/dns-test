@@ -10,6 +10,13 @@ use FindBin;
 use lib "$FindBin::Bin/../lib";
 use DNSUtil;
 
+# --help/-h 用法提示
+if (@ARGV && $ARGV[0] =~ /^(-h|--help)$/) {
+    print "用法: perl 03_dns64_check.pl [DNS1] [DNS2] ...\n";
+    print "  默认 Google/Cloudflare DNS64 + 云南电信对照；支持环境变量 DNS_LIST\n";
+    exit 0;
+}
+
 # 配置: 待检测的DNS服务器
 my @DNS_SERVERS;
 if (@ARGV) {

@@ -20,6 +20,7 @@ source lib/core.sh
 VERSION="v2026.08.3"
 GEN_HTML=0
 SAVE_JSON=1
+MODE="lite"    # lite(默认) / full
 # lite默认计分点（无IPv6环境=63；IPv6可用时7b项参与计分=64，环境相关）
 LITE_ITEMS="63"
 
@@ -28,12 +29,14 @@ DNS_ARGS=()
 for a in "$@"; do
   case "$a" in
     --html)     GEN_HTML=1 ;;
+    --full)     MODE="full" ;;
     --no-save)  SAVE_JSON=0 ;;
     --help|-h)
-      echo "用法: bash compare.sh DNS1 [DNS2] ... [--html] [--no-save]"
+      echo "用法: bash compare.sh DNS1 [DNS2] ... [--html] [--full] [--no-save]"
       echo "  例: bash compare.sh 223.5.5.5 119.29.29.29 222.172.200.68"
       echo "      bash compare.sh 223.5.5.5 119.29.29.29 --html"
-      echo "环境变量: COMPARE_MAX_CONCURRENCY=3  (lite并行数,1=串行最稳)"
+      echo "      bash compare.sh 223.5.5.5 119.29.29.29 --full   # 用完整版测试(77~78项/DNS)"
+      echo "环境变量: COMPARE_MAX_CONCURRENCY=3  (并行数,1=串行最稳)"
       exit 0 ;;
     *) DNS_ARGS+=("$a") ;;
   esac
@@ -60,9 +63,9 @@ if [ ${#DNS_ARGS[@]} -eq 0 ]; then
   exit 1
 fi
 
-print_header "多DNS对比测试 (v3) — lite精简版 ${LITE_ITEMS}项/DNS"
+print_header "多DNS对比测试 (v3) — $( [ "$MODE" = "full" ] && echo "完整版 77~78项/DNS" || echo "lite精简版 ${LITE_ITEMS}项/DNS" )"
 echo "  对比DNS: ${DNS_ARGS[*]}"
-echo "  lite并发: ${COMPARE_MAX_CONCURRENCY:-3}（设1为串行最稳）"
+echo "  测试并发: ${COMPARE_MAX_CONCURRENCY:-3}（设1为串行最稳）"
 T0=$(date +%s)
 
 # ============================================================================
@@ -107,7 +110,7 @@ STAB_VAL=()
 MAXC="${COMPARE_MAX_CONCURRENCY:-3}"
 [[ "$MAXC" =~ ^[1-9][0-9]*$ ]] || MAXC=3
 echo ""
-echo "  ━━━ [1] 精简版测试（lite ${LITE_ITEMS}项/DNS, 并发${MAXC}） ━━━"
+echo "  ━━━ [1] 测试（$( [ "$MODE" = "full" ] && echo "完整版 77~78项" || echo "lite精简版 ${LITE_ITEMS}项" )/DNS, 并发${MAXC}） ━━━"
 TMPD=$(mktemp -d)
 trap 'rm -rf "$TMPD"' EXIT INT TERM
 
@@ -115,7 +118,7 @@ IDX_MAP=()
 for i in "${!DNS_ARGS[@]}"; do
   if [ -z "${DELAY_VAL[$i]}" ]; then
     SCORE_VAL[$i]="不可达"; STAB_VAL[$i]="-"
-    echo "     ⏭️  ${DNS_ARGS[$i]} 不可达，跳过lite测试"
+    echo "     ⏭️  ${DNS_ARGS[$i]} 不可达，跳过测试"
     continue
   fi
   echo "     ⏳ ${DNS_ARGS[$i]} 测试中..."
@@ -124,7 +127,7 @@ done
 
 pids=(); n=0
 for i in "${IDX_MAP[@]}"; do
-  bash lite.sh "${DNS_ARGS[$i]}" 0 > "$TMPD/$n.out" 2>&1 &
+  bash "${MODE}.sh" "${DNS_ARGS[$i]}" 0 > "$TMPD/$n.out" 2>&1 &
   pids+=($!)
   n=$((n+1))
   if [ $((n % MAXC)) -eq 0 ]; then
@@ -191,7 +194,7 @@ if [ "$SAVE_JSON" = "1" ]; then
     echo "  \"tool\": \"dns-test/compare.sh\","
     echo "  \"version\": \"${VERSION}\","
     echo "  \"timestamp\": \"$(date '+%Y-%m-%d %H:%M:%S %z')\","
-    echo "  \"mode\": \"lite(${LITE_ITEMS}项)\","
+    echo "  \"mode\": \"${MODE}\","
     echo "  \"cost_s\": ${COST},"
     echo "  \"dns\": ["
     i=0
@@ -239,7 +242,7 @@ if [ "$GEN_HTML" = "1" ]; then
     echo "</head><body>"
     echo "<div class='wrap'>"
     echo "<div class='card'><h1>🌐 DNS 对比报告</h1>"
-    echo "<div class='meta'>$(date '+%Y-%m-%d %H:%M:%S') ｜ lite精简版 ${LITE_ITEMS}项/DNS ｜ dns-test ${VERSION} ｜ 耗时${COST}s</div>"
+    echo "<div class='meta'>$(date '+%Y-%m-%d %H:%M:%S') ｜ $( [ "$MODE" = "full" ] && echo "完整版" || echo "lite精简版" ) ${LITE_ITEMS:+${LITE_ITEMS}项}/DNS ｜ dns-test ${VERSION} ｜ 耗时${COST}s</div>"
     if [ "$BEST_IDX" -ge 0 ]; then
       echo "<div class='rec'>🏆 综合推荐: <b>$BEST</b> — 评分${BEST_SCORE}% ｜ 延迟${BEST_DELAY}ms</div>"
     else
