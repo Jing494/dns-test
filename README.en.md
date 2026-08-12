@@ -17,7 +17,7 @@ A unified toolkit for DNS benchmarking and network diagnostics, with a focus on 
 - **AI Operator Manual** — 12-chapter guide teaching AI agents how to interact with users properly (ask DNS → pick version → guide to specialty tests)
 - **DNS Comparison** — `compare.sh` compares multiple DNS side-by-side (score / latency median / stability), optional responsive HTML report + structured JSON results
 - **Trend Insight** — `trends.sh` aggregates historical compare results (linear-regression trend arrows, CSV export, SVG line charts, optional cron collection)
-- **Automated Smoke Test** — `smoke_test.sh` validates all core paths in one run (22 checks)
+- **Automated Smoke Test** — `smoke_test.sh` validates all core paths in one run (23 checks)
 
 ## Quick Start
 
@@ -32,7 +32,7 @@ cd dns-test
 #   macOS:             brew install bind curl
 
 # 3. Verify (5 minutes)
-bash smoke_test.sh          # automated 22-item validation
+bash smoke_test.sh          # automated 23-item validation
 bash lite.sh 223.5.5.5 0    # benchmark a DNS
 ```
 

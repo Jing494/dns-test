@@ -118,7 +118,7 @@ dns-test/
 ├── trends.sh                   # DNS趋势洞察（聚合compare历史：趋势/CSV/SVG折线图/cron采集）
 ├── install.sh                  # 一键安装依赖（缺失才装）
 ├── release.sh                  # 打包发布脚本
-├── smoke_test.sh               # 自动化冒烟测试（22项）
+├── smoke_test.sh               # 自动化冒烟测试（23项）
 ├── full.sh / lite.sh           # 基础测试入口（完整版/精简版）
 ├── lib/core.sh                 # 公共核心库（变量/函数/测试逻辑）
 ├── docs/

@@ -3,7 +3,7 @@
 # 自动安装依赖脚本（缺失才装，自动检测 apt/yum/dnf/brew）
 # 用法: bash install.sh [--smoke]
 #   直接跑: 检测 dig/perl/curl，缺失才安装，装完强制校验，通过后给下一步指引
-#   --smoke: 校验通过后直接跑冒烟测试（22项自动化验证）
+#   --smoke: 校验通过后直接跑冒烟测试（23项自动化验证）
 # 安装: dig(bind-utils/dnsutils/bind) + perl + curl
 # ============================================================================
 echo "════ 依赖检测 ════"
@@ -86,8 +86,8 @@ if [ "$1" = "--smoke" ]; then
   bash smoke_test.sh
 else
   echo "✅ 依赖就绪！下一步（任选）:"
-  echo "  bash install.sh --smoke            # 一键验证环境（22项自动化）"
-  echo "  bash smoke_test.sh                 # 验证环境（22项自动化）"
+  echo "  bash install.sh --smoke            # 一键验证环境（23项自动化）"
+  echo "  bash smoke_test.sh                 # 验证环境（23项自动化）"
   echo "  bash dns-test.sh                   # 交互引导测试（选DNS/版本/专项）"
   echo "  bash lite.sh 223.5.5.5 0           # 快速测一个DNS"
   echo "  bash compare.sh 223.5.5.5 119.29.29.29  # 多DNS横向对比"
