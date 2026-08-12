@@ -40,8 +40,9 @@ cd dns-test
 #   macOS:             brew install bind curl
 
 # 3. Verify (5 minutes)
-bash smoke_test.sh          # automated 23-item validation
-bash lite.sh 223.5.5.5 0    # benchmark a DNS
+bash verify.sh             # one-command full self-check (syntax/unit/smoke/compare/trends)
+bash smoke_test.sh         # automated 23-item validation
+bash lite.sh 223.5.5.5 0   # benchmark a DNS
 ```
 
 ## Usage Examples
