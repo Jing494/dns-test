@@ -10,6 +10,13 @@ use FindBin;
 use lib "$FindBin::Bin/../lib";
 use DNSUtil;
 
+# --help/-h 用法提示
+if (@ARGV && $ARGV[0] =~ /^(-h|--help)$/) {
+    print "用法: perl 04_reverse_dns.pl [DNS地址]\n";
+    print "  默认 222.172.200.68（云南电信）；支持环境变量 DNS_SERVER\n";
+    exit 0;
+}
+
 # 配置: 待反向解析的IP地址（v4/v6 混合，仅公共DNS/私网地址）
 my @IPS = (
     "8.8.8.8",              # Google DNS

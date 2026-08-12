@@ -10,6 +10,13 @@ use FindBin;
 use lib "$FindBin::Bin/../lib";
 use DNSUtil;
 
+# --help/-h 用法提示
+if (@ARGV && $ARGV[0] =~ /^(-h|--help)$/) {
+    print "用法: perl 02_multi_dns_compare.pl [DNS1] [DNS2] ...\n";
+    print "  默认 云南电信×2 + 114 + 阿里 + 云南v6；支持环境变量 DNS_LIST\n";
+    exit 0;
+}
+
 # 配置: 要测试的DNS服务器
 my @DNS_SERVERS;
 if (@ARGV) {
