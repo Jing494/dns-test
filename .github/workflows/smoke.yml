@@ -49,6 +49,9 @@ jobs:
           ls "$TMPR/out/report.html" "$TMPR/out/trends.csv" >/dev/null 2>&1 || { echo "❌ trends产物缺失"; exit 1; }
           rm -rf "$TMPR"
           echo "  ✅ trends 聚合+产物"
+          echo "--- 6. 单元测试（DNSUtil 纯函数）"
+          perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 || { echo "❌ 单元测试失败"; exit 1; }
+          echo "  ✅ 单元测试通过"
           echo "════ Strict checks 全部通过 ════"
 
   # 容错层：完整冒烟（含网络敏感项：ePDG/路由器/省级DNS等）
