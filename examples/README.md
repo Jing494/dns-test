@@ -37,6 +37,7 @@ perl examples/04_reverse_dns.pl
 | `04_reverse_dns.pl` | `[DNS地址]` | `perl examples/04_reverse_dns.pl 114.114.114.114` | `222.172.200.68`（云南电信v4） |
 
 > 💡 **v4/v6 任意混传**：传 `8.8.8.8`、`240e:52:4800::8888`、混合都可以，脚本自动识别双栈。
+> 💡 **查看用法**：所有脚本支持 `--help` / `-h` 打印用法与默认值说明（如 `perl examples/01_dns_query.pl --help`）。
 
 ### 环境变量（不想改命令时的另一种自定义）
 

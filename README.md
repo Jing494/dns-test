@@ -68,7 +68,7 @@ dns-test/
 │   ├── compat.sh               # 平台兼容层（timeout兼容函数，macOS可用）
 │   └── DNSUtil.pm              # DNS纯函数模块（sockaddr/报文构建/响应解析，可单测）
 ├── tests/                      # 单元测试
-│   └── 01_dnsutil.t            # DNSUtil 13用例（perl -Ilib tests/01_dnsutil.t）
+│   └── 01_dnsutil.t            # DNSUtil 18用例（perl -Ilib tests/01_dnsutil.t）
 ├── docs/                       # 详细技术文档
 │   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
 │   ├── TEST_METHOD.md          # DNS测试方法论/评分标准
@@ -184,6 +184,7 @@ perl examples/04_reverse_dns.pl 8.8.8.8                     # 反向解析
 # 多DNS对比（根目录compare.sh，推荐：并行+延迟中位数+推荐结论）
 bash compare.sh 223.5.5.5 119.29.29.29                     # 纯文本对比
 bash compare.sh 223.5.5.5 119.29.29.29 --html               # 生成 results/report.html（响应式）
+bash compare.sh 223.5.5.5 119.29.29.29 --full               # 用完整版测试对比（77~78项/DNS）
 bash compare.sh 223.5.5.5 --no-save                         # 不保存JSON结果
 #   环境变量: COMPARE_MAX_CONCURRENCY=3  lite并行数（设1串行最稳）
 #   输出: results/compare-<时间戳>.json 结构化结果（历史趋势积累用）
@@ -297,7 +298,7 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 按优先级排序：
 
-- **单元测试（已启动 ✅）**：`lib/DNSUtil.pm` 提取 DNS 纯函数 + `tests/01_dnsutil.t` 12 用例（sockaddr/域名编码/响应解析），已接入 CI strict job；运行 `perl -Ilib tests/01_dnsutil.t`
+- **单元测试（已启动 ✅）**：`lib/DNSUtil.pm` 提取 DNS 纯函数 + `tests/01_dnsutil.t` 18 用例（sockaddr/域名编码/响应解析/PTR/IP一致性/畸形包防崩），已接入 CI strict job；运行 `perl -Ilib tests/01_dnsutil.t`
   - 待办：其余 perl 脚本（02/03/04/examples）迁移到 DNSUtil 模块、bats 引入评估
 - **par_run 通用化**：封装可配置并发数 + 更优雅的结果收集（当前 8 并发 + 临时文件方案够用，核心库重构需谨慎）
 - **trends svg_chart 模板化**：HTML/SVG 内联字符串改 heredoc/独立模板文件（当前功能正常，纯可读性优化）
@@ -307,4 +308,4 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 ## 🔄 更新记录
 
-完整变更历史（第 1~69 轮）见 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**。
+完整变更历史（第 1~70 轮）见 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**。
