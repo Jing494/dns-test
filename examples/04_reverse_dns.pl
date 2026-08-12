@@ -6,6 +6,9 @@
 use strict;
 use warnings;
 use Socket qw(:DEFAULT IPPROTO_UDP IPPROTO_TCP);
+use FindBin;
+use lib "$FindBin::Bin/../lib";
+use DNSUtil;
 
 # 配置: 待反向解析的IP地址（v4/v6 混合，仅公共DNS/私网地址）
 my @IPS = (
@@ -23,48 +26,7 @@ my $DNS_SERVER = $ARGV[0] || $ENV{DNS_SERVER} || "222.172.200.68";  # 默认云�
 # IPv6地址转换 
 
 # 自动识别IPv4/IPv6地址，返回 (sockaddr, family, error)
-sub dns_sockaddr {
-    my ($addr, $port) = @_;
-    if ($addr =~ /^\d{1,3}(?:\.\d{1,3}){3}$/) {
-        my $ip = inet_aton($addr);
-        return (undef, undef, "IPv4地址格式无效: $addr") unless defined $ip;
-        return (pack_sockaddr_in($port, $ip), AF_INET, undef);
-    }
-    my $ip = inet_pton_ipv6($addr);
-    return (undef, undef, "IPv6地址格式无效: $addr") unless defined $ip;
-    return (pack("S n N a16 N", AF_INET6, $port, 0, $ip, 0), AF_INET6, undef);
-}
 
-sub inet_pton_ipv6 {
-    my ($addr) = @_;
-    if ($addr =~ /::/) {
-        my @parts = split(/::/, $addr, 2);
-        my @left = $parts[0] ? split(/:/, $parts[0]) : ();
-        my @right = $parts[1] ? split(/:/, $parts[1]) : ();
-        my $missing = 8 - scalar(@left) - scalar(@right);
-        return undef if ($missing < 0);
-        my @mid = ("0") x $missing if $missing > 0;
-        my @full = (@left, @mid, @right);
-        return undef if (scalar(@full) != 8);
-        my $bytes = "";
-        foreach my $part (@full) {
-            $part = "0" if (!defined $part || $part eq "");
-            return undef if ($part =~ /[^0-9a-fA-F]/);
-            $bytes .= pack("n", hex($part));
-        }
-        return $bytes;
-    } else {
-        my @parts = split(/:/, $addr);
-        return undef if (scalar(@parts) != 8);
-        my $bytes = "";
-        foreach my $part (@parts) {
-            $part = "0" if (!defined $part || $part eq "");
-            return undef if ($part =~ /[^0-9a-fA-F]/);
-            $bytes .= pack("n", hex($part));
-        }
-        return $bytes;
-    }
-}
 
 # 构建PTR查询
 sub build_ptr_query {

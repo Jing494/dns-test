@@ -2,6 +2,8 @@
 
 > 完整轮次变更历史（从第 46 轮起有 git 提交可追溯；更早轮次为仓库建立前的开发记录）。
 
+- 2026-08-10（第六十九轮）：**DNSUtil 全量迁移**——其余 7 个 perl 脚本（02/03/carrier_epdg/port_test/examples 01-04）函数副本迁移到 lib/DNSUtil.pm（消除 ~700 行重复代码，统一维护+单测覆盖）；check_ips 改纯函数（prev 引用参数）并入 DNSUtil；**迁移过程状态机一度误删主逻辑**（sub{ 双重计数致花括号配平失效），已定位修复并全量回归；单测扩至 13 用例；smoke 加第 22 项单元测试（22→23 项）；README.en 补 FAQ/CHANGELOG 链接
+
 - 2026-08-10（第六十八轮）：**单元测试启动**——提取 lib/DNSUtil.pm（dns_sockaddr/inet_pton_ipv6/build_dns_query/parse_dns_response 纯函数模块），01_resolve_vowifi.pl 接入（其余脚本后续迁移）；tests/01_dnsutil.t 12 用例（sockaddr v4/v6/非法、IPv6 压缩/展开/hex校验、报文编码、响应解析 A/AAAA/NXDOMAIN/压缩指针/短包）；**单测发现真实 bug**：inet_pton_ipv6 不校验 hex 合法性（perl hex() 宽容处理"gg::1"）已修；CI strict job 加单测步骤；README Roadmap 更新（单测已启动）
 - 2026-08-10（第六十七轮）：工程化与文档优化——① README 顶部加 TL;DR + 典型输出片段 ② CI strict job 加 shellcheck（全项目 0 告警：core.sh 豁免 SC2155/SC2034/SC1090 并注释理由，其余 SC2164×4/SC2206/SC2207/SC2044 全修）③ CI 工程化：concurrency 取消旧run、smoke timeout-minutes、fork PR 跳过网络冒烟、artifact 上传 results/trends 产物 ④ 注入拦截断言改退出码（不依赖输出文本）⑤ install.sh 无包管理器分支增强（各平台手动安装命令表 + WSL/完整环境建议）
 - 2026-08-10（第六十六轮）：补丁版 **v1.5.1 (v2026.08.3)**——代码 VERSION 统一升级（lite/full/compare/trends/release.sh），README 徽章/下载名/版本规则同步（语义版补丁位 .1）
