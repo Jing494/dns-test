@@ -23,7 +23,7 @@
 ```bash
 git clone https://github.com/Jing494/dns-test.git && cd dns-test
 bash install.sh        # 缺失才装 dig/perl/curl（已齐全则跳过 sudo）
-bash smoke_test.sh     # 22 项自动化验证环境
+bash smoke_test.sh     # 23 项自动化验证环境
 bash dns-test.sh       # 交互引导测试（或 bash lite.sh 223.5.5.5 0 快速测）
 ```
 
@@ -68,7 +68,7 @@ dns-test/
 │   ├── compat.sh               # 平台兼容层（timeout兼容函数，macOS可用）
 │   └── DNSUtil.pm              # DNS纯函数模块（sockaddr/报文构建/响应解析，可单测）
 ├── tests/                      # 单元测试
-│   └── 01_dnsutil.t            # DNSUtil 12用例（perl -Ilib tests/01_dnsutil.t）
+│   └── 01_dnsutil.t            # DNSUtil 13用例（perl -Ilib tests/01_dnsutil.t）
 ├── docs/                       # 详细技术文档
 │   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
 │   ├── TEST_METHOD.md          # DNS测试方法论/评分标准
@@ -307,4 +307,4 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 ## 🔄 更新记录
 
-完整变更历史（第 1~68 轮）见 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**。
+完整变更历史（第 1~69 轮）见 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**。
