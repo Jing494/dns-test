@@ -30,7 +30,19 @@ if [ ${#NEED[@]} -eq 0 ]; then
   echo "  ✅ dig / perl / curl 已全部齐全，无需安装（跳过 sudo）"
 elif [ -z "$PM" ]; then
   echo "  ❌ 未检测到 apt/yum/dnf/brew，且缺少: dig perl curl"
-  echo "    请手动安装: dig(bind-utils) + perl + curl"
+  echo ""
+  echo "════ 手动安装指引（按你的系统选一条） ════"
+  echo "  Debian/Ubuntu/WSL:   sudo apt-get install -y dnsutils perl curl"
+  echo "  RHEL/CentOS/Fedora:  sudo dnf install -y bind-utils perl curl   (或 sudo yum ...)"
+  echo "  macOS (Homebrew):    brew install bind perl curl"
+  echo "  Alpine:              apk add bind-tools perl curl"
+  echo "  Arch Linux:          sudo pacman -S bind perl curl"
+  echo "  openSUSE:            sudo zypper install -y bind-utils perl curl"
+  echo "  静态二进制(无包管理器): 从 https://github.com/ 搜索 dig/perl 静态包，或改用系统包管理"
+  echo ""
+  echo "  💡 极简/精简环境（busybox 等）建议：改用 WSL(Ubuntu) 或完整发行版——"
+  echo "     本工具集依赖 dig + perl + curl，busybox 的替代命令不完整"
+  echo "  📌 装好后重新运行: bash install.sh"
   exit 1
 else
   echo "  缺失: ${NEED[*]}"

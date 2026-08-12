@@ -1,4 +1,9 @@
 #!/bin/bash
+# shellcheck disable=SC2155,SC2034,SC1090
+# 豁免说明：
+#   SC2155 (local x=$(cmd))：项目统一风格，47处机械替换风险高收益低
+#   SC2034 (未使用变量)：ALI/TENCENT_DNS_* 为全局配置，供其他脚本 source 后使用（跨文件）
+#   SC1090 (动态source)：source "$CONFIG_DOMAINS" 为合法动态加载
 # ============================================================================
 # DNS测试核心库
 # 功能：公共变量、辅助函数、测试逻辑入口
@@ -398,7 +403,7 @@ run_full_test() {
   for i in $(seq 1 $STAB_ROUNDS); do
     local qtime=$(dig @${addr} www.baidu.com A +time=3 +tries=1 2>/dev/null | sed -n 's/.*Query time: \([0-9]*\).*/\1/p' | head -1)
     if [ -n "$qtime" ]; then
-      stab_success=$((stab_success + 1)); stab_times+=(${qtime})
+      stab_success=$((stab_success + 1)); stab_times+=("$qtime")
     fi
     [ $((i % 5)) -eq 0 ] && printf "."
   done
@@ -596,7 +601,7 @@ run_full_test() {
   for ((i=0; i<ttl_total; i++)); do
     local out=$(cat "${PARR_TMPDIR}/${i}.out")
     local ttl=$(echo "$out" | sed -n '/ANSWER SECTION/{n;p;}' | sed -n 's/.*[[:space:]]\([0-9][0-9]*\)[[:space:]]\+IN[[:space:]].*/\1/p' | head -1)
-    [ -n "$ttl" ] && [ "$ttl" -gt 0 ] 2>/dev/null && ttl_values+=(${ttl})
+    [ -n "$ttl" ] && [ "$ttl" -gt 0 ] 2>/dev/null && ttl_values+=("$ttl")
   done
   rm -rf "$PARR_TMPDIR"
   if [ ${#ttl_values[@]} -gt 0 ]; then

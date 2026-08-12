@@ -3,7 +3,7 @@
 # 自动化冒烟测试：一键验证工具集核心功能
 # 用法: bash smoke_test.sh    （任何一项失败 → 退出码非0，适合CI/改动后回归）
 # ============================================================================
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit 1
 PASS=0; FAIL=0
 
 # 平台兼容层（timeout 兼容函数，macOS 无 timeout 命令）
@@ -19,7 +19,7 @@ echo "════ DNS工具集 冒烟测试 ════"
 echo "--- 1. 全量语法检查"
 OK=1
 for f in *.sh; do bash -n "$f" 2>/dev/null || OK=0; done
-for f in $(find . -name '*.pl'); do perl -c "$f" >/dev/null 2>&1 || OK=0; done
+while IFS= read -r f; do perl -c "$f" >/dev/null 2>&1 || OK=0; done < <(find . -name '*.pl')
 check "全量语法" $((1-OK))
 
 echo "--- 2. lite 功能"
@@ -32,7 +32,12 @@ echo "--- 3. 不可达预检"
 timeout 10 bash lite.sh 192.0.2.1 0 2>&1 | grep -q "不可达" && check "不可达预检跳过" 0 || check "不可达预检跳过" 1
 
 echo "--- 4. 注入防护"
-timeout 5 bash lite.sh '1.1.1.1;id' 2>&1 | grep -q "非法" && check "注入拦截" 0 || check "注入拦截" 1
+# 断言退出码（lite.sh 对非法地址 exit 1）而非 grep 输出文本（更稳，不受输出变动/locale影响）
+if timeout 5 bash lite.sh '1.1.1.1;id' >/dev/null 2>&1; then
+  check "注入拦截" 1
+else
+  check "注入拦截" 0
+fi
 
 echo "--- 5. 入口非交互"
 timeout 15 bash dns-test.sh 223.5.5.5 </dev/null 2>&1 | grep -q "非交互" && check "入口非交互" 0 || check "入口非交互" 1

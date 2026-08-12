@@ -13,8 +13,8 @@
 #   JSON结果默认保存 results/compare-<时间戳>.json（供历史趋势积累）
 # 退出码: 0=完成  1=参数错误  2=全部DNS不可达
 # ============================================================================
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-cd "$SCRIPT_DIR"
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
+cd "$SCRIPT_DIR" || exit 1
 source lib/core.sh
 
 VERSION="v2026.08.3"
