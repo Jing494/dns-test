@@ -65,11 +65,18 @@ dns-test/
 ├── install.sh                  # 一键安装（依赖检查+快捷方式）
 ├── release.sh                  # 打包发布脚本（生成 tar.gz + 上传指引）
 ├── full.sh/lite.sh             # DNS基础测试入口
-├── lib/core.sh                 # 公共核心库（变量/函数/测试逻辑）
+├── lib/                        # 公共库
+│   ├── core.sh                 # 核心库（变量/函数/测试逻辑）
+│   ├── compat.sh               # 平台兼容层（timeout兼容函数，macOS可用）
+│   └── DNSUtil.pm              # DNS纯函数模块（sockaddr/报文构建/响应解析，可单测）
+├── tests/                      # 单元测试
+│   └── 01_dnsutil.t            # DNSUtil 12用例（perl -Ilib tests/01_dnsutil.t）
 ├── docs/                       # 详细技术文档
 │   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
 │   ├── TEST_METHOD.md          # DNS测试方法论/评分标准
-│   └── SANDBOX_GUIDE.md        # 沙箱环境使用指南
+│   ├── SANDBOX_GUIDE.md        # 沙箱环境使用指南
+│   ├── CHANGELOG.md            # 完整变更记录（第1~68轮）
+│   └── FAQ.md                  # 常见问题
 ├── examples/                   # 通用示例脚本
 │   ├── README.md               # 示例说明
 │   ├── 01_dns_query.pl         # 基础DNS查询
@@ -285,44 +292,12 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 ## ❓ 常见问题
 
-### Q: 运行超时怎么办？
-完整版测试单DNS约2-4分钟，多DNS完整跑完会超过大多数调用超时限制。解决方案：
-- **推荐**：命令末尾加索引参数，只测第N个DNS：`bash full.sh 8.8.8.8 114.114.114.114 0`
-- 或运行入口脚本，选择基础测试后选"指定测试某一个DNS"
-- 非交互模式（无终端）自动降级为精简版+仅第1个DNS，不会超时
-
-### Q: 测试结果中的扣分项影响使用吗？
-- PTR解析扣分：国内IP大多无反向解析，属于正常现象，不影响使用
-- 劫持检测扣分：CDN域名解析不同是负载均衡正常现象
-- DNSSEC扣分：不是所有域名都部署了DNSSEC，轻微影响
-- VoWiFi域名返回127.0.0.1：表示该运营商未部署ePDG，属于正常现象
-
-### Q: 如何验证路由器DNS是否转发到省级DNS？
-运行路由器DNS转发测试（`perl tools/vowifi/03_test_router_dns.pl 192.168.1.1`），脚本会先取云南电信省级DNS的解析结果作为基准，再对比路由器DNS的解析结果——完全一致则说明路由器将DNS请求转发到了省级DNS；不一致则可能是自建DNS或转发了其他DNS。
-
-### Q: 支持哪些操作系统？
-支持所有安装了`dig`、`ping`工具的Linux/macOS系统，Perl脚本需要Perl 5.10+环境。
-
-**Windows 用户**（不支持原生，请用以下方式）：
-```bash
-# 方式1: WSL（推荐，体验与Linux一致）
-wsl --install                    # 首次安装WSL
-wsl -d Ubuntu -- apt install dnsutils curl perl   # 装依赖
-wsl -d Ubuntu -- bash smoke_test.sh               # 验证
-
-# 方式2: Git Bash / MSYS2（部分功能可用，需自行装 dig/perl）
-#   注意: DoH/DoT检测的 /dev/tcp 在Git Bash下不可靠
-```
-> 不建议尝试原生 cmd/PowerShell 运行——脚本依赖 bash 特性（BASH_SOURCE、/dev/tcp 等）与 GNU 工具（dig/sed/awk）。
-
-### Q: 可以测试多少个DNS？
-支持任意数量的DNS。单个DNS可完整跑完；多个DNS建议用索引参数逐个测（`bash full.sh A B 0`、`bash full.sh A B 1`），避免单次调用超时。
+常见问题（运行超时 / 扣分项影响 / 路由器转发验证 / 系统支持 / DNS数量限制）见 **[docs/FAQ.md](./docs/FAQ.md)**。
 
 ---
-
 ## 🗺️ Roadmap（未来计划）
 
-按优先级排序，未实施项记录自代码审查建议：
+按优先级排序：
 
 - **单元测试（已启动 ✅）**：`lib/DNSUtil.pm` 提取 DNS 纯函数 + `tests/01_dnsutil.t` 12 用例（sockaddr/域名编码/响应解析），已接入 CI strict job；运行 `perl -Ilib tests/01_dnsutil.t`
   - 待办：其余 perl 脚本（02/03/04/examples）迁移到 DNSUtil 模块、bats 引入评估
@@ -333,69 +308,5 @@ wsl -d Ubuntu -- bash smoke_test.sh               # 验证
 ---
 
 ## 🔄 更新记录
-- 2026-08-10（第六十八轮）：**单元测试启动**——提取 lib/DNSUtil.pm（dns_sockaddr/inet_pton_ipv6/build_dns_query/parse_dns_response 纯函数模块），01_resolve_vowifi.pl 接入（其余脚本后续迁移）；tests/01_dnsutil.t 12 用例（sockaddr v4/v6/非法、IPv6 压缩/展开/hex校验、报文编码、响应解析 A/AAAA/NXDOMAIN/压缩指针/短包）；**单测发现真实 bug**：inet_pton_ipv6 不校验 hex 合法性（perl hex() 宽容处理"gg::1"）已修；CI strict job 加单测步骤；README Roadmap 更新（单测已启动）
-- 2026-08-10（第六十七轮）：GitHub agent 建议落地——① README 顶部加 TL;DR + 典型输出片段 ② CI strict job 加 shellcheck（全项目 0 告警：core.sh 豁免 SC2155/SC2034/SC1090 并注释理由，其余 SC2164×4/SC2206/SC2207/SC2044 全修）③ CI 工程化：concurrency 取消旧run、smoke timeout-minutes、fork PR 跳过网络冒烟、artifact 上传 results/trends 产物 ④ 注入拦截断言改退出码（不依赖输出文本）⑤ install.sh 无包管理器分支增强（各平台手动安装命令表 + WSL/完整环境建议）
-- 2026-08-10（第六十六轮）：补丁版 **v1.5.1 (v2026.08.3)**——代码 VERSION 统一升级（lite/full/compare/trends/release.sh），README 徽章/下载名/版本规则同步（语义版补丁位 .1）
-- 2026-08-10（第六十五轮）：代码审查建议落地——① timeout 兼容函数抽离到 lib/compat.sh（core.sh/smoke_test/doh_dot_check 三处统一 source，消除重复，compat 为纯函数文件无前置检查依赖）② CI 分层：新增 strict job（语法/注入拦截/不可达预检/trends本地聚合，无网络依赖，**失败即红**，真实回归不再被掩盖），原 smoke 保持容错并 needs strict；③ README 新增 Roadmap（单测/par_run通用化/svg模板化/jq，按优先级记录待实施）
-- 2026-08-10（第六十四轮）：版本号升级 **v1.5 (v2026.08.2)**——双轨制版本规则落地（日期式 vYYYY.MM.N ↔ 语义 vX.Y，README 顶部注明）；代码 VERSION 统一更新（lite/full/compare/trends/release.sh）；README 徽章/下载名同步
-- 2026-08-10（第六十三轮）：文档一致性彻查——AI_GUIDE初始化章节smoke项数19→22修正；TEST_METHOD 3GPP域名数1/2→3个（与core.sh DOMAINS_3GPP对齐，mnc011/mnc000/mnc001）；边界测试矩阵全过（无参数/注入/缺值/未知参数/超长参数/混合v4-v6，退出码1均正确）
-- 2026-08-10（第六十二轮）：macOS timeout命令兼容——core.sh/smoke_test/doh_dot_check 三处加兼容函数（macOS 默认无 timeout，仅 coreutils 有；函数版后台sleep+kill模拟，正常/超时/管道三场景实测通过）；doh_dot_check 去冗余 timeout 包装（dig 用自带 +time、curl 用 --max-time，仅端口级保留）；网络环境矩阵实测：DEFAULT_DNS_CSV/PRESET_DNS_CSV/STAB_ROUNDS/ECS_SUBNET/PROVINCE_DNS 环境变量回退全部生效
-- 2026-08-10（第六十一轮）：macOS bash 3.2 兼容性修复——compare.sh v3 / trends.sh 全部去掉 declare -A 关联数组（改平行数组+索引映射，macOS 默认 bash 3.2 可直跑）；install.sh 重构为"缺失才装+装完强制校验"（依赖已齐零sudo直达冒烟）；smoke下一步指引补compare行；README徽章 Bash 4+→3.2+；CI注释补macOS兼容提醒
-- 2026-08-10（第六十轮）：全链路丝滑衔接——lite/full完成横幅加"对比/趋势"下一步提示、compare尾部加趋势提示（出口=入口闭环）；dns-test.sh专项菜单新增 8.多DNS对比 9.趋势洞察（带DNS引导输入）；install.sh下一步指引补compare/trends；smoke补第21项compare对比（21→22项）；非交互传多DNS时提示可用compare；AI_GUIDE命令映射表补两行
-- 2026-08-10（第五十九轮）：新增 trends.sh DNS趋势洞察——聚合 results/compare-*.json（按DNS分组、按时间排序），线性回归斜率为主+首尾对比为辅的趋势判定（评分↑=变好/延迟↑=变好，箭头=好坏方向）；输出文本总览表+trends.csv+trends/report.html（纯SVG折线图，无JS依赖，响应式手机可看）；--detail/--limit/--since/DNS过滤；--cron 定时采集模式（先跑compare再聚合，附crontab示例）；环境变量 TRENDS_DIR/COMPARE_RESULTS_DIR；smoke补19/20项；README/AI_GUIDE同步
-- 2026-08-10（第五十八轮）：compare.sh v2 重构——延迟改3次dig中位数（去掉名不副实的"平均"）；lite批次并发（默认3，COMPARE_MAX_CONCURRENCY可调，3 DNS从45s+降至~20s）；DNS去重；不可达DNS跳过lite；结构化JSON结果 results/compare-<ts>.json（供趋势积累）；HTML报告响应式（手机可看）+综合推荐结论+延迟颜色分级（绿<100ms 黄100~300ms 红≥300ms）+汇总表；退出码0/1/2（全不可达=2）；README目录结构/用法/更新记录同步
-- 2026-08-10（第五十七轮）：compare.sh 延迟改为独立dig测量（lite版不输出延迟，避免无数据硬填）
-- 2026-08-10（第五十六轮）：新增 compare.sh 多DNS对比模式（任意数量DNS + --html 生成 results/report.html）
-- 2026-08-10（第五十五轮）：CI双平台矩阵（ubuntu+macOS）；macOS依赖安装改平台条件（自带dig/perl/curl）；流程连贯（install→smoke/下一步指引/AI_GUIDE初始化章节）
-- 2026-08-10（第五十四轮）：新增 install.sh 一键安装脚本；README加CI徽章
-- 2026-08-10（第五十三轮）：smoke专项覆盖补至18项、README补已知限制；CI加固（smoke workflow限main分支、网络敏感项容错）；release.sh自动查Release ID
-- 2026-08-10（第五十二轮）：新增打包脚本 release.sh（自动排除.git/results内容/日志，防遗漏新文件，打印上传指引）+ CONTRIBUTING.md 贡献指南 + CI冒烟上线 + dig版本说明
-- 2026-08-10（第五十一轮）：README加徽章（License/Release/Platform/Bash/Perl/CI）；smoke网络项超时加宽；AI_GUIDE补Windows/WSL环境说明
-- 2026-08-10（第五十轮）：新增Windows使用指引（WSL推荐/GitBash注意事项）；README补ECS_SUBNET环境变量说明
-- 2026-08-10（第四十九轮）：新增英文README（README.en.md精简版）+ README顶部中英互跳；新增Releases下载方式；gitignore排除tar.gz
-- 2026-08-10（第四十八轮）：README结构整理——新增"获取与安装"章节、删除重复环境指引章节、补回效率提示标题
-- 2026-08-10（第四十七轮）：目录结构补AI_GUIDE.md/LICENSE条目，同步交互工具表述
-- 2026-08-10（第四十六轮）：md总审与更新记录去重修复；占位IP隐私说明（RFC 5737示例地址统一）；AI交互工具表述通用化
-- 2026-08-09（第四十四轮）：安全加固——.gitignore补*.log/*报告*/*.tmp；SAVE_LOG日志与测试报告确认不随git上传；敏感IP残留清零（仅私网示例）
-- 2026-08-09（第四十三轮）：安全加固——移除示例中的运营商基础设施IP（端口测试默认目标换公共DNS/私网、专项4引导示例、README/TEST_METHOD/AI_GUIDE/SANDBOX/examples文档示例全部清理）；仅保留02检测对比数据
-- 2026-08-09（第四十二轮）：专项4端口测试/专项7 DoH-DoT 加交互引导（可自定义目标/DNS，回车用默认）；非交互与直接传参完全兼容（read仅交互模式）
-- 2026-08-09（第四十一轮）：专项3路由器测试交互引导（入口进入可输入路由器IP+省级DNS，不锁省级）；专项菜单↔脚本对应复核全通过
-- 2026-08-09（第四十轮）：DoH/DoT加入专项菜单第7项（入口可测）；README专项表补行；smoke补环境依赖报告(13项)
-- 2026-08-09（第三十九轮）：DoH/DoT环境自适应——DoT v4/v6均dig+tls实测；DoH有curl则curl --doh-url实测(阿里200✅)无则端口级；沙箱装curl；md更新DoH描述；smoke补环境依赖报告(13项)
-- 2026-08-09（第三十八轮）：DoH/DoT方法边界诚实化——DoT实测可区分支持与否、DoH仅端口级标注；md补SAVE_LOG详细说明(触发/位置/格式)
-- 2026-08-09（第三十七轮）：DoH/DoT检测IPv6分支升级为实际dig +tls验证（不再假阳性）；smoke_test补SAVE_LOG项
-- 2026-08-09（第三十六轮）：DoH/DoT检测修复——IPv6目标不再假阳性（/dev/tcp不可靠，改dig+tls验证）、支持多DNS逗号分隔、smoke补DoH/DoT项
-- 2026-08-09（第三十五轮）：md全面同步——README/SANDBOX目录结构补smoke_test/doh_dot_check/carrier_epdg，AI_GUIDE命令映射、TEST_METHOD效率机制更新
-- 2026-08-09（第三十四轮）：工程化——新增smoke_test.sh自动化冒烟(10项)；评分加关键指标行🔑；SAVE_LOG日志自动保存；退出码约定(0完成/1错误/2全不可达)；AI_GUIDE报告模板；域名列表CONFIG_DOMAINS外置；DoH/DoT检测脚本
-- 2026-08-09（第三十三轮）：安全——DNS地址格式校验防命令注入（full/lite/preset入口拦截）；DEFAULT_DNS_NAME数量自动补齐；README补WSL支持
-- 2026-08-09（第三十二轮）：端口测试补IPv6目标支持（dns_sockaddr双栈），全工具v4/v6齐
-- 2026-08-09（第三十一轮）：carrier_epdg支持PROVINCE_DNS环境变量覆盖默认DNS
-- 2026-08-09（第三十轮）：03路由器测试支持--分隔符直传省级基准；无参数打印用法提示
-- 2026-08-09（第二十九轮）：路由器测试支持 -- 分隔符命令行直传省级基准（`perl 03.pl 192.168.1.1 -- 223.5.5.5`），优先级 -- > PROVINCE_DNS > 默认云南电信；无参数时打印用法提示；5份文档加路径可放置说明
-- 2026-08-09（第二十八轮）：环境感知——print_env_info环境自检标注（full/lite/dns-test/dns-preset头部）、专项1/2/5加>4 DNS超时保护、专项3忽略DNS_LIST、README环境指引与AI_GUIDE环境行解读
-- 2026-08-09（第二十七轮）：路径健壮性验证——脚本复制到任意目录可运行（BASH_SOURCE相对定位实测通过）；5份md加"目录可自由放置"说明（AI_GUIDE加执行前确认实际路径指引）
-- 2026-08-09（第二十六轮）：核心代码终审全绿；索引越界提示（full/lite）
-- 2026-08-09（第二十五轮）：专项1/2/5加>4 DNS超时保护；专项3修复DNS_LIST误当路由器IP
-- 2026-08-09（第二十四轮）：过时描述清理——9项→10项、15项→16项、旧域名引用
-- 2026-08-09（第二十三轮）：print_env_info环境自检标注上线（full/lite/dns-test/dns-preset头部）；AI_GUIDE/TEST_METHOD补环境说明
-- 2026-08-09（第二十二轮）：完整性检查——print_env_info全入口覆盖、文档补环境行解读
-- 2026-08-09（第二十一轮）：环境感知——README运行环境选择指引（沙箱vs真机对照表）
-- 2026-08-09（第二十轮）：ePDG多DNS交叉实测（电信mnc011经省级DNS+路由器稳定解析）；01脚本过滤127.0.0.1黑洞（统计8/16→真实1/16）
-- 2026-08-09（第十九轮）：MCC/MNC编码tavily核实——电信11/03/05、移动00/02/07、联通01/06/09、广电15；carrier_epdg电信组修正（删误加的mnc000）
-- 2026-08-09（第十八轮）：7个不规范ePDG域名清理（chinatelecom.cn/chn/mcc460.mnc顺序反等）；md复查
-- 2026-08-09（第十七轮）：ePDG多DNS可用性实测（云南电信/路由器/公共DNS交叉）
-- 2026-08-09（第十六轮）：新增carrier_epdg.pl运营商ePDG部署检测（电信/移动/联通/广电，交互+传参，省级DNS/路由器，免责声明）；删除vowifi.189.cn
-- 2026-08-09（第十五轮）：自定义性增强——DEFAULT_DNS_CSV覆盖默认DNS组、PROVINCE_DNS覆盖路由器对比基准、PRESET_DNS_CSV自定义预设、examples支持DNS_SERVER/DNS_LIST环境变量；修复03自定义基准全空时数组解引用报错
-- 2026-08-09（第十四轮）：新增[7b]IPv6实际连通性测试（ping6，平台适配ping6/ping -6，无IPv6环境自动跳过不计分）；实测本机IPv6到百度/QQ/B站/腾讯全部通畅（30~76ms）；lite评分项63→64，full 77→78；云南电信完整版复测96~97%稳定
-- 2026-08-09（第十三轮）：AI_GUIDE新增"脚本排障与异常处理"（排查顺序/报错速查）+"环境差异与评分波动"（假失败清单/波动阈值/对比方法论）；云南电信完整版+路由器转发结果归档TEST_METHOD
-- 2026-08-09（第十二轮）：AI_GUIDE新增"日志截断与结果确认"章（看结尾不看开头、三标记确认法、6种截断补救手段、真异常清单）
-- 2026-08-09（第十一轮）：dig前置检查、版本号v2026.08、results/保存示例、测试结束总耗时统计
-- 2026-08-09（第十轮）：可达性预检改双域名防海外误判；STAB_ROUNDS参数校验防除零；劫持基准探测域名优化（alidns.com）；README更新记录补全；SANDBOX_GUIDE目录加AI_GUIDE
-- 2026-08-09（第九轮）：新增docs/AI_GUIDE.md（AI操作手册：先问DNS/版本/专项，ask/无ask双模式）；选组4+完整版自动限单DNS防超时；自定义DNS显示地址；清理未使用模块
-- 2026-08-09（第八轮）：macOS ping -W平台区分（防连通性误判）；trap临时目录清理；稳定性进度提示；01 AAAA轮跳过超时域名；入口read全部加超时
-- 2026-08-09（第七轮）：新增阿里/腾讯DNS预设组+dns-preset.sh一键脚本+入口交互选组；DNS可达性预检（不可达秒跳过）；A/AAAA/运营商/其他/DNSSEC/ECS/PTR/TTL/劫持全面并行化（full单DNS从2~4分钟降至约10秒）；01/02默认补IPv4；chmod 755；ECS subnet参数化
-- 2026-08-09（第六轮）：劫持检测白名单扩充+基准降级IPv4（qq.com误报修复，评分94→96%）、grep -oP改sed兼容（macOS可用）、IPv6反向解析(ip6.arpa)、UDP探测提示、死代码清理、examples默认DNS回云南电信、路由器测试重构为对比云南电信省级DNS
-- 2026-08-09（第五轮）：VoWiFi解析A/AAAA分开统计（修复成功率超100%）、端口测试TCP改非阻塞connect防卡死、3GPP域名改信息项不扣分、PTR解析器支持压缩指针（8.8.8.8→dns.google）、稳定性轮次支持环境变量、索引参数判定加保护
-- 2026-08-09（第四轮）：修复v4/v6混合支持（6个Perl脚本补IPv4双栈），协议号硬编码消除环境警告，端口测试UDP加超时防卡死，非交互模式防超时降级，修正README目录结构
-- 2026-08-09（第三轮）：整合所有DNS/网络测试工具到统一目录，添加智能引导入口，所有脚本支持自定义参数
-- 2026-08-08：初始版本，完成云南电信DNS基准测试
+
+完整变更历史（第 1~68 轮）见 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**。
