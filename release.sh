@@ -6,8 +6,8 @@
 # 提示: 上传 Release 的命令会打印出来（需 GitHub 令牌）
 # ============================================================================
 VERSION="${1:-v2026.08.3}"
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-cd "$SCRIPT_DIR"
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
+cd "$SCRIPT_DIR" || exit 1
 
 OUT="dns-test-${VERSION}.tar.gz"
 rm -f "$OUT"

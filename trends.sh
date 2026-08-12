@@ -15,8 +15,8 @@
 #   评分: ↑=变好 ↓=变差；延迟: ↑=变好 ↓=变差（箭头=好坏方向，非数值方向）
 # 退出码: 0=完成  1=参数/错误  2=无可用数据
 # ============================================================================
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-cd "$SCRIPT_DIR"
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
+cd "$SCRIPT_DIR" || exit 1
 source lib/core.sh
 
 VERSION="v2026.08.3"

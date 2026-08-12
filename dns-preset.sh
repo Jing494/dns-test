@@ -11,8 +11,8 @@
 #   bash dns-preset.sh all lite            # 全部预设（可能较慢）
 # ============================================================================
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-cd "$SCRIPT_DIR"
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || exit 1
+cd "$SCRIPT_DIR" || exit 1
 source "${SCRIPT_DIR}/lib/core.sh"
 
 PRESET="${1:-yunnan}"

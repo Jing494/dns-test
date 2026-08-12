@@ -16,6 +16,28 @@
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
+---
+
+## ⚡ TL;DR（30 秒上手）
+
+```bash
+git clone https://github.com/Jing494/dns-test.git && cd dns-test
+bash install.sh        # 缺失才装 dig/perl/curl（已齐全则跳过 sudo）
+bash smoke_test.sh     # 22 项自动化验证环境
+bash dns-test.sh       # 交互引导测试（或 bash lite.sh 223.5.5.5 0 快速测）
+```
+
+**典型输出**（`bash lite.sh 223.5.5.5 0` 结尾）：
+
+```
+📊 综合评分: 98% (62/63 项通过)
+⏱️  稳定性: 95%
+```
+
+→ 多 DNS 横向对比用 `bash compare.sh DNS1 DNS2 --html`，历史趋势用 `bash trends.sh --html`（结果存 results/、趋势存 trends/）。
+
+---
+
 ## 📌 简介
 本工具集是统一管理的DNS/网络测试工具合集，包含完整的DNS基准测试、专项功能测试、通用示例脚本和技术文档，支持自定义DNS参数传入，覆盖VoWiFi、DNS64、反向解析等专业测试场景。
 
@@ -308,6 +330,7 @@ wsl -d Ubuntu -- bash smoke_test.sh               # 验证
 ---
 
 ## 🔄 更新记录
+- 2026-08-10（第六十七轮）：GitHub agent 建议落地——① README 顶部加 TL;DR + 典型输出片段 ② CI strict job 加 shellcheck（全项目 0 告警：core.sh 豁免 SC2155/SC2034/SC1090 并注释理由，其余 SC2164×4/SC2206/SC2207/SC2044 全修）③ CI 工程化：concurrency 取消旧run、smoke timeout-minutes、fork PR 跳过网络冒烟、artifact 上传 results/trends 产物 ④ 注入拦截断言改退出码（不依赖输出文本）⑤ install.sh 无包管理器分支增强（各平台手动安装命令表 + WSL/完整环境建议）
 - 2026-08-10（第六十六轮）：补丁版 **v1.5.1 (v2026.08.3)**——代码 VERSION 统一升级（lite/full/compare/trends/release.sh），README 徽章/下载名/版本规则同步（语义版补丁位 .1）
 - 2026-08-10（第六十五轮）：代码审查建议落地——① timeout 兼容函数抽离到 lib/compat.sh（core.sh/smoke_test/doh_dot_check 三处统一 source，消除重复，compat 为纯函数文件无前置检查依赖）② CI 分层：新增 strict job（语法/注入拦截/不可达预检/trends本地聚合，无网络依赖，**失败即红**，真实回归不再被掩盖），原 smoke 保持容错并 needs strict；③ README 新增 Roadmap（单测/par_run通用化/svg模板化/jq，按优先级记录待实施）
 - 2026-08-10（第六十四轮）：版本号升级 **v1.5 (v2026.08.2)**——双轨制版本规则落地（日期式 vYYYY.MM.N ↔ 语义 vX.Y，README 顶部注明）；代码 VERSION 统一更新（lite/full/compare/trends/release.sh）；README 徽章/下载名同步

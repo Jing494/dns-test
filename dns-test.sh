@@ -8,8 +8,8 @@
 #   bash dns-test.sh 8.8.8.8 114.114.114.114  # 测试多个自定义DNS
 # ============================================================================
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-cd "$SCRIPT_DIR"
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || exit 1
+cd "$SCRIPT_DIR" || exit 1
 # 引入核心库（获取默认DNS等公共变量）
 source "${SCRIPT_DIR}/lib/core.sh"
 
@@ -269,8 +269,8 @@ if [ -t 0 ]; then
             echo "  对比至少需要2个DNS（当前: ${DNS_LIST[*]:-无}）"
             read -t 30 -p "  请输入要对比的DNS（逗号分隔，回车默认 223.5.5.5,119.29.29.29）: " cmp_input
             if [ -n "$cmp_input" ]; then
-              # 逗号/空格分隔都兼容
-              cmp_list=($(echo "$cmp_input" | tr ',' ' '))
+              # 逗号/空格分隔都兼容（read -ra 防分词问题）
+              IFS=', ' read -ra cmp_list <<< "$cmp_input"
               bash compare.sh "${cmp_list[@]}"
             else
               echo "  未输入，默认对比 223.5.5.5 与 119.29.29.29"
