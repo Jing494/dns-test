@@ -129,7 +129,7 @@ bash dns-test.sh
 | 反向解析（v4/v6） | `perl examples/04_reverse_dns.pl 222.172.200.68` |
 | 多DNS横向对比 | `bash compare.sh 223.5.5.5 119.29.29.29`（`--html` 生成响应式报告；`COMPARE_MAX_CONCURRENCY=1` 串行最稳） |
 | DNS历史趋势洞察 | `bash trends.sh --html --csv`（需先积累 compare 数据；`--cron DNS列表` 配 crontab 定时采集） |
-| 单元测试（DNSUtil） | `perl -Ilib tests/01_dnsutil.t`（sockaddr/报文构建/响应解析 12 用例，CI 已接入） |
+| 单元测试（DNSUtil） | `perl -Ilib tests/01_dnsutil.t`（sockaddr/报文构建/响应解析/PTR/畸形包 18 用例，CI 已接入） |
 
 ---
 

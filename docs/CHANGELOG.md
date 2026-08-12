@@ -2,6 +2,7 @@
 
 > 完整轮次变更历史（从第 46 轮起有 git 提交可追溯；更早轮次为仓库建立前的开发记录）。
 
+- 2026-08-10（第七十轮）：compare.sh 支持 `--full` 模式（完整版 77~78项/DNS 对比，标题/JSON/HTML 全部模式化）；examples 01-04 脚本加 `--help`/`-h` 用法提示；文档同步（README compare 用法/AI_GUIDE 单测用例数 18/examples README）
 - 2026-08-10（第六十九轮）：**DNSUtil 全量迁移**——其余 7 个 perl 脚本（02/03/carrier_epdg/port_test/examples 01-04）函数副本迁移到 lib/DNSUtil.pm（消除 ~700 行重复代码，统一维护+单测覆盖）；check_ips 改纯函数（prev 引用参数）并入 DNSUtil；**迁移过程状态机一度误删主逻辑**（sub{ 双重计数致花括号配平失效），已定位修复并全量回归；单测扩至 13 用例；smoke 加第 22 项单元测试（22→23 项）；README.en 补 FAQ/CHANGELOG 链接
 
 - 2026-08-10（第六十八轮）：**单元测试启动**——提取 lib/DNSUtil.pm（dns_sockaddr/inet_pton_ipv6/build_dns_query/parse_dns_response 纯函数模块），01_resolve_vowifi.pl 接入（其余脚本后续迁移）；tests/01_dnsutil.t 12 用例（sockaddr v4/v6/非法、IPv6 压缩/展开/hex校验、报文编码、响应解析 A/AAAA/NXDOMAIN/压缩指针/短包）；**单测发现真实 bug**：inet_pton_ipv6 不校验 hex 合法性（perl hex() 宽容处理"gg::1"）已修；CI strict job 加单测步骤；README Roadmap 更新（单测已启动）
