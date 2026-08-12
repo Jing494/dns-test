@@ -78,7 +78,7 @@ dns-test/
 │   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
 │   ├── TEST_METHOD.md          # DNS测试方法论/评分标准
 │   ├── SANDBOX_GUIDE.md        # 沙箱环境使用指南
-│   ├── CHANGELOG.md            # 完整变更记录（第1~68轮）
+│   ├── CHANGELOG.md            # 完整变更记录（第1~71轮）
 │   └── FAQ.md                  # 常见问题
 ├── examples/                   # 通用示例脚本
 │   ├── README.md               # 示例说明
@@ -313,4 +313,4 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 ## 🔄 更新记录
 
-完整变更历史（第 1~70 轮）见 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**。
+完整变更历史（第 1~71 轮）见 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**。

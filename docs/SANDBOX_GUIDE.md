@@ -116,15 +116,23 @@ dns-test/
 ├── dns-preset.sh               # DNS预设快捷测试（云南电信/阿里/腾讯）
 ├── compare.sh                  # 多DNS对比（并行+延迟中位数+HTML报告+JSON结果）
 ├── trends.sh                   # DNS趋势洞察（聚合compare历史：趋势/CSV/SVG折线图/cron采集）
+├── verify.sh                   # 一键全面验证（语法+shellcheck+单测+冒烟+compare+trends+专项）
 ├── install.sh                  # 一键安装依赖（缺失才装）
 ├── release.sh                  # 打包发布脚本
 ├── smoke_test.sh               # 自动化冒烟测试（23项）
 ├── full.sh / lite.sh           # 基础测试入口（完整版/精简版）
-├── lib/core.sh                 # 公共核心库（变量/函数/测试逻辑）
+├── lib/                        # 公共库
+│   ├── core.sh                 # 核心库（变量/函数/测试逻辑）
+│   ├── compat.sh               # 平台兼容层（timeout兼容函数，macOS可用）
+│   └── DNSUtil.pm              # DNS纯函数模块（sockaddr/报文构建/响应解析，可单测）
+├── tests/                      # 单元测试
+│   └── 01_dnsutil.t            # DNSUtil 18用例（perl -Ilib tests/01_dnsutil.t）
 ├── docs/
 │   ├── TEST_METHOD.md          # 测试方法论/评分标准/实测结果
 │   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
-│   └── SANDBOX_GUIDE.md        # 本文档
+│   ├── SANDBOX_GUIDE.md        # 本文档
+│   ├── CHANGELOG.md            # 完整变更记录（第1~71轮）
+│   └── FAQ.md                  # 常见问题
 ├── examples/
 │   ├── 01_dns_query.pl         # 基础DNS查询（v4/v6）
 │   ├── 02_multi_dns_compare.pl # 多DNS对比

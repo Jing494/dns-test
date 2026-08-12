@@ -11,10 +11,16 @@ dns-test/
 ├── dns-preset.sh            # 预设快捷测试
 ├── compare.sh               # 多DNS对比（并行+延迟中位数+HTML/JSON）
 ├── trends.sh                # DNS趋势洞察（聚合compare历史数据）
+├── verify.sh                # 一键全面验证（语法+单测+冒烟+对比+趋势）
 ├── install.sh               # 一键安装依赖（缺失才装）
 ├── release.sh               # 打包发布脚本
 ├── smoke_test.sh            # 自动化冒烟测试（改动后必跑）
-├── lib/core.sh              # 核心库（变量/函数/并行/评分）
+├── lib/                     # 公共库
+│   ├── core.sh              # 核心库（变量/函数/并行/评分）
+│   ├── compat.sh            # 平台兼容层（timeout等，macOS）
+│   └── DNSUtil.pm           # DNS纯函数模块（可单测）
+├── tests/                   # 单元测试
+│   └── 01_dnsutil.t         # DNSUtil 18用例
 ├── tools/vowifi/            # VoWiFi专项（ePDG检测/路由器转发）
 ├── tools/network/           # 端口测试 / DoH-DoT检测
 ├── examples/                # 示例脚本（可传参）
