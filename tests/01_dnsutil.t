@@ -120,4 +120,56 @@ subtest 'check_ips IP一致性' => sub {
     is(check_ips("x.com", ["1.1.1.1"], undef), "", "无历史返回空");
 };
 
+# ---------- PTR 相关 ----------
+subtest 'build_reverse_name 反向域名' => sub {
+    is(build_reverse_name("8.8.8.8"), "8.8.8.8.in-addr.arpa", "IPv4 反向名");
+    is(build_reverse_name("1.2.3.4"), "4.3.2.1.in-addr.arpa", "IPv4 反向名(倒序)");
+    ok(defined build_reverse_name("240e:52:4800::8888"), "IPv6 反向名生成");
+    like(build_reverse_name("::1"), qr/^1(\.0){31}\.ip6\.arpa$/, "::1 反向名(32段)");
+    is(build_reverse_name("1.2.3"), undef, "非法IPv4段数返回undef");
+};
+
+subtest 'expand_ipv6' => sub {
+    is(expand_ipv6("::1"), "00000000000000000000000000000001", "::1 展开32hex");
+    is(length(expand_ipv6("240e:52:4800::8888")), 32, "云南电信v6 32字符");
+    is(expand_ipv6("gg::1"), undef, "非法hex返回undef");
+};
+
+subtest 'build_ptr_query 编码' => sub {
+    my $q = build_ptr_query("8.8.8.8.in-addr.arpa");
+    my ($qtype) = unpack("n", substr($q, length($q)-4, 2));
+    is($qtype, 12, "PTR类型=12");
+    like(substr($q, 12, length($q)-16), qr/^\x01\x38/, "反向域名编码(1,8,8,8...)");
+};
+
+subtest 'parse_ptr_response_simple' => sub {
+    # 构造 PTR 响应: 8.8.8.8.in-addr.arpa → dns.google
+    my $resp = pack("n6", 0x1234, 0x8180, 1, 1, 0, 0);
+    $resp .= "\x01\x38\x01\x38\x01\x38\x01\x38\x07in-addr\x04arpa\x00";
+    $resp .= pack("nn", 12, 1);
+    $resp .= "\xc0\x0c";                                  # owner 压缩指针
+    $resp .= pack("nnNn", 12, 1, 300, 16);                # PTR, rdlength=16
+    # rdata 域名（label 长度必须精确：dns=3/google=6/com=3；\x03 后跟 hex 字符需拆开写）
+    $resp .= "\x03dns\x06google" . "\x03" . "com\x00";
+    my @names = parse_ptr_response_simple($resp);
+    is(scalar(@names), 1, "解析出1个PTR名");
+    is($names[0], "dns.google.com", "PTR目标域名正确");
+};
+
+# ---------- 畸形包防崩（E） ----------
+subtest 'parse_dns_response 畸形包防崩' => sub {
+    # 随机/截断/异常输入不应崩溃（返回空列表即可）
+    my @weird = (
+        "", "x", "\x00" x 12, "\xff" x 200,
+        pack("n6", 1, 0x8180, 1, 1, 0, 0) . "\xff" x 100,   # 声明有答案但数据畸形
+        "\x00\x01\x02\x03" x 10,
+        join("", map { chr(int(rand(256))) } 1 .. 300),      # 随机字节
+        join("", map { chr(int(rand(256))) } 1 .. 300),      # 再来一包随机
+    );
+    for my $pkt (@weird) {
+        my @r = eval { parse_dns_response($pkt, 1) };
+        ok(!$@, "畸形包不崩溃 (len=" . length($pkt) . ")") or diag $@;
+    }
+};
+
 done_testing();

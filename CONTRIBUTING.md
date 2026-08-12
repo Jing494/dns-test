@@ -27,7 +27,7 @@ dns-test/
 2. **改代码**：遵循现有风格（bash 3.2+ / Perl 5.10+，v4/v6 双栈，注释中文）
 3. **跑冒烟测试**（必须）：
    ```bash
-   bash smoke_test.sh   # 22项全绿才能提交
+   bash smoke_test.sh   # 23项全绿才能提交
    ```
 4. **分支流程**：功能改动先提交到 develop 分支，CI（ubuntu+macOS）通过后再合并 main
 5. **提交规范**：`type: 简短中文描述`（type: feat/fix/docs/chore）
