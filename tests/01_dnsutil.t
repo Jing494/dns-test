@@ -112,4 +112,12 @@ subtest 'parse_dns_response 边界' => sub {
     is(scalar(parse_dns_response($no_qr, 1)), 0, "qr=0(查询报文)返回空");
 };
 
+# ---------- check_ips ----------
+subtest 'check_ips IP一致性' => sub {
+    is(check_ips("x.com", ["1.1.1.1"], ["1.1.1.1"]), "[✓ 与之前一致]", "无变化→一致");
+    is(check_ips("x.com", ["1.1.1.1", "2.2.2.2"], ["1.1.1.1"]), "[⚠️ 新增IP: 2.2.2.2]", "新增IP提示");
+    is(check_ips("x.com", ["2.2.2.2"], ["1.1.1.1"]), "[⚠️ 新增IP: 2.2.2.2]", "IP变化提示");
+    is(check_ips("x.com", ["1.1.1.1"], undef), "", "无历史返回空");
+};
+
 done_testing();

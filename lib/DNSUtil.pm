@@ -10,7 +10,7 @@ use warnings;
 use Socket qw(:DEFAULT IPPROTO_UDP IPPROTO_TCP);
 use Exporter 'import';
 
-our @EXPORT = qw(dns_sockaddr inet_pton_ipv6 build_dns_query parse_dns_response);
+our @EXPORT = qw(dns_sockaddr inet_pton_ipv6 build_dns_query parse_dns_response check_ips);
 
 # 自动识别IPv4/IPv6地址，返回 (sockaddr, family, error)
 sub dns_sockaddr {
@@ -145,6 +145,19 @@ sub parse_dns_response {
     }
 
     return @ips;
+}
+
+# IP一致性对比（纯函数：prev_ref 为历史 IP 数组引用；返回状态文字）
+sub check_ips {
+    my ($domain, $current_ips, $prev_ref) = @_;
+    return "" unless $prev_ref;
+    my %prev_set = map { $_ => 1 } @$prev_ref;
+    my @new = grep { !$prev_set{$_} } @$current_ips;
+    if (@new) {
+        return "[⚠️ 新增IP: " . join(", ", @new) . "]";
+    } else {
+        return "[✓ 与之前一致]";
+    }
 }
 
 1;

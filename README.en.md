@@ -59,9 +59,11 @@ bash tools/network/doh_dot_check.sh 223.5.5.5          # DoH/DoT check
 
 Detailed docs are in Chinese (the primary audience is China's telecom/DNS community):
 - [README.md](./README.md) — full usage guide
-- [docs/AI_GUIDE.md](./docs/AI_GUIDE.md) — AI operator manual (11 chapters)
+- [docs/AI_GUIDE.md](./docs/AI_GUIDE.md) — AI operator manual (12 chapters)
 - [docs/TEST_METHOD.md](./docs/TEST_METHOD.md) — test methodology & scoring
 - [docs/SANDBOX_GUIDE.md](./docs/SANDBOX_GUIDE.md) — sandbox environment guide
+- [docs/FAQ.md](./docs/FAQ.md) — frequently asked questions
+- [docs/CHANGELOG.md](./docs/CHANGELOG.md) — full change history
 
 ## License
 

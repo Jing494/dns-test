@@ -2,6 +2,9 @@
 use strict;
 use warnings;
 use Socket qw(:DEFAULT IPPROTO_UDP IPPROTO_TCP);
+use FindBin;
+use lib "$FindBin::Bin/../../lib";
+use DNSUtil;
 use POSIX qw(errno_h);
 use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
 
@@ -126,45 +129,4 @@ print "测试完成\n";
 print "=" x 70 . "\n";
 
 # ========== v4/v6 双栈工具函数 ==========
-sub dns_sockaddr {
-    my ($addr, $port) = @_;
-    if ($addr =~ /^\d{1,3}(?:\.\d{1,3}){3}$/) {
-        my $ip = inet_aton($addr);
-        return (undef, undef, "IPv4地址格式无效: $addr") unless defined $ip;
-        return (pack_sockaddr_in($port, $ip), AF_INET, undef);
-    }
-    my $ip = inet_pton_ipv6($addr);
-    return (undef, undef, "IPv6地址格式无效: $addr") unless defined $ip;
-    return (pack("S n N a16 N", AF_INET6, $port, 0, $ip, 0), AF_INET6, undef);
-}
 
-sub inet_pton_ipv6 {
-    my ($addr) = @_;
-    if ($addr =~ /::/) {
-        my @parts = split(/::/, $addr, 2);
-        my @left = $parts[0] ? split(/:/, $parts[0]) : ();
-        my @right = $parts[1] ? split(/:/, $parts[1]) : ();
-        my $missing = 8 - scalar(@left) - scalar(@right);
-        return undef if ($missing < 0);
-        my @mid = ("0") x $missing if $missing > 0;
-        my @full = (@left, @mid, @right);
-        return undef if (scalar(@full) != 8);
-        my $bytes = "";
-        foreach my $part (@full) {
-            $part = "0" if (!defined $part || $part eq "");
-            return undef if ($part =~ /[^0-9a-fA-F]/);
-            $bytes .= pack("n", hex($part));
-        }
-        return $bytes;
-    } else {
-        my @parts = split(/:/, $addr);
-        return undef if (scalar(@parts) != 8);
-        my $bytes = "";
-        foreach my $part (@parts) {
-            $part = "0" if (!defined $part || $part eq "");
-            return undef if ($part =~ /[^0-9a-fA-F]/);
-            $bytes .= pack("n", hex($part));
-        }
-        return $bytes;
-    }
-}
