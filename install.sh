@@ -88,6 +88,7 @@ else
   echo "✅ 依赖就绪！下一步（任选）:"
   echo "  bash install.sh --smoke            # 一键验证环境（23项自动化）"
   echo "  bash smoke_test.sh                 # 验证环境（23项自动化）"
+  echo "  bash verify.sh                     # 一键全量深度自检（含单测/compare/trends，约5分钟）"
   echo "  bash dns-test.sh                   # 交互引导测试（选DNS/版本/专项）"
   echo "  bash lite.sh 223.5.5.5 0           # 快速测一个DNS"
   echo "  bash compare.sh 223.5.5.5 119.29.29.29  # 多DNS横向对比"
