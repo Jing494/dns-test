@@ -17,7 +17,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
 cd "$SCRIPT_DIR" || exit 1
 source lib/core.sh
 
-VERSION="v2026.08.3"
+VERSION="v2026.08.4"
 GEN_HTML=0
 SAVE_JSON=1
 MODE="lite"    # lite(默认) / full
