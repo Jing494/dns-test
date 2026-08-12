@@ -322,9 +322,10 @@ wsl -d Ubuntu -- bash smoke_test.sh               # 验证
 
 ## 🗺️ Roadmap（未来计划）
 
-按优先级排序，暂未实施（记录自 longcat 代码审查建议）：
+按优先级排序，未实施项记录自代码审查建议：
 
-- **单元测试**：优先 Perl 函数级测试（`parse_dns_response`/`dns_sockaddr`/`build_dns_query` 用 Test::More，perl 自带零依赖）；bash 层视需要引入 bats
+- **单元测试（已启动 ✅）**：`lib/DNSUtil.pm` 提取 DNS 纯函数 + `tests/01_dnsutil.t` 12 用例（sockaddr/域名编码/响应解析），已接入 CI strict job；运行 `perl -Ilib tests/01_dnsutil.t`
+  - 待办：其余 perl 脚本（02/03/04/examples）迁移到 DNSUtil 模块、bats 引入评估
 - **par_run 通用化**：封装可配置并发数 + 更优雅的结果收集（当前 8 并发 + 临时文件方案够用，核心库重构需谨慎）
 - **trends svg_chart 模板化**：HTML/SVG 内联字符串改 heredoc/独立模板文件（当前功能正常，纯可读性优化）
 - **JSON 序列化增强**：compare 结果结构复杂化时引入 jq（当前 JSON 自产自销且格式固定，echo 拼接足够，避免增加依赖）
@@ -332,6 +333,7 @@ wsl -d Ubuntu -- bash smoke_test.sh               # 验证
 ---
 
 ## 🔄 更新记录
+- 2026-08-10（第六十八轮）：**单元测试启动**——提取 lib/DNSUtil.pm（dns_sockaddr/inet_pton_ipv6/build_dns_query/parse_dns_response 纯函数模块），01_resolve_vowifi.pl 接入（其余脚本后续迁移）；tests/01_dnsutil.t 12 用例（sockaddr v4/v6/非法、IPv6 压缩/展开/hex校验、报文编码、响应解析 A/AAAA/NXDOMAIN/压缩指针/短包）；**单测发现真实 bug**：inet_pton_ipv6 不校验 hex 合法性（perl hex() 宽容处理"gg::1"）已修；CI strict job 加单测步骤；README Roadmap 更新（单测已启动）
 - 2026-08-10（第六十七轮）：GitHub agent 建议落地——① README 顶部加 TL;DR + 典型输出片段 ② CI strict job 加 shellcheck（全项目 0 告警：core.sh 豁免 SC2155/SC2034/SC1090 并注释理由，其余 SC2164×4/SC2206/SC2207/SC2044 全修）③ CI 工程化：concurrency 取消旧run、smoke timeout-minutes、fork PR 跳过网络冒烟、artifact 上传 results/trends 产物 ④ 注入拦截断言改退出码（不依赖输出文本）⑤ install.sh 无包管理器分支增强（各平台手动安装命令表 + WSL/完整环境建议）
 - 2026-08-10（第六十六轮）：补丁版 **v1.5.1 (v2026.08.3)**——代码 VERSION 统一升级（lite/full/compare/trends/release.sh），README 徽章/下载名/版本规则同步（语义版补丁位 .1）
 - 2026-08-10（第六十五轮）：代码审查建议落地——① timeout 兼容函数抽离到 lib/compat.sh（core.sh/smoke_test/doh_dot_check 三处统一 source，消除重复，compat 为纯函数文件无前置检查依赖）② CI 分层：新增 strict job（语法/注入拦截/不可达预检/trends本地聚合，无网络依赖，**失败即红**，真实回归不再被掩盖），原 smoke 保持容错并 needs strict；③ README 新增 Roadmap（单测/par_run通用化/svg模板化/jq，按优先级记录待实施）
