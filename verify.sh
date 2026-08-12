@@ -76,4 +76,10 @@ tick "专项(示例02/DoH)" $((1-OK))
 echo ""
 echo "════ 汇总: $PASS 通过 / $FAIL 失败 ════"
 [ -n "$FAILED_ITEMS" ] && echo "失败项:$FAILED_ITEMS"
+echo ""
+echo "════ 下一步 ════"
+echo "  bash dns-test.sh                    # 交互引导测试（选DNS组/版本/专项）"
+echo "  bash compare.sh 223.5.5.5 119.29.29.29  # 多DNS横向对比"
+echo "  bash trends.sh --html               # DNS趋势洞察（积累compare数据后）"
+[ "$FAIL" -gt 0 ] && echo "  💡 有失败项：对照上方输出重跑单项，或看 docs/AI_GUIDE.md 第十一章（环境差异）"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
