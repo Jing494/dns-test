@@ -59,9 +59,10 @@ jobs:
           ls "$TMPR/out/report.html" "$TMPR/out/trends.csv" >/dev/null 2>&1 || { echo "❌ trends产物缺失"; exit 1; }
           rm -rf "$TMPR"
           echo "  ✅ trends 聚合+产物"
-          echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins bash 9用例）"
+          echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins bash 9用例 + dig_target 4用例）"
           perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 || { echo "❌ perl单测失败"; exit 1; }
           bash tests/02_plugins.sh >/dev/null 2>&1 || { echo "❌ bash单测失败"; exit 1; }
+          bash tests/03_dig_target.sh >/dev/null 2>&1 || { echo "❌ dig_target单测失败"; exit 1; }
           echo "  ✅ 单元测试通过"
           echo "--- 7. 插件系统（清单/脚本存在/拦截，无网络）"
           source lib/plugins.sh

@@ -27,8 +27,8 @@ esac
 # 引入核心库
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/lib/core.sh"
-# 异常退出时清理并行临时目录
-trap 'rm -rf "$PARR_TMPDIR"' EXIT INT TERM
+# 异常退出时统一清理：并行临时目录 + 各测试函数注册的临时目录（TMPDIR_LIST 由 core.sh 维护）
+trap 'rm -rf "$PARR_TMPDIR" "${TMPDIR_LIST[@]}"' EXIT INT TERM
 
 # 自动保存日志（SAVE_LOG=1 时写入 results/，Linux tee到终端+文件 / macOS写文件）
 if [ -n "$SAVE_LOG" ]; then

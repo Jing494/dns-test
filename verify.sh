@@ -75,9 +75,9 @@ else
   tick "shellcheck(未装跳过)" 0
 fi
 
-echo "--- 3. 单元测试（DNSUtil perl 18用例 + plugins bash 9用例）"
-if perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 && bash tests/02_plugins.sh >/dev/null 2>&1; then
-  tick "单测(18+9用例)" 0
+echo "--- 3. 单元测试（DNSUtil perl 18用例 + plugins bash 9用例 + dig_target 4用例）"
+if perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 && bash tests/02_plugins.sh >/dev/null 2>&1 && bash tests/03_dig_target.sh >/dev/null 2>&1; then
+  tick "单测(18+9+4用例)" 0
 else
   tick "单测" 1
 fi
