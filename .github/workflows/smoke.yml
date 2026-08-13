@@ -13,13 +13,23 @@ concurrency:
 jobs:
   # 严格层：纯确定性项（语法/shellcheck/注入拦截/不可达预检/本地数据聚合），失败即红
   # 不依赖网络，海外 runner 不会误红 —— 真实回归会被拦截
+  # 双平台矩阵：macOS 的 bash -n 用自带 bash 3.2（能抓 4+ 语法），shellcheck/插件检查/单测全跑
   strict:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Install shellcheck
-        run: sudo apt-get install -y shellcheck
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install shellcheck
+          else
+            sudo apt-get install -y shellcheck
+          fi
       - name: Strict checks (deterministic, no network)
         run: |
           echo "--- 1. 语法检查"
