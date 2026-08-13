@@ -14,7 +14,7 @@
 PLUGIN_ITEMS=(
   "vowifi|01_resolve_vowifi.pl|VoWiFi域名全解析测试|perl||"
   "vowifi|02_vowifi_verify.pl|VoWiFi多DNS交叉验证|perl||"
-  "vowifi|03_test_router_dns.pl|路由器DNS转发测试|perl|路由器网关IP(逗号分隔，回车默认192.168.1.1,192.168.2.1)|"
+  "vowifi|03_test_router_dns.pl|路由器DNS转发测试|perl|路由器网关IP(逗号分隔，回车默认192.168.1.1,192.168.2.1)|0"
   "vowifi|carrier_epdg.pl|运营商ePDG部署检测|perl|运营商(ct/cmcc/cucc/cbn/all，输入直跑；回车进交互选择)|0"
   "network|01_port_test.pl|端口连通性测试|perl|目标IP 端口 协议(如 223.5.5.5 53 udp)|0"
   "network|doh_dot_check.sh|DoH/DoT支持检测|bash|检测DNS(逗号分隔，回车用当前组)|"
