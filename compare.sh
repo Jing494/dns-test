@@ -78,7 +78,7 @@ echo "  ━━━ [0] 延迟探测（每DNS 3次dig → 中位数） ━━━"
 PARR_CMDS=()
 for d in "${DNS_ARGS[@]}"; do
   for i in 1 2 3; do
-    PARR_CMDS+=("dig @${d} www.baidu.com A +time=2 +tries=1 2>/dev/null | sed -n 's/.*Query time: \\([0-9]*\\) msec.*/\\1/p'")
+    PARR_CMDS+=("dig @$(dig_target "$d") www.baidu.com A +time=2 +tries=1 2>/dev/null | sed -n 's/.*Query time: \\([0-9]*\\) msec.*/\\1/p'")
   done
 done
 par_run
