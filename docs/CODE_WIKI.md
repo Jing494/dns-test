@@ -239,9 +239,9 @@ use DNSUtil;
 | `dns_health_check` | DNS 可达性预检（双域名探测，任一成功即可达），不可达返回 1 快速跳过 |
 | `par_run` | 并行 dig 引擎：将 `PARR_CMDS[]` 数组中的命令 8 并发执行，结果存 `$PARR_TMPDIR/N.out` |
 | `is_valid_response` | 判断 dig 响应是否有效（过滤通信错误/无服务器/OPT 杂项） |
-| `is_cdn_domain` | 判断域名是否为 CDN（劫持检测时排除负载均衡差异） |
+| `is_cdn_domain` | 判断域名是否为 CDN（结果对比时排除负载均衡差异） |
 | `print_header` / `print_separator` | 输出格式化头部/分隔线 |
-| `run_full_test` | 完整版测试逻辑（16 项：A/AAAA/3GPP/记录类型/稳定性/异常/连通性/IPv6/一致性/运营商/DNSSEC/ECS/PTR/TTL/劫持/递归） |
+| `run_full_test` | 完整版测试逻辑（16 项：A/AAAA/3GPP/记录类型/稳定性/异常/连通性/IPv6/一致性/运营商/DNSSEC/ECS/PTR/TTL/结果对比/递归） |
 | `run_lite_test` | 精简版测试逻辑（10 项，输出更短） |
 
 ### 5.3 lib/plugins.sh（插件加载器）
