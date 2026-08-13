@@ -123,174 +123,57 @@ if [ -t 0 ]; then
       esac
       ;;
     2)
-      # 专项测试：列出选项让用户选
-      echo "可选专项测试："
-      echo "1. VoWiFi域名全解析测试（mnc000-015全量探测，或传入自定义DNS）"
-      echo "2. VoWiFi多DNS交叉验证（对比多个DNS的VoWiFi解析结果）"
-      echo "3. 路由器DNS转发测试（测试路由器DNS是否转发到指定DNS）"
-      echo "4. 端口连通性测试（测试ePDG/VoWiFi相关端口是否开放）"
-      echo "5. 通用示例脚本（基础查询/多DNS对比/DNS64检测/反向解析）"
-      echo "6. 运营商ePDG部署检测（电信/移动/联通/广电，判断各省份VoWiFi部署情况）"
-      echo "7. DoH/DoT支持检测（判断DNS是否提供加密解析）"
-      echo "8. 多DNS对比（compare.sh，横向对比评分/延迟，可生成HTML报告）"
-      echo "9. DNS趋势洞察（trends.sh，聚合历史compare数据看趋势，需先积累）"
-      echo "10. 一键全面验证（verify.sh，语法+单测+冒烟+对比+趋势全自检，约5分钟；--strict 强制 shellcheck）"
-      read -t 30 -p "请输入选项(1-10): " professional_test
+      # 专项测试：插件注册表驱动（lib/plugins.sh + tools/manifest.sh），新增专项自动出现
+      source "${SCRIPT_DIR}/lib/plugins.sh"
+      N_PLUGIN=${#PLUGIN_ITEMS[@]}
+      CMP_N=$((N_PLUGIN+1)); TRD_N=$((N_PLUGIN+2)); VER_N=$((N_PLUGIN+3))
+      echo "可选专项测试（插件注册表驱动，新增专项自动出现）:"
+      plugin_list
+      echo "$CMP_N. 多DNS对比（compare.sh，横向对比评分/延迟，可生成HTML报告）"
+      echo "$TRD_N. DNS趋势洞察（trends.sh，聚合历史compare数据看趋势，需先积累）"
+      echo "$VER_N. 一键全面验证（verify.sh，语法+单测+冒烟+对比+趋势全自检，约5分钟；--strict 强制 shellcheck）"
+      read -t 30 -p "请输入选项(1-$VER_N): " professional_test
       echo ""
       case $professional_test in
-        1)
-          echo "开始VoWiFi域名全解析测试..."
-          if [ ${#DNS_LIST[@]} -gt 4 ]; then
-            echo "⚠️  ${#DNS_LIST[@]}个DNS跑全解析会超时，本次只测前4个"
-            perl tools/vowifi/01_resolve_vowifi.pl "${DNS_LIST[@]:0:4}"
-          elif [ $# -ge 1 ]; then
-            perl tools/vowifi/01_resolve_vowifi.pl "${DNS_LIST[@]}"
-          else
-            perl tools/vowifi/01_resolve_vowifi.pl
-          fi
-          ;;
-        2)
-          echo "开始VoWiFi多DNS交叉验证..."
-          if [ ${#DNS_LIST[@]} -gt 4 ]; then
-            echo "⚠️  ${#DNS_LIST[@]}个DNS跑交叉验证会慢，本次只测前4个"
-            perl tools/vowifi/02_vowifi_verify.pl "${DNS_LIST[@]:0:4}"
-          elif [ $# -ge 1 ]; then
-            perl tools/vowifi/02_vowifi_verify.pl "${DNS_LIST[@]}"
-          else
-            perl tools/vowifi/02_vowifi_verify.pl
-          fi
-          ;;
-        3)
-          echo "开始路由器DNS转发测试（对比省级DNS）..."
-          echo "━━ 引导式配置（直接回车用默认值，不锁省级DNS） ━━"
-          read -t 30 -p "路由器网关IP（逗号分隔，默认192.168.1.1,192.168.2.1）: " router_input
-          read -t 30 -p "省级DNS对比基准（回车默认云南电信，如219.141.136.10）: " province_input
-          if [ -n "$router_input" ] && [ -n "$province_input" ]; then
-            perl tools/vowifi/03_test_router_dns.pl "$router_input" -- "$province_input"
-          elif [ -n "$router_input" ]; then
-            perl tools/vowifi/03_test_router_dns.pl "$router_input"
-          elif [ -n "$province_input" ]; then
-            PROVINCE_DNS="$province_input" perl tools/vowifi/03_test_router_dns.pl
-          else
-            perl tools/vowifi/03_test_router_dns.pl
-          fi
-          ;;
-        4)
-          echo "开始端口连通性测试..."
-          echo "━━ 引导式配置（回车用默认ePDG目标） ━━"
-          read -t 30 -p "目标 IP 端口 协议（如 223.5.5.5 53 udp）: " port_input
-          if [ -n "$port_input" ]; then
-            perl tools/network/01_port_test.pl $port_input
-          else
-            perl tools/network/01_port_test.pl
-          fi
-          ;;
-        5)
-          echo "开始通用示例脚本演示..."
-          # 限制DNS数量避免示例脚本超时（示例2/3收多DNS会慢）
-          if [ ${#DNS_LIST[@]} -gt 4 ]; then
-            echo "⚠️  ${#DNS_LIST[@]}个DNS跑示例会慢，本次只取前4个"
-            DNS_LIST=("${DNS_LIST[@]:0:4}")
-          fi
-          echo "1. 基础DNS查询"
-          echo "2. 多DNS对比测试"
-          echo "3. DNS64支持检测"
-          echo "4. 反向DNS解析"
-          read -t 30 -p "请输入要运行的示例编号(1-4): " example_id
-          echo ""
-          case $example_id in
-            1)
-              if [ $# -ge 1 ]; then
-                perl examples/01_dns_query.pl "${DNS_LIST[@]}"
-              else
-                perl examples/01_dns_query.pl
-              fi
-              ;;
-            2)
-              if [ $# -ge 1 ]; then
-                perl examples/02_multi_dns_compare.pl "${DNS_LIST[@]}"
-              else
-                perl examples/02_multi_dns_compare.pl
-              fi
-              ;;
-            3)
-              if [ $# -ge 1 ]; then
-                perl examples/03_dns64_check.pl "${DNS_LIST[@]}"
-              else
-                perl examples/03_dns64_check.pl
-              fi
-              ;;
-            4)
-              if [ $# -ge 1 ]; then
-                perl examples/04_reverse_dns.pl "${DNS_LIST[@]}"
-              else
-                perl examples/04_reverse_dns.pl
-              fi
-              ;;
-            *)
-              echo "无效选项，运行所有示例..."
-              echo ""
-              echo "=== 1. 基础DNS查询 ==="
-              if [ $# -ge 1 ]; then perl examples/01_dns_query.pl "${DNS_LIST[@]}"; else perl examples/01_dns_query.pl; fi
-              echo ""
-              echo "=== 2. 多DNS对比测试 ==="
-              if [ $# -ge 1 ]; then perl examples/02_multi_dns_compare.pl "${DNS_LIST[@]}"; else perl examples/02_multi_dns_compare.pl; fi
-              echo ""
-              echo "=== 3. DNS64支持检测 ==="
-              if [ $# -ge 1 ]; then perl examples/03_dns64_check.pl "${DNS_LIST[@]}"; else perl examples/03_dns64_check.pl; fi
-              echo ""
-              echo "=== 4. 反向DNS解析 ==="
-              if [ $# -ge 1 ]; then perl examples/04_reverse_dns.pl "${DNS_LIST[@]}"; else perl examples/04_reverse_dns.pl; fi
-              ;;
-          esac
-          ;;
-        6)
-          echo "开始运营商ePDG部署检测..."
-          echo "提示: 直接运行也可传参: perl tools/vowifi/carrier_epdg.pl [ct/cmcc/cucc/cbn/all] [DNS或router]"
-          perl tools/vowifi/carrier_epdg.pl
-          ;;
-        7)
-          echo "开始DoH/DoT支持检测（环境自适应：有curl则实测，无则端口级）..."
-          read -t 30 -p "检测DNS（逗号分隔，回车用当前组/默认）: " doh_input
-          if [ -n "$doh_input" ]; then
-            bash tools/network/doh_dot_check.sh "$doh_input"
-          elif [ ${#DNS_LIST[@]} -ge 1 ]; then
-            doh_list=$(IFS=','; echo "${DNS_LIST[*]}")
-            bash tools/network/doh_dot_check.sh "${doh_list}"
-          else
-            bash tools/network/doh_dot_check.sh
-          fi
-          ;;
-        8)
-          echo "开始多DNS对比（compare.sh，lite精简版63项/DNS，并行）..."
-          if [ ${#DNS_LIST[@]} -ge 2 ]; then
-            echo "  使用当前DNS列表: ${DNS_LIST[*]}"
-            bash compare.sh "${DNS_LIST[@]}"
-          else
-            echo "  对比至少需要2个DNS（当前: ${DNS_LIST[*]:-无}）"
-            read -t 30 -p "  请输入要对比的DNS（逗号分隔，回车默认 223.5.5.5,119.29.29.29）: " cmp_input
-            if [ -n "$cmp_input" ]; then
-              # 逗号/空格分隔都兼容（read -ra 防分词问题）
-              IFS=', ' read -ra cmp_list <<< "$cmp_input"
-              bash compare.sh "${cmp_list[@]}"
-            else
-              echo "  未输入，默认对比 223.5.5.5 与 119.29.29.29"
-              bash compare.sh 223.5.5.5 119.29.29.29
-            fi
-          fi
-          ;;
-        9)
-          echo "开始DNS趋势洞察（trends.sh，聚合 results/compare-*.json）..."
-          echo "  提示: 需先积累compare数据（跑过第8项或直接跑compare.sh即自动保存）"
-          bash trends.sh --html
-          ;;
-        10)
-          echo "开始一键全面验证（verify.sh，含语法/单测/冒烟/compare/trends/专项）..."
-          echo "  提示: 网络项（compare/专项）在海外/受限网络可能超时，会友好提示"
-          bash verify.sh
+        ""|*[!0-9]*)
+          echo "无效选项，返回主菜单..."
           ;;
         *)
-          echo "无效选项，返回主菜单..."
+          if [ "$professional_test" -le "$N_PLUGIN" ]; then
+            # 专项插件：DNS 数量保护（专项脚本收多 DNS 会慢/超时，最多4个）
+            if [ ${#DNS_LIST[@]} -gt 4 ]; then
+              echo "⚠️  ${#DNS_LIST[@]}个DNS跑专项会慢，本次只取前4个"
+              DNS_LIST=("${DNS_LIST[@]:0:4}")
+            fi
+            plugin_run "$professional_test" "${DNS_LIST[@]}"
+          elif [ "$professional_test" = "$CMP_N" ]; then
+            echo "开始多DNS对比（compare.sh，lite精简版63项/DNS，并行）..."
+            if [ ${#DNS_LIST[@]} -ge 2 ]; then
+              echo "  使用当前DNS列表: ${DNS_LIST[*]}"
+              bash compare.sh "${DNS_LIST[@]}"
+            else
+              echo "  对比至少需要2个DNS（当前: ${DNS_LIST[*]:-无}）"
+              read -t 30 -p "  请输入要对比的DNS（逗号分隔，回车默认 223.5.5.5,119.29.29.29）: " cmp_input
+              if [ -n "$cmp_input" ]; then
+                # 逗号/空格分隔都兼容（read -ra 防分词问题）
+                IFS=", " read -ra cmp_list <<< "$cmp_input"
+                bash compare.sh "${cmp_list[@]}"
+              else
+                echo "  未输入，默认对比 223.5.5.5 与 119.29.29.29"
+                bash compare.sh 223.5.5.5 119.29.29.29
+              fi
+            fi
+          elif [ "$professional_test" = "$TRD_N" ]; then
+            echo "开始DNS趋势洞察（trends.sh，聚合 results/compare-*.json）..."
+            echo "  提示: 需先积累compare数据（跑过compare即自动保存）"
+            bash trends.sh --html
+          elif [ "$professional_test" = "$VER_N" ]; then
+            echo "开始一键全面验证（verify.sh，含语法/单测/冒烟/compare/trends/专项）..."
+            echo "  提示: 网络项（compare/专项）在海外/受限网络可能超时，会友好提示"
+            bash verify.sh
+          else
+            echo "无效选项，返回主菜单..."
+          fi
           ;;
       esac
       ;;
