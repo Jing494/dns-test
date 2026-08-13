@@ -237,7 +237,7 @@ use DNSUtil;
 | `print_env_info` | 环境自检：输出 OS/dig/perl/ping/IPv6 可用性摘要（结果可回溯） |
 | `valid_dns_addr` | DNS 地址格式校验（IPv4/IPv6），防命令注入/误传 |
 | `dns_health_check` | DNS 可达性预检（双域名探测，任一成功即可达），不可达返回 1 快速跳过 |
-| `par_run` | 并行 dig 引擎：将 `PARR_CMDS[]` 数组中的命令 8 并发执行，结果存 `$PARR_TMPDIR/N.out` |
+| `par_run` | 并行 dig 引擎：将 `PARR_CMDS[]` 数组中的命令 `PARR_MAX` 并发（默认 8，环境变量可调）执行，结果存 `$PARR_TMPDIR/N.out`；临时目录自动注册进 `TMPDIR_LIST` 由入口脚本 trap 统一清理 |
 | `is_valid_response` | 判断 dig 响应是否有效（过滤通信错误/无服务器/OPT 杂项） |
 | `is_cdn_domain` | 判断域名是否为 CDN（结果对比时排除负载均衡差异） |
 | `print_header` / `print_separator` | 输出格式化头部/分隔线 |
@@ -312,6 +312,7 @@ tools/network/doh_dot_check.sh ─► lib/compat.sh（相对定位 ../../lib/）
 | `DNS_SERVER` / `DNS_LIST` | examples 默认 DNS | 云南电信 |
 | `COMPARE_MAX_CONCURRENCY` | compare 并行数 | 3 |
 | `SAVE_LOG` | 保存日志到 results/ | 关闭 |
+| `PARR_MAX` | par_run 并行并发上限（正整数，调小可降低负载） | 8 |
 | `TRENDS_DIR` / `COMPARE_RESULTS_DIR` | 趋势产物/数据源目录 | `trends/` / `results/` |
 | `PLUGIN_MANIFEST` | 插件注册表路径覆盖 | `tools/manifest.sh` |
 
@@ -472,7 +473,7 @@ perl examples/04_reverse_dns.pl 222.172.200.68             # 反向解析
 |------|------|
 | 不引入 bats | 现有 perl 单测 + smoke/verify 集成已够，bash 纯函数用零依赖轻量断言补充 |
 | 不引入 jq | compare JSON 自产自销且格式固定，echo 拼接足够 |
-| `par_run` 用临时文件方案 | 8 并发 + 临时文件够用，核心库重构需谨慎 |
+| `par_run` 用临时文件方案 | PARR_MAX 并发（默认 8）+ 临时文件，核心库重构需谨慎 |
 | compare 用平行数组而非关联数组 | 兼容 bash 3.2（macOS 默认） |
 | DNSUtil 抽取为纯函数模块 | 可单元测试，9 个 perl 脚本共用，消除重复 |
 | 运营商 IP 用 RFC 5737 占位 | 隐私保护，不暴露真实运营商内部 IP |
@@ -480,7 +481,7 @@ perl examples/04_reverse_dns.pl 222.172.200.68             # 反向解析
 ### 10.3 Roadmap
 
 - ✅ 单元测试（已完成）
-- 🔜 `par_run` 通用化（可配置并发数 + 优雅结果收集）
+- ✅ `par_run` 通用化（PARR_MAX 环境变量可调并发数 + 临时目录统一 TMPDIR_LIST 清理）
 - 🔜 `trends svg_chart` 模板化（HTML/SVG 内联字符串改 heredoc/独立模板）
 - 🔜 JSON 序列化增强（结构复杂化时引入 jq）
 
