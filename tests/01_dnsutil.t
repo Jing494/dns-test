@@ -170,6 +170,12 @@ subtest 'parse_dns_response 畸形包防崩' => sub {
         my @r = eval { parse_dns_response($pkt, 1) };
         ok(!$@, "畸形包不崩溃 (len=" . length($pkt) . ")") or diag $@;
     }
+    # 定向：64-191 保留位标签（P2修复）——不应被当普通长度跳变，解析受限且不崩
+    my $mal = pack("n6", 1, 0x8180, 1, 1, 0, 0) . chr(100) . "x" . "\x00" . pack("nn", 1, 1);
+    $mal .= chr(100) . "x" . "\x00" . pack("nnNn", 1, 1, 0, 4) . pack("C4", 9, 9, 9, 9);
+    my @rm = eval { parse_dns_response($mal, 1) };
+    ok(!$@, "64-191畸形标签不崩溃") or diag $@;
+    ok(@rm <= 1, "64-191畸形标签结果受限(<=1条)");
 };
 
 done_testing();
