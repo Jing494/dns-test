@@ -86,7 +86,8 @@ dns-test/
 │   ├── plugins.sh              # 插件加载器（plugin_list/plugin_run，专项菜单动态驱动）
 │   └── DNSUtil.pm              # DNS纯函数模块（sockaddr/报文构建/响应解析，可单测）
 ├── tests/                      # 单元测试
-│   └── 01_dnsutil.t            # DNSUtil 18用例（perl -Ilib tests/01_dnsutil.t）
+│   ├── 01_dnsutil.t            # DNSUtil 18用例（perl -Ilib tests/01_dnsutil.t）
+│   └── 02_plugins.sh           # 插件系统 9用例（bash tests/02_plugins.sh）
 ├── docs/                       # 详细技术文档
 │   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
 │   ├── TEST_METHOD.md          # DNS测试方法论/评分标准
@@ -301,8 +302,8 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 按优先级排序：
 
-- **单元测试（已启动 ✅）**：`lib/DNSUtil.pm` 提取 DNS 纯函数 + `tests/01_dnsutil.t` 18 用例（sockaddr/域名编码/响应解析/PTR/IP一致性/畸形包防崩），已接入 CI strict job；运行 `perl -Ilib tests/01_dnsutil.t`
-  - 待办：其余 perl 脚本（02/03/04/examples）迁移到 DNSUtil 模块、bats 引入评估
+- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh`
+  - bats 评估结论（2026-08-13）：**不引入**——现有 perl 单测 + smoke/verify 集成已够，bash 纯函数用零依赖轻量断言（tests/02_plugins.sh）补充，避免增加依赖
 - **par_run 通用化**：封装可配置并发数 + 更优雅的结果收集（当前 8 并发 + 临时文件方案够用，核心库重构需谨慎）
 - **trends svg_chart 模板化**：HTML/SVG 内联字符串改 heredoc/独立模板文件（当前功能正常，纯可读性优化）
 - **JSON 序列化增强**：compare 结果结构复杂化时引入 jq（当前 JSON 自产自销且格式固定，echo 拼接足够，避免增加依赖）

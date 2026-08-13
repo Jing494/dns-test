@@ -127,7 +127,8 @@ dns-test/
 │   ├── plugins.sh              # 插件加载器（plugin_list/plugin_run）
 │   └── DNSUtil.pm              # DNS纯函数模块（sockaddr/报文构建/响应解析，可单测）
 ├── tests/                      # 单元测试
-│   └── 01_dnsutil.t            # DNSUtil 18用例（perl -Ilib tests/01_dnsutil.t）
+│   ├── 01_dnsutil.t            # DNSUtil 18用例（perl -Ilib tests/01_dnsutil.t）
+│   └── 02_plugins.sh           # 插件系统 9用例（bash tests/02_plugins.sh）
 ├── docs/
 │   ├── TEST_METHOD.md          # 测试方法论/评分标准/实测结果
 │   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
