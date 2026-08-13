@@ -18,9 +18,11 @@ dns-test/
 ├── lib/                     # 公共库
 │   ├── core.sh              # 核心库（变量/函数/并行/评分）
 │   ├── compat.sh            # 平台兼容层（timeout等，macOS）
+│   ├── plugins.sh           # 插件加载器（专项菜单动态驱动）
 │   └── DNSUtil.pm           # DNS纯函数模块（可单测）
 ├── tests/                   # 单元测试
 │   └── 01_dnsutil.t         # DNSUtil 18用例
+├── tools/manifest.sh        # 插件注册表（专项插件清单，新增专项加一行）
 ├── tools/vowifi/            # VoWiFi专项（ePDG检测/路由器转发）
 ├── tools/network/           # 端口测试 / DoH-DoT检测
 ├── examples/                # 示例脚本（可传参）
@@ -33,11 +35,20 @@ dns-test/
 2. **改代码**：遵循现有风格（bash 3.2+ / Perl 5.10+，v4/v6 双栈，注释中文）
 3. **跑冒烟测试**（必须）：
    ```bash
-   bash smoke_test.sh   # 24项全绿才能提交
+   bash smoke_test.sh   # 25项全绿才能提交
    ```
 4. **分支流程**：功能改动先提交到 develop 分支，CI（ubuntu+macOS）通过后再合并 main
 5. **提交规范**：`type: 简短中文描述`（type: feat/fix/docs/chore）
 6. **PR**：说明改动内容 + 附 smoke 结果
+
+## 新增专项插件（可选）
+
+专项菜单由注册表驱动（`dns-test.sh` 选"专项测试"自动列出），**新增一个专项只需两步**：
+
+1. 把脚本放进 `tools/<目录>/`（或 `examples/`）
+2. 在 `tools/manifest.sh` 的 `PLUGIN_ITEMS` 加一行：`插件id|脚本|菜单名|执行器(perl/bash)|引导提示(可空)|透传DNS(1/0,默认1)`，并在文件底部补 `PLUGIN_DIR_<id>="目录"` 映射
+
+字段说明：`引导提示` 非空则执行前 `read -t 30` 询问一次；**参数策略三态**——引导输入非空→独占参数；空引导+透传DNS=1→透传当前 DNS 组；空引导+透传DNS=0→无参数执行（用脚本默认）。执行器白名单仅 `perl`/`bash`。详见 `lib/plugins.sh` 头注释。加完跑 `bash smoke_test.sh` 确认"插件注册表可加载"仍绿。
 
 ## 注意事项
 

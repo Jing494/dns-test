@@ -11,13 +11,14 @@ A unified toolkit for DNS benchmarking and network diagnostics, with a focus on 
 - **DNS Benchmarking** (lite: 10 items / full: 16 items, ~10s per DNS)
   - A/AAAA records, MX/NS/TXT/CNAME/SOA, stability (20 rounds), NXDOMAIN, ping (IPv4 + IPv6), consistency, carrier domains, DNSSEC, ECS, PTR, TTL, hijack detection, recursion
 - **Carrier ePDG Deployment Detection** — check whether China Telecom / China Mobile / China Unicom / China Broadnet have deployed VoWiFi ePDG (per-province, via your provincial DNS)
+- **Plugin Registry** — the special-test menu is driven by `tools/manifest.sh` (loaded by `lib/plugins.sh`); adding a new plugin = one line in the manifest + a directory mapping, it appears in the menu automatically
 - **Router DNS Forwarding Test** — verify if your home router forwards DNS to the provincial DNS (custom baseline supported)
 - **DoH / DoT Support Check** — adaptive: real test via `dig +tls` / `curl --doh-url` when available, port-level probe otherwise
 - **IPv6 support** — v4/v6 dual-stack everywhere, IPv6 connectivity test (ping6)
 - **AI Operator Manual** — 12-chapter guide teaching AI agents how to interact with users properly (ask DNS → pick version → guide to specialty tests)
 - **DNS Comparison** — `compare.sh` compares multiple DNS side-by-side (score / latency median / stability), optional responsive HTML report + structured JSON results
 - **Trend Insight** — `trends.sh` aggregates historical compare results (linear-regression trend arrows, CSV export, SVG line charts, optional cron collection)
-- **Automated Smoke Test** — `smoke_test.sh` validates all core paths in one run (23 checks)
+- **Automated Smoke Test** — `smoke_test.sh` validates all core paths in one run (25 checks)
 
 ## Quick Start
 
@@ -25,7 +26,7 @@ A unified toolkit for DNS benchmarking and network diagnostics, with a focus on 
 # TL;DR: clone → install → verify
 git clone https://github.com/Jing494/dns-test.git && cd dns-test
 bash install.sh            # install dig/perl/curl only if missing (add --all to also install optional shellcheck)
-bash smoke_test.sh         # 24-item automated validation
+bash smoke_test.sh         # 25-item automated validation
 bash dns-test.sh           # interactive guided testing
 ```
 
@@ -42,7 +43,7 @@ cd dns-test
 # 3. Verify (5 minutes)
 bash verify.sh             # one-command full self-check (syntax/unit/smoke/compare/trends; --help for usage)
 bash verify.sh --strict    # strict mode: missing shellcheck (optional dep) counts as FAIL
-bash smoke_test.sh         # automated 24-item validation
+bash smoke_test.sh         # automated 25-item validation
 bash lite.sh 223.5.5.5 0   # benchmark a DNS
 ```
 

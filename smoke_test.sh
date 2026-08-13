@@ -18,7 +18,7 @@ echo "════ DNS工具集 冒烟测试 ════"
 
 echo "--- 1. 全量语法检查"
 OK=1
-for f in *.sh lib/*.sh tools/network/*.sh; do bash -n "$f" 2>/dev/null || OK=0; done
+for f in *.sh lib/*.sh tools/*.sh tools/network/*.sh; do bash -n "$f" 2>/dev/null || OK=0; done
 while IFS= read -r f; do perl -c "$f" >/dev/null 2>&1 || OK=0; done < <(find . -name '*.pl')
 check "全量语法" $((1-OK))
 
@@ -128,6 +128,13 @@ perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 && check "单元测试" 0 || check
 
 echo "--- 23. verify.sh --help 参数识别"
 timeout 10 bash verify.sh --help >/dev/null 2>&1 && check "verify --help" 0 || check "verify --help" 1
+
+echo "--- 24. 插件注册表可加载（lib/plugins.sh + tools/manifest.sh）"
+if bash -c 'source lib/plugins.sh && [ ${#PLUGIN_ITEMS[@]} -ge 1 ] && [ "$(plugin_list | wc -l)" -ge 1 ]' 2>/dev/null; then
+  check "插件注册表" 0
+else
+  check "插件注册表" 1
+fi
 
 echo ""
 echo "════ 结果: $PASS 通过 / $FAIL 失败 ════"

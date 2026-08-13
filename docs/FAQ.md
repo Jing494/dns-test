@@ -43,7 +43,7 @@ sudo apt install -y dnsutils perl curl
 
 # ④ 在 WSL 内验证环境（把工具包放到 WSL 能访问的位置，如 /mnt/d/dns-test）
 cd /mnt/d/dns-test        # D盘在WSL里挂载为 /mnt/d
-bash smoke_test.sh        # 24 项自动化验证，全绿 = 环境就绪
+bash smoke_test.sh        # 25 项自动化验证，全绿 = 环境就绪
 bash dns-test.sh          # 交互引导测试
 ```
 > 💡 要点：`wsl --install` 需 Win10 2004+/Win11；老版本先 `wsl --update` 升到 WSL2；Windows 文件（D 盘等）在 WSL 里挂载为 `/mnt/<盘符>`，可直接访问；装完依赖也可直接 `bash install.sh` 自动补齐。

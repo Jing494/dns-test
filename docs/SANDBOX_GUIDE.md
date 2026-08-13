@@ -119,11 +119,12 @@ dns-test/
 ├── verify.sh                   # 一键全面验证（语法+shellcheck+单测+冒烟+compare+trends+专项，--strict 可强制 shellcheck）
 ├── install.sh                  # 一键安装依赖（缺失才装，--all 连可选依赖 shellcheck 一起装）
 ├── release.sh                  # 打包发布脚本
-├── smoke_test.sh               # 自动化冒烟测试（24项）
+├── smoke_test.sh               # 自动化冒烟测试（25项）
 ├── full.sh / lite.sh           # 基础测试入口（完整版/精简版）
 ├── lib/                        # 公共库
 │   ├── core.sh                 # 核心库（变量/函数/测试逻辑）
 │   ├── compat.sh               # 平台兼容层（timeout兼容函数，macOS可用）
+│   ├── plugins.sh              # 插件加载器（plugin_list/plugin_run）
 │   └── DNSUtil.pm              # DNS纯函数模块（sockaddr/报文构建/响应解析，可单测）
 ├── tests/                      # 单元测试
 │   └── 01_dnsutil.t            # DNSUtil 18用例（perl -Ilib tests/01_dnsutil.t）
@@ -131,7 +132,7 @@ dns-test/
 │   ├── TEST_METHOD.md          # 测试方法论/评分标准/实测结果
 │   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
 │   ├── SANDBOX_GUIDE.md        # 本文档
-│   ├── CHANGELOG.md            # 完整变更记录（第1~71轮）
+│   ├── CHANGELOG.md            # 完整变更记录（第1~72轮）
 │   └── FAQ.md                  # 常见问题
 ├── examples/
 │   ├── 01_dns_query.pl         # 基础DNS查询（v4/v6）
@@ -139,6 +140,7 @@ dns-test/
 │   ├── 03_dns64_check.pl       # DNS64检测
 │   └── 04_reverse_dns.pl       # 反向解析（含IPv6）
 ├── tools/
+│   ├── manifest.sh             # 插件注册表（专项插件清单）
 │   ├── vowifi/
 │   │   ├── 01_resolve_vowifi.pl    # VoWiFi全域名解析（v4/v6）
 │   │   ├── 02_vowifi_verify.pl     # VoWiFi多DNS交叉验证

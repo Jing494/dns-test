@@ -22,7 +22,12 @@ case "$1" in
     ;;
 esac
 
-DNS_LIST="${1:-223.5.5.5}"
+# 支持多位置参数或逗号分隔单参数（插件化后 dns-test.sh 可能传多个 DNS 位置参数）
+if [ $# -ge 2 ]; then
+  DNS_LIST=$(IFS=','; echo "$*")
+else
+  DNS_LIST="${1:-223.5.5.5}"
+fi
 
 # 平台兼容层（timeout 兼容函数，macOS 无 timeout 命令；仅端口级探测用）
 # 用 BASH_SOURCE 定位（$0 在非标准调用方式下可能失真）
