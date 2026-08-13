@@ -40,6 +40,18 @@ bash dns-test.sh       # 交互引导测试（或 bash lite.sh 223.5.5.5 0 快�
 
 → 多 DNS 横向对比用 `bash compare.sh DNS1 DNS2 --html`，历史趋势用 `bash trends.sh --html`（结果存 results/、趋势存 trends/）。
 
+## 📚 文档导航
+
+| 文档 | 用途 |
+|------|------|
+| 🌐 [README.en.md](./README.en.md) | English overview |
+| 🧠 [docs/AI_GUIDE.md](./docs/AI_GUIDE.md) | AI 助手操作手册（先问DNS/版本/专项，交互双模式） |
+| 🧪 [docs/TEST_METHOD.md](./docs/TEST_METHOD.md) | 测试方法论 / 评分标准 / 测试维度明细 |
+| ❓ [docs/FAQ.md](./docs/FAQ.md) | 常见问题（含 Windows/WSL 引导） |
+| 📜 [docs/CHANGELOG.md](./docs/CHANGELOG.md) | 完整变更记录（每轮） |
+| 🏖️ [docs/SANDBOX_GUIDE.md](./docs/SANDBOX_GUIDE.md) | 沙箱环境使用指南 |
+| 📦 [examples/README.md](./examples/README.md) | 通用示例脚本说明 |
+
 ---
 
 ## 📌 简介
@@ -79,7 +91,7 @@ dns-test/
 │   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
 │   ├── TEST_METHOD.md          # DNS测试方法论/评分标准
 │   ├── SANDBOX_GUIDE.md        # 沙箱环境使用指南
-│   ├── CHANGELOG.md            # 完整变更记录（第1~71轮）
+│   ├── CHANGELOG.md            # 完整变更记录（第1~72轮）
 │   └── FAQ.md                  # 常见问题
 ├── examples/                   # 通用示例脚本
 │   ├── README.md               # 示例说明
@@ -246,27 +258,7 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 ## 📋 测试维度说明
 
-### 基础测试（lite/full）
-#### 精简版（10项，约9秒/DNS）
-1. A记录批量测试（25个国内+国际域名）
-2. AAAA记录批量测试（8个域名）
-3. 3GPP/VoWiFi域名测试（电信/移动/联通代表域名，信息项不计分）
-4. 其他记录类型测试（MX/NS/TXT）
-5. 稳定性压力测试（20次连续查询）
-6. 异常/边界测试（NXDOMAIN）
-7. 实际连通性测试（Ping IPv4）
-7b. IPv6实际连通性测试（ping6，无IPv6环境自动跳过）
-8. IPv4/IPv6解析一致性
-9. 运营商域名解析测试（4个三大运营商域名）
-
-#### 完整版（16项，约10秒/DNS）
-在精简版基础上增加：
-10. DNSSEC安全扩展测试
-11. EDNS Client Subnet (ECS)测试
-12. 反向DNS解析(PTR)测试
-13. TTL值分析
-14. DNS劫持检测（与阿里DNS对比）
-15. 递归/迭代查询类型测试
+**基础测试（lite/full）测试项明细与评分标准**详见 [docs/TEST_METHOD.md](./docs/TEST_METHOD.md) 第四章（精简版 10 项/完整版 16 项，评分项 64/78 点）。
 
 ### 专项测试
 | 测试类型 | 功能说明 | 默认测试目标 |
@@ -298,13 +290,6 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 - **运营商 ePDG 检测**：公共 DNS 查不到运营商内部记录属正常（需用省级 DNS）；仅反映解析/部署，实际可用性需自测
 - **网络波动**：加速器/代理环境会导致延迟偏高、国际域名解析不稳——测试结果以真实网络为准
 
-## 📖 文档说明
-- 英文简介见：[README.en.md](./README.en.md)（English overview）
-- 详细的测试方法论和评分标准见：[docs/TEST_METHOD.md](./docs/TEST_METHOD.md)
-- **AI助手操作手册（先问DNS/版本/专项，交互提问工具两种模式（命名因agent而异：ask_user等），**日志截断处理见第八章**）见：[docs/AI_GUIDE.md](./docs/AI_GUIDE.md)**
-- 沙箱环境使用说明、限制见：[docs/SANDBOX_GUIDE.md](./docs/SANDBOX_GUIDE.md)
-- 通用示例脚本使用说明见：[examples/README.md](./examples/README.md)
-
 ---
 
 ## ❓ 常见问题
@@ -326,4 +311,4 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 ## 🔄 更新记录
 
-完整变更历史（第 1~71 轮）见 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**。
+完整变更历史（第 1~72 轮）见 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**。
