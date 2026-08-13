@@ -3,8 +3,8 @@
 > 🌐 **English**：[README.en.md](./README.en.md) ｜ **中文**：本文档
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Release: v1.6.1](https://img.shields.io/badge/Release-v1.6.1-blue.svg)
-![Version: v2026.08.7](https://img.shields.io/badge/Version-v2026.08.7-blue.svg)
+![Release: v1.6.2](https://img.shields.io/badge/Release-v1.6.2-blue.svg)
+![Version: v2026.08.8](https://img.shields.io/badge/Version-v2026.08.8-blue.svg)
 ![Platform: Linux/macOS/WSL](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20WSL-green.svg)
 ![Bash 3.2+](https://img.shields.io/badge/Bash-3.2%2B-blue.svg)
 ![Perl 5.10+](https://img.shields.io/badge/Perl-5.10%2B-blue.svg)
@@ -14,7 +14,7 @@
 
 > 🏷️ **版本号规则（双轨制）**：`vYYYY.MM.N` 日期式（N=当月发布序号）↔ 语义 `vX.Y`（X=主版本，重大重构才升；Y=次版本，功能更新）。补丁级修复仅递增日期式 N。
 
-> 🔧 **版本历程**：**v1.6.1 = v2026.08.7**（插件系统bash单测9用例）；v1.6 = v2026.08.6（专项菜单插件化+CI双平台矩阵）；v1.5.3 = v2026.08.5（可选依赖引导）；v1.5 = v2026.08.2（功能大更新）；初始 v1.0 = v2026.08。
+> 🔧 **版本历程**：**v1.6.2 = v2026.08.8**（审阅建议优化：IPv6方括号/一致性按实计/trap收敛/compare IPv6）；v1.6.1 = v2026.08.7（插件系统bash单测9用例）；v1.6 = v2026.08.6（专项菜单插件化+CI双平台矩阵）；v1.5.3 = v2026.08.5（可选依赖引导）；v1.5 = v2026.08.2（功能大更新）；初始 v1.0 = v2026.08。
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
@@ -130,7 +130,7 @@ cd dns-test
 
 # 方式2: Releases 下载（免 git，直接拿成品包）
 #   前往 https://github.com/Jing494/dns-test/releases
-#   下载 dns-test-v2026.08.6.tar.gz 后解压即可
+#   下载 dns-test-v2026.08.8.tar.gz 后解压即可
 
 # 方式3: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
 ```

@@ -9,7 +9,7 @@ A unified toolkit for DNS benchmarking and network diagnostics, with a focus on 
 ## Features
 
 - **DNS Benchmarking** (lite: 10 items / full: 16 items, ~10s per DNS)
-  - A/AAAA records, MX/NS/TXT/CNAME/SOA, stability (20 rounds), NXDOMAIN, ping (IPv4 + IPv6), consistency, carrier domains, DNSSEC, ECS, PTR, TTL, hijack detection, recursion
+  - A/AAAA records, MX/NS/TXT/CNAME/SOA, stability (20 rounds), NXDOMAIN, ping (IPv4 + IPv6), consistency, carrier domains, DNSSEC, ECS, PTR, TTL, result comparison vs Alibaba DNS (suspected-hijack hint), recursion
 - **Carrier ePDG Deployment Detection** — check whether China Telecom / China Mobile / China Unicom / China Broadnet have deployed VoWiFi ePDG (per-province, via your provincial DNS)
 - **Plugin Registry** — the special-test menu is driven by `tools/manifest.sh` (loaded by `lib/plugins.sh`); adding a new plugin = one line in the manifest + a directory mapping, it appears in the menu automatically
 - **Router DNS Forwarding Test** — verify if your home router forwards DNS to the provincial DNS (custom baseline supported)
