@@ -52,6 +52,21 @@ jobs:
           echo "--- 6. 单元测试（DNSUtil 纯函数）"
           perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 || { echo "❌ 单元测试失败"; exit 1; }
           echo "  ✅ 单元测试通过"
+          echo "--- 7. 插件系统（清单/脚本存在/拦截，无网络）"
+          source lib/plugins.sh
+          [ ${#PLUGIN_ITEMS[@]} -ge 10 ] || { echo "❌ 插件清单少于10项"; exit 1; }
+          plugin_list | grep -q "VoWiFi域名" || { echo "❌ plugin_list 输出异常"; exit 1; }
+          for item in "${PLUGIN_ITEMS[@]}"; do
+            P_ID="${item%%|*}"; rest="${item#*|}"
+            P_SCRIPT="${rest%%|*}"
+            dir="PLUGIN_DIR_$P_ID"; dir="${!dir}"
+            [ -f "${dir}/${P_SCRIPT}" ] || { echo "❌ 插件脚本缺失: ${dir}/${P_SCRIPT}"; exit 1; }
+          done
+          echo "  ✅ 插件清单+脚本存在"
+          if plugin_run 999 >/dev/null 2>&1; then echo "❌ 无效编号未拦截"; exit 1; fi
+          # 未知执行器拦截：在子 shell 内设数组+屏蔽 manifest（环境变量前缀传数组只传首个元素，会失效）
+          bash -c 'PLUGIN_MANIFEST=/dev/null; PLUGIN_ITEMS=("x|dns-test.sh|测试|python|"); PLUGIN_DIR_x="."; source lib/plugins.sh && plugin_run 1' >/dev/null 2>&1 && { echo "❌ 未知执行器未拦截"; exit 1; }
+          echo "  ✅ 插件拦截"
           echo "════ Strict checks 全部通过 ════"
 
   # 容错层：完整冒烟（含网络敏感项：ePDG/路由器/省级DNS等）
