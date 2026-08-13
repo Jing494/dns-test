@@ -101,19 +101,39 @@ else
   case "$PM" in
     apt)
       echo "════ 安装（apt-get） ════"
-      sudo apt-get update && sudo apt-get install -y "${NEED[@]}" "${NEED_SC[@]}" || { echo "❌ 安装失败（可能需 sudo 权限或网络问题）"; exit 1; }
+      if sudo apt-get update && sudo apt-get install -y "${NEED[@]}" "${NEED_SC[@]}"; then
+        :
+      else
+        echo "❌ 安装失败（可能需 sudo 权限或网络问题）"
+        exit 1
+      fi
       ;;
     dnf)
       echo "════ 安装（dnf） ════"
-      sudo dnf install -y "${NEED[@]}" "${NEED_SC[@]}" || { echo "❌ 安装失败"; exit 1; }
+      if sudo dnf install -y "${NEED[@]}" "${NEED_SC[@]}"; then
+        :
+      else
+        echo "❌ 安装失败"
+        exit 1
+      fi
       ;;
     yum)
       echo "════ 安装（yum） ════"
-      sudo yum install -y "${NEED[@]}" "${NEED_SC[@]}" || { echo "❌ 安装失败"; exit 1; }
+      if sudo yum install -y "${NEED[@]}" "${NEED_SC[@]}"; then
+        :
+      else
+        echo "❌ 安装失败"
+        exit 1
+      fi
       ;;
     brew)
       echo "════ 安装（brew） ════"
-      brew install "${NEED[@]}" "${NEED_SC[@]}" || { echo "❌ 安装失败"; exit 1; }
+      if brew install "${NEED[@]}" "${NEED_SC[@]}"; then
+        :
+      else
+        echo "❌ 安装失败"
+        exit 1
+      fi
       ;;
     apk|pacman|zypper)
       # 无自动分支的包管理器：必需项给出对应命令，可选项单独提示
@@ -169,10 +189,10 @@ else
     if [ "$ANS" = "y" ] || [ "$ANS" = "Y" ]; then
       echo "════ 安装 shellcheck（可选依赖） ════"
       case "$PM" in
-        apt) sudo apt-get update >/dev/null 2>&1 && sudo apt-get install -y "$PKG_SC" >/dev/null 2>&1 && echo "  ✅ 安装成功" || echo "  ❌ 安装失败（可能需 sudo 权限或网络问题）" ;;
-        dnf) sudo dnf install -y "$PKG_SC" >/dev/null 2>&1 && echo "  ✅ 安装成功" || echo "  ❌ 安装失败" ;;
-        yum) sudo yum install -y "$PKG_SC" >/dev/null 2>&1 && echo "  ✅ 安装成功" || echo "  ❌ 安装失败" ;;
-        brew) brew install "$PKG_SC" >/dev/null 2>&1 && echo "  ✅ 安装成功" || echo "  ❌ 安装失败" ;;
+        apt) if sudo apt-get update >/dev/null 2>&1 && sudo apt-get install -y "$PKG_SC" >/dev/null 2>&1; then echo "  ✅ 安装成功"; else echo "  ❌ 安装失败（可能需 sudo 权限或网络问题）"; fi ;;
+        dnf) if sudo dnf install -y "$PKG_SC" >/dev/null 2>&1; then echo "  ✅ 安装成功"; else echo "  ❌ 安装失败"; fi ;;
+        yum) if sudo yum install -y "$PKG_SC" >/dev/null 2>&1; then echo "  ✅ 安装成功"; else echo "  ❌ 安装失败"; fi ;;
+        brew) if brew install "$PKG_SC" >/dev/null 2>&1; then echo "  ✅ 安装成功"; else echo "  ❌ 安装失败"; fi ;;
         apk|pacman|zypper) echo "  ⚠️ $PM 暂无自动分支，请手动: ${PKG_SC}（Debian 系 sudo apt-get install -y shellcheck / macOS brew install shellcheck）" ;;
       esac
       if command -v shellcheck >/dev/null 2>&1; then

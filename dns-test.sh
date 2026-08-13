@@ -38,7 +38,7 @@ if [ -t 0 ]; then
     echo "2. 阿里云公共DNS"
     echo "3. 腾讯DNSPod"
     echo "4. 全部（云南电信+阿里+腾讯，串行会很久，建议配合索引参数）"
-    read -t 30 -p "请输入选项(1-4): " dns_group
+    read -r -t 30 -p "请输入选项(1-4): " dns_group
     echo ""
     case $dns_group in
       2) DNS_LIST=("${ALI_DNS_ADDR[@]}"); DNS_DISPLAY="阿里云公共DNS（4个）" ;;
@@ -56,7 +56,7 @@ if [ -t 0 ]; then
   echo "请选择测试类型："
   echo "1. 基础测试（完整版/精简版，覆盖通用DNS功能）"
   echo "2. 专项测试（VoWiFi/端口连通性/反向解析等专业测试）"
-  read -t 30 -p "请输入选项(1/2): " test_type
+  read -r -t 30 -p "请输入选项(1/2): " test_type
   echo ""
 
   case $test_type in
@@ -65,7 +65,7 @@ if [ -t 0 ]; then
       echo "请选择基础测试版本："
       echo "1. 精简版（10项基础测试，约9秒/DNS）"
       echo "2. 完整版（16项全面测试，约10秒/DNS）"
-      read -t 30 -p "请输入选项(1/2): " version
+      read -r -t 30 -p "请输入选项(1/2): " version
       echo ""
 
       # 判断DNS数量，超过1个询问是否指定索引
@@ -73,14 +73,14 @@ if [ -t 0 ]; then
         echo "检测到你要测试 ${#DNS_LIST[@]} 个DNS，完整跑完所有DNS可能会超时"
         echo "1. 测试所有DNS（可能会超时）"
         echo "2. 指定测试某一个DNS（推荐）"
-        read -t 30 -p "请选择(1/2): " dns_select
+        read -r -t 30 -p "请选择(1/2): " dns_select
         echo ""
         if [ "$dns_select" = "2" ]; then
           echo "可测试的DNS列表："
           for idx in "${!DNS_LIST[@]}"; do
             printf "  %d. %s\n" $((idx+1)) "${DNS_LIST[$idx]}"
           done
-          read -t 30 -p "请输入要测试的DNS编号(1-${#DNS_LIST[@]}): " dns_idx
+          read -r -t 30 -p "请输入要测试的DNS编号(1-${#DNS_LIST[@]}): " dns_idx
           echo ""
           # 转换为从0开始的索引
           dns_idx=$((dns_idx-1))
@@ -132,7 +132,7 @@ if [ -t 0 ]; then
       echo "$CMP_N. 多DNS对比（compare.sh，横向对比评分/延迟，可生成HTML报告）"
       echo "$TRD_N. DNS趋势洞察（trends.sh，聚合历史compare数据看趋势，需先积累）"
       echo "$VER_N. 一键全面验证（verify.sh，语法+单测+冒烟+对比+趋势全自检，约5分钟；--strict 强制 shellcheck）"
-      read -t 30 -p "请输入选项(1-$VER_N): " professional_test
+      read -r -t 30 -p "请输入选项(1-$VER_N): " professional_test
       echo ""
       case $professional_test in
         ""|*[!0-9]*)
@@ -153,7 +153,7 @@ if [ -t 0 ]; then
               bash compare.sh "${DNS_LIST[@]}"
             else
               echo "  对比至少需要2个DNS（当前: ${DNS_LIST[*]:-无}）"
-              read -t 30 -p "  请输入要对比的DNS（逗号分隔，回车默认 223.5.5.5,119.29.29.29）: " cmp_input
+              read -r -t 30 -p "  请输入要对比的DNS（逗号分隔，回车默认 223.5.5.5,119.29.29.29）: " cmp_input
               if [ -n "$cmp_input" ]; then
                 # 逗号/空格分隔都兼容（read -ra 防分词问题）
                 IFS=", " read -ra cmp_list <<< "$cmp_input"

@@ -154,12 +154,14 @@ sub check_ips {
     my ($domain, $current_ips, $prev_ref) = @_;
     return "" unless $prev_ref;
     my %prev_set = map { $_ => 1 } @$prev_ref;
-    my @new = grep { !$prev_set{$_} } @$current_ips;
-    if (@new) {
-        return "[⚠️ 新增IP: " . join(", ", @new) . "]";
-    } else {
-        return "[✓ 与之前一致]";
-    }
+    my %cur_set  = map { $_ => 1 } @$current_ips;
+    my @new  = grep { !$prev_set{$_} } @$current_ips;
+    my @gone = grep { !$cur_set{$_}  } @$prev_ref;
+    my @parts;
+    push @parts, "新增IP: " . join(", ", @new)  if @new;
+    push @parts, "消失IP: " . join(", ", @gone) if @gone;
+    return "[⚠️ " . join(" | ", @parts) . "]" if @parts;
+    return "[✓ 与之前一致]";
 }
 
 # 构建 PTR 查询（Type PTR = 12）

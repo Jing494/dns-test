@@ -199,9 +199,10 @@ if [ "$SAVE_JSON" = "1" ]; then
     echo "  \"dns\": ["
     i=0
     for d in "${DNS_ARGS[@]}"; do
+      esc_d=$(printf '%s' "$d" | sed 's/\\/\\\\/g; s/"/\\"/g')
       [ "${SCORE_VAL[$i]}" = "不可达" ] && reachable=false || reachable=true
       comma=""; [ $i -lt $(( ${#DNS_ARGS[@]} - 1 )) ] && comma=","
-      echo "    {\"addr\": \"${d}\", \"score\": \"${SCORE_VAL[$i]}\", \"stab\": \"${STAB_VAL[$i]}\", \"delay_ms\": ${DELAY_VAL[$i]:-0}, \"reachable\": ${reachable}}${comma}"
+      echo "    {\"addr\": \"${esc_d}\", \"score\": \"${SCORE_VAL[$i]}\", \"stab\": \"${STAB_VAL[$i]}\", \"delay_ms\": ${DELAY_VAL[$i]:-0}, \"reachable\": ${reachable}}${comma}"
       i=$((i+1))
     done
     echo "  ]"
