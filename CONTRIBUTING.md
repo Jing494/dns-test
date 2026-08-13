@@ -21,7 +21,8 @@ dns-test/
 │   ├── plugins.sh           # 插件加载器（专项菜单动态驱动）
 │   └── DNSUtil.pm           # DNS纯函数模块（可单测）
 ├── tests/                   # 单元测试
-│   └── 01_dnsutil.t         # DNSUtil 18用例
+│   ├── 01_dnsutil.t         # DNSUtil 18用例（perl）
+│   └── 02_plugins.sh        # 插件系统 9用例（bash）
 ├── tools/manifest.sh        # 插件注册表（专项插件清单，新增专项加一行）
 ├── tools/vowifi/            # VoWiFi专项（ePDG检测/路由器转发）
 ├── tools/network/           # 端口测试 / DoH-DoT检测
