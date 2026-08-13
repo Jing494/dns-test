@@ -16,8 +16,10 @@
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
 cd "$SCRIPT_DIR" || exit 1
 source lib/core.sh
+# 异常退出时统一清理：全部临时目录走 TMPDIR_LIST（含 par_run 自动注册的 PARR_TMPDIR），trap 延迟求值
+trap 'rm -rf "${TMPDIR_LIST[@]}"' EXIT INT TERM
 
-VERSION="v2026.08.8"
+VERSION="v2026.08.9"
 GEN_HTML=0
 SAVE_JSON=1
 MODE="lite"    # lite(默认) / full
@@ -99,7 +101,6 @@ for d in "${DNS_ARGS[@]}"; do
     printf "     ❌ %-42s 不可达（3次dig均无响应）\n" "$d"
   fi
 done
-rm -rf "$PARR_TMPDIR"
 
 # ============================================================================
 # 2) lite 测试（批次并发，上限 MAXC）
@@ -111,8 +112,8 @@ MAXC="${COMPARE_MAX_CONCURRENCY:-3}"
 [[ "$MAXC" =~ ^[1-9][0-9]*$ ]] || MAXC=3
 echo ""
 echo "  ━━━ [1] 测试（$( [ "$MODE" = "full" ] && echo "完整版 77~78项" || echo "lite精简版 ${LITE_ITEMS}项" )/DNS, 并发${MAXC}） ━━━"
-TMPD=$(mktemp -d)
-trap 'rm -rf "$TMPD"' EXIT INT TERM
+TMPD=$(mktemp -d "${TMPDIR:-/tmp}/dns-test-compare.XXXXXX")
+TMPDIR_LIST+=("$TMPD")
 
 IDX_MAP=()
 for i in "${!DNS_ARGS[@]}"; do

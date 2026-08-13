@@ -202,22 +202,26 @@ dns_health_check() {
   return 1
 }
 
-# 并行dig辅助：将 PARR_CMDS 数组中的dig命令并行执行（8并发），结果存 $PARR_TMPDIR/N.out
+# 并行dig辅助：将 PARR_CMDS 数组中的dig命令并行执行（PARR_MAX 并发，默认8），结果存 $PARR_TMPDIR/N.out
 # 使用方式：
 #   PARR_CMDS=(); PARR_CMDS+=("dig @1.1.1.1 www.a.com A +time=3 +tries=1 2>/dev/null"); ...
 #   par_run
 #   for ((i=0; i<PARR_COUNT; i++)); do result=$(cat "$PARR_TMPDIR/$i.out"); ...; done
-#   rm -rf "$PARR_TMPDIR"
+#   临时目录由 par_run 自动注册进 TMPDIR_LIST，脚本退出/中断时由入口脚本 trap 统一清理
 PARR_CMDS=()
 PARR_TMPDIR=""
 PARR_COUNT=0
+# 并行并发上限（环境变量 PARR_MAX 可覆盖，调小可降低负载）
+PARR_MAX="${PARR_MAX:-8}"
+[[ "$PARR_MAX" =~ ^[1-9][0-9]*$ ]] || PARR_MAX=8
 par_run() {
-  PARR_TMPDIR=$(mktemp -d)
+  PARR_TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/dns-test.XXXXXX")
+  TMPDIR_LIST+=("$PARR_TMPDIR")
   local i=0
   for cmd in "${PARR_CMDS[@]}"; do
     (eval "$cmd" > "${PARR_TMPDIR}/${i}.out") &
     i=$((i + 1))
-    [ $((i % 8)) -eq 0 ] && wait
+    [ $((i % PARR_MAX)) -eq 0 ] && wait
   done
   wait
   PARR_COUNT=$i
@@ -291,7 +295,7 @@ run_full_test() {
   echo ""
   echo "  ━━━ [1] A记录批量测试 (${#DOMAINS_MAIN[@]} 国内 + ${#DOMAINS_GLOBAL[@]} 国际) ━━━"
   local a_success=0; local a_total=0; local a_time_sum=0
-  local a_tmpdir=$(mktemp -d)
+  local a_tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/dns-test.XXXXXX")
   TMPDIR_LIST+=("$a_tmpdir")
   local a_i=0
   local a_domains=("${DOMAINS_MAIN[@]}" "${DOMAINS_GLOBAL[@]}")
@@ -309,7 +313,6 @@ run_full_test() {
     a_time_sum=$((a_time_sum + ${qtime:-0}))
     is_valid_response "$result" && a_success=$((a_success + 1))
   done
-  rm -rf "$a_tmpdir"
   local a_rate=$((a_total ? a_success * 100 / a_total : 0))
   local a_avg=$((a_total ? a_time_sum / a_total : 0))
   printf "  📊 A记录: %d/%d (%d%%) | 平均延迟: %dms\n" "$a_success" "$a_total" "$a_rate" "$a_avg"
@@ -330,7 +333,6 @@ run_full_test() {
     local result=$(cat "${PARR_TMPDIR}/${i}.out")
     is_valid_response "$result" && aaaa_success=$((aaaa_success + 1))
   done
-  rm -rf "$PARR_TMPDIR"
   local aaaa_rate=$((aaaa_total ? aaaa_success * 100 / aaaa_total : 0))
   printf "  📊 AAAA记录: 有记录 %d/%d (%d%%)\n" "$aaaa_success" "$aaaa_total" "$aaaa_rate"
   total_all=$((total_all + aaaa_total)); success_all=$((success_all + aaaa_success))
@@ -356,7 +358,6 @@ run_full_test() {
       printf "     ⚠️  %s → 无记录（公共DNS查不到，正常）\n" "$d"
     fi
   done
-  rm -rf "$PARR_TMPDIR"
   echo "     📝 注: VoWiFi为信息项，不影响综合评分"
 
   # ===== 4. 其他记录类型测试（并行） =====
@@ -413,7 +414,6 @@ run_full_test() {
   else
     echo "     ❌ SOA (baidu.com): 失败"; total_all=$((total_all+1));
   fi
-  rm -rf "$PARR_TMPDIR"
 
   # ===== 5. 稳定性压力测试 =====
   echo ""
@@ -509,7 +509,6 @@ run_full_test() {
     local has_a=$(cat "${PARR_TMPDIR}/${i}.out" | grep -v OPT | head -1)
     [ -n "$has_a" ] && consistent=$((consistent + 1))
   done
-  rm -rf "$PARR_TMPDIR"
   printf "     📊 A记录覆盖率: %d/%d\n" "$consistent" "$check_total"
   total_all=$((total_all+1)); [ $consistent -gt 0 ] && success_all=$((success_all + 1))
 
@@ -532,7 +531,6 @@ run_full_test() {
       printf "     ❌ %s → 失败\n" "${DOMAINS_CARRIER[$i]}"
     fi
   done
-  rm -rf "$PARR_TMPDIR"
   local carrier_rate=$((carrier_total ? carrier_success * 100 / carrier_total : 0))
   printf "  📊 运营商域名: %d/%d (%d%%)\n" "$carrier_success" "$carrier_total" "$carrier_rate"
   total_all=$((total_all + carrier_total)); success_all=$((success_all + carrier_success))
@@ -559,7 +557,6 @@ run_full_test() {
       printf "     ⚠️ %s: 无DNSSEC记录\n" "${DOMAINS_DNSSEC[$i]}"
     fi
   done
-  rm -rf "$PARR_TMPDIR"
   local dnssec_rate=$((dnssec_total ? dnssec_found * 100 / dnssec_total : 0))
   printf "  📊 DNSSEC: %d/%d (%d%%)\n" "$dnssec_found" "$dnssec_total" "$dnssec_rate"
   total_all=$((total_all + dnssec_total)); success_all=$((success_all + dnssec_found))
@@ -583,7 +580,6 @@ run_full_test() {
   else
     echo "     ❌ ECS 查询失败"; total_all=$((total_all+1));
   fi
-  rm -rf "$PARR_TMPDIR"
 
   # ===== 12. 反向DNS解析(PTR)测试（并行） =====
   echo ""
@@ -603,7 +599,6 @@ run_full_test() {
       printf "     ⚠️ %s → 无PTR记录\n" "${TEST_IPS[$i]}"
     fi
   done
-  rm -rf "$PARR_TMPDIR"
   local ptr_rate=$((ptr_total ? ptr_success * 100 / ptr_total : 0))
   printf "  📊 PTR解析: %d/%d (%d%%)\n" "$ptr_success" "$ptr_total" "$ptr_rate"
   total_all=$((total_all + ptr_total)); success_all=$((success_all + ptr_success))
@@ -623,7 +618,6 @@ run_full_test() {
     local ttl=$(echo "$out" | sed -n '/ANSWER SECTION/{n;p;}' | sed -n 's/.*[[:space:]]\([0-9][0-9]*\)[[:space:]]\+IN[[:space:]].*/\1/p' | head -1)
     [ -n "$ttl" ] && [ "$ttl" -gt 0 ] 2>/dev/null && ttl_values+=("$ttl")
   done
-  rm -rf "$PARR_TMPDIR"
   if [ ${#ttl_values[@]} -gt 0 ]; then
     local ttl_min=${ttl_values[0]}; local ttl_max=${ttl_values[0]}; local ttl_sum=0
     for t in "${ttl_values[@]}"; do
@@ -670,7 +664,6 @@ run_full_test() {
       printf "     ⚠️ %s: 本地=%s, 基准=%s（结果不同，可能为负载均衡或异常）\n" "$d" "$local_result" "$ref_result"
     fi
   done
-  rm -rf "$PARR_TMPDIR"
   local hijack_judged=$((hijack_total - hijack_unknown))
   local hijack_rate=100
   [ $hijack_judged -gt 0 ] && hijack_rate=$((hijack_safe * 100 / hijack_judged))
@@ -721,7 +714,7 @@ run_lite_test() {
   echo ""
   echo "  ━━━ [1] A记录批量测试 ━━━"
   local a_success=0; local a_total=0
-  local a_tmpdir=$(mktemp -d)
+  local a_tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/dns-test.XXXXXX")
   TMPDIR_LIST+=("$a_tmpdir")
   local a_i=0
   local a_domains=("${DOMAINS_MAIN[@]}" "${DOMAINS_GLOBAL[@]}")
@@ -737,7 +730,6 @@ run_lite_test() {
     local result=$(echo "$out" | sed -n '/ANSWER SECTION/,/^$/p' | grep -v "ANSWER SECTION" | awk '{print $NF}')
     is_valid_response "$result" && a_success=$((a_success + 1))
   done
-  rm -rf "$a_tmpdir"
   local a_rate=$((a_total ? a_success * 100 / a_total : 0))
   printf "  📊 A记录: %d/%d (%d%%)\n" "$a_success" "$a_total" "$a_rate"
   total_all=$((total_all + a_total)); success_all=$((success_all + a_success))
@@ -757,7 +749,6 @@ run_lite_test() {
     local result=$(cat "${PARR_TMPDIR}/${i}.out")
     is_valid_response "$result" && aaaa_success=$((aaaa_success + 1))
   done
-  rm -rf "$PARR_TMPDIR"
   local aaaa_rate=$((aaaa_total ? aaaa_success * 100 / aaaa_total : 0))
   printf "  📊 AAAA记录: %d/%d (%d%%)\n" "$aaaa_success" "$aaaa_total" "$aaaa_rate"
   total_all=$((total_all + aaaa_total)); success_all=$((success_all + aaaa_success))
@@ -783,7 +774,6 @@ run_lite_test() {
       printf "     ⚠️  %s → 无记录（公共DNS查不到，正常）\n" "$d"
     fi
   done
-  rm -rf "$PARR_TMPDIR"
   echo "     📝 注: VoWiFi为信息项，不影响综合评分"
 
   # 4. 其他记录类型（并行）
@@ -813,7 +803,6 @@ run_lite_test() {
   else
     echo "     ❌ TXT (google.com): 失败"; total_all=$((total_all+1));
   fi
-  rm -rf "$PARR_TMPDIR"
 
   # 5. 稳定性
   echo ""
@@ -895,7 +884,6 @@ run_lite_test() {
     local has_a=$(cat "${PARR_TMPDIR}/${i}.out" | grep -v OPT | head -1)
     [ -n "$has_a" ] && consistent=$((consistent + 1))
   done
-  rm -rf "$PARR_TMPDIR"
   printf "     📊 A记录覆盖率: %d/%d\n" "$consistent" "$check_total"
   total_all=$((total_all+1)); [ $consistent -gt 0 ] && success_all=$((success_all + 1))
 
@@ -918,7 +906,6 @@ run_lite_test() {
       printf "     ❌ %s → 失败\n" "${DOMAINS_CARRIER[$i]}"
     fi
   done
-  rm -rf "$PARR_TMPDIR"
   local carrier_rate=$((carrier_total ? carrier_success * 100 / carrier_total : 0))
   printf "  📊 运营商域名: %d/%d (%d%%)\n" "$carrier_success" "$carrier_total" "$carrier_rate"
   total_all=$((total_all + carrier_total)); success_all=$((success_all + carrier_success))
