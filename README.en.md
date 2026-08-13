@@ -25,7 +25,7 @@ A unified toolkit for DNS benchmarking and network diagnostics, with a focus on 
 # TL;DR: clone → install → verify
 git clone https://github.com/Jing494/dns-test.git && cd dns-test
 bash install.sh            # install dig/perl/curl only if missing (add --all to also install optional shellcheck)
-bash smoke_test.sh         # 24-item automated validation
+bash smoke_test.sh         # 25-item automated validation
 bash dns-test.sh           # interactive guided testing
 ```
 
@@ -42,7 +42,7 @@ cd dns-test
 # 3. Verify (5 minutes)
 bash verify.sh             # one-command full self-check (syntax/unit/smoke/compare/trends; --help for usage)
 bash verify.sh --strict    # strict mode: missing shellcheck (optional dep) counts as FAIL
-bash smoke_test.sh         # automated 24-item validation
+bash smoke_test.sh         # automated 25-item validation
 bash lite.sh 223.5.5.5 0   # benchmark a DNS
 ```
 

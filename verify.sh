@@ -82,9 +82,9 @@ else
   tick "单测" 1
 fi
 
-echo "--- 4. 冒烟测试（24项，含网络项约3分钟）"
-if timeout 300 bash smoke_test.sh 2>&1 | grep -q "24 通过 / 0 失败"; then
-  tick "冒烟(24项)" 0
+echo "--- 4. 冒烟测试（25项，含网络项约3分钟）"
+if timeout 300 bash smoke_test.sh 2>&1 | grep -q "25 通过 / 0 失败"; then
+  tick "冒烟(25项)" 0
 else
   tick "冒烟" 1
 fi

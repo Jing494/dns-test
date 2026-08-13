@@ -25,7 +25,7 @@
 ```bash
 git clone https://github.com/Jing494/dns-test.git && cd dns-test
 bash install.sh        # 缺失才装 dig/perl/curl（已齐全则跳过 sudo）
-bash smoke_test.sh     # 24 项自动化验证环境
+bash smoke_test.sh     # 25 项自动化验证环境
 bash dns-test.sh       # 交互引导测试（或 bash lite.sh 223.5.5.5 0 快速测）
 ```
 
@@ -71,6 +71,7 @@ dns-test/
 ├── lib/                        # 公共库
 │   ├── core.sh                 # 核心库（变量/函数/测试逻辑）
 │   ├── compat.sh               # 平台兼容层（timeout兼容函数，macOS可用）
+│   ├── plugins.sh              # 插件加载器（plugin_list/plugin_run，专项菜单动态驱动）
 │   └── DNSUtil.pm              # DNS纯函数模块（sockaddr/报文构建/响应解析，可单测）
 ├── tests/                      # 单元测试
 │   └── 01_dnsutil.t            # DNSUtil 18用例（perl -Ilib tests/01_dnsutil.t）
@@ -87,6 +88,7 @@ dns-test/
 │   ├── 03_dns64_check.pl       # DNS64支持检测
 │   └── 04_reverse_dns.pl       # 反向DNS解析
 ├── tools/                      # 专项测试工具
+│   ├── manifest.sh             # 插件注册表（专项插件清单，新增专项=加一行）
 │   ├── vowifi/                 # VoWiFi专项测试
 │   │   ├── 01_resolve_vowifi.pl    # VoWiFi全域名解析
 │   │   ├── 02_vowifi_verify.pl     # VoWiFi多DNS交叉验证
@@ -276,6 +278,14 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 | 运营商ePDG部署检测 | 检测电信/移动/联通/广电的ePDG域名解析，判断各省份VoWiFi部署 | 云南电信DNS（可选家宽路由器） |
 | DoH/DoT支持检测 | 判断DNS是否提供加密解析（有curl实测/无则端口级） | 223.5.5.5 等 |
 | 通用示例 | 基础查询、多DNS对比、DNS64检测、反向解析 | 云南电信DNS |
+
+### 🧩 插件机制（专项菜单动态驱动）
+专项菜单由 `tools/manifest.sh` 注册表驱动：`dns-test.sh` 选"专项测试"时，自动列出注册表中的全部插件（新专项**自动出现**，主脚本零改动）。**新增一个专项只需两步**：
+1. 把脚本放进 `tools/<目录>/`（或 `examples/`）
+2. 在 `tools/manifest.sh` 的 `PLUGIN_ITEMS` 加一行：`插件id|脚本文件名|菜单显示名|执行器(perl/bash)|引导提示(可空)`
+   （同时在文件底部补 `PLUGIN_DIR_<id>="目录"` 映射）
+
+字段说明：`引导提示` 非空时，执行前会 `read -t 30` 询问一次，**输入值独占作为脚本参数**（回车则透传当前 DNS 组）；执行器白名单仅 `perl`/`bash`。执行时从项目根调用 `目录/脚本`（不 cd，脚本内部相对路径不受影响）。详见 `lib/plugins.sh` 头注释。
 
 ---
 

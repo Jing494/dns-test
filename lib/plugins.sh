@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC1090  # 注册表路径可被 PLUGIN_MANIFEST 覆盖（非固定 source，与 core.sh 同策略）
 # ============================================================================
 # 专项插件加载器（纯函数文件，无副作用，任何脚本可安全 source）
 # 依赖: tools/manifest.sh（注册表，可用 PLUGIN_MANIFEST 环境变量覆盖路径）
@@ -25,11 +26,12 @@ _plugins_load() {
 }
 _plugins_load
 
-# 拆分注册表行（| 分隔，纯内置）: $1=行  ->  全局 P_ID/P_SCRIPT/P_NAME/P_EXEC/P_PROMPT
+# 拆分注册表行（| 分隔，纯内置）: $1=行  ->  全局 P_ID/P_SCRIPT/P_NAME/P_EXEC/P_PROMPT/P_FWD
 _plugin_split() {
   local line="$1"
-  P_ID=""; P_SCRIPT=""; P_NAME=""; P_EXEC=""; P_PROMPT=""
-  IFS='|' read -r P_ID P_SCRIPT P_NAME P_EXEC P_PROMPT <<< "$line"
+  P_ID=""; P_SCRIPT=""; P_NAME=""; P_EXEC=""; P_PROMPT=""; P_FWD=1
+  IFS='|' read -r P_ID P_SCRIPT P_NAME P_EXEC P_PROMPT P_FWD <<< "$line"
+  [ -z "$P_FWD" ] && P_FWD=1
 }
 
 # 打印所有菜单项: "编号. 名称"
@@ -62,20 +64,22 @@ plugin_run() {
         read -r -t 30 -p "${P_PROMPT}: " pval 2>/dev/null || true
         [ -n "$pval" ] && args="$pval"
       fi
-      # 与命令行直跑一致：从项目根调用 dir/script（不 cd，避免脚本内部相对路径失效）
-      # 引导值(可选) + DNS列表(可空) 作为脚本参数
-      case "$P_EXEC" in
-        perl)
-          if [ -n "$args" ]; then perl "$path" $args "$@"; else perl "$path" "$@"; fi
-          ;;
-        bash)
-          if [ -n "$args" ]; then bash "$path" $args "$@"; else bash "$path" "$@"; fi
-          ;;
-        *)
-          echo "❌ 未知执行器: $P_EXEC" >&2
-          return 1
-          ;;
-      esac
+      # 校验执行器（perl/bash 白名单，防 manifest 误填执行任意命令）
+      if [ "$P_EXEC" != "perl" ] && [ "$P_EXEC" != "bash" ]; then
+        echo "❌ 未知执行器: $P_EXEC（仅支持 perl/bash）" >&2
+        return 1
+      fi
+      # 参数策略三态（防 DNS 被误当插件参数）:
+      #   1) 引导输入非空 → 独占参数（用户明确给了目标）
+      #   2) 引导为空 + P_FWD=1 → 透传 DNS_LIST（如 DoH"回车用当前组"）
+      #   3) 引导为空 + P_FWD=0 → 无参数执行（如 carrier_epdg/端口测试，用脚本默认/内置）
+      if [ -n "$args" ]; then
+        "$P_EXEC" "$path" $args
+      elif [ "$P_FWD" = "1" ]; then
+        "$P_EXEC" "$path" "$@"
+      else
+        "$P_EXEC" "$path"
+      fi
       return $?
     fi
     i=$((i+1))

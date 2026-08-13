@@ -18,6 +18,7 @@ dns-test/
 ├── lib/                     # 公共库
 │   ├── core.sh              # 核心库（变量/函数/并行/评分）
 │   ├── compat.sh            # 平台兼容层（timeout等，macOS）
+│   ├── plugins.sh           # 插件加载器（专项菜单动态驱动）
 │   └── DNSUtil.pm           # DNS纯函数模块（可单测）
 ├── tests/                   # 单元测试
 │   └── 01_dnsutil.t         # DNSUtil 18用例
@@ -33,7 +34,7 @@ dns-test/
 2. **改代码**：遵循现有风格（bash 3.2+ / Perl 5.10+，v4/v6 双栈，注释中文）
 3. **跑冒烟测试**（必须）：
    ```bash
-   bash smoke_test.sh   # 24项全绿才能提交
+   bash smoke_test.sh   # 25项全绿才能提交
    ```
 4. **分支流程**：功能改动先提交到 develop 分支，CI（ubuntu+macOS）通过后再合并 main
 5. **提交规范**：`type: 简短中文描述`（type: feat/fix/docs/chore）

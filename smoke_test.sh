@@ -129,6 +129,13 @@ perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 && check "单元测试" 0 || check
 echo "--- 23. verify.sh --help 参数识别"
 timeout 10 bash verify.sh --help >/dev/null 2>&1 && check "verify --help" 0 || check "verify --help" 1
 
+echo "--- 24. 插件注册表可加载（lib/plugins.sh + tools/manifest.sh）"
+if bash -c 'source lib/plugins.sh && [ ${#PLUGIN_ITEMS[@]} -ge 1 ] && [ "$(plugin_list | wc -l)" -ge 1 ]' 2>/dev/null; then
+  check "插件注册表" 0
+else
+  check "插件注册表" 1
+fi
+
 echo ""
 echo "════ 结果: $PASS 通过 / $FAIL 失败 ════"
 echo ""
