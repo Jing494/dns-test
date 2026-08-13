@@ -12,11 +12,14 @@
 #   - 引导: 注册表第5字段非空时，执行前 read -t 30 一次，输入作为脚本首参（可空）
 # ============================================================================
 
+# 项目根（本文件在 lib/ 下，上一级才是根；不依赖调用方 CWD——任何脚本可安全 source）
+_PLUGIN_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || exit 1
+
 # 加载注册表（幂等）
 _plugins_loaded=0
 _plugins_load() {
   [ "$_plugins_loaded" = "1" ] && return 0
-  local mf="${PLUGIN_MANIFEST:-tools/manifest.sh}"
+  local mf="${PLUGIN_MANIFEST:-$_PLUGIN_ROOT/tools/manifest.sh}"
   if [ -f "$mf" ]; then
     source "$mf"
     _plugins_loaded=1
@@ -56,7 +59,8 @@ plugin_run() {
       dir="PLUGIN_DIR_$P_ID"
       dir="${!dir}"
       [ -z "$dir" ] && { echo "❌ 插件目录未注册: $P_ID" >&2; return 1; }
-      path="${dir}/${P_SCRIPT}"
+      # 绝对路径拼接（项目根 + 目录映射 + 脚本名），与调用方 CWD 无关
+      path="${_PLUGIN_ROOT}/${dir}/${P_SCRIPT}"
       [ -f "$path" ] || { echo "❌ 插件脚本不存在: $path" >&2; return 1; }
       echo "开始${P_NAME}..."
       args=""
