@@ -11,8 +11,8 @@ dns-test/
 ├── dns-preset.sh            # 预设快捷测试
 ├── compare.sh               # 多DNS对比（并行+延迟中位数+HTML/JSON）
 ├── trends.sh                # DNS趋势洞察（聚合compare历史数据）
-├── verify.sh                # 一键全面验证（语法+单测+冒烟+对比+趋势）
-├── install.sh               # 一键安装依赖（缺失才装）
+├── verify.sh                # 一键全面验证（语法+shellcheck+单测+冒烟+对比+趋势，--strict 可强制 shellcheck）
+├── install.sh               # 一键安装依赖（缺失才装，--all 连可选依赖 shellcheck 一起装）
 ├── release.sh               # 打包发布脚本
 ├── smoke_test.sh            # 自动化冒烟测试（改动后必跑）
 ├── lib/                     # 公共库
@@ -33,7 +33,7 @@ dns-test/
 2. **改代码**：遵循现有风格（bash 3.2+ / Perl 5.10+，v4/v6 双栈，注释中文）
 3. **跑冒烟测试**（必须）：
    ```bash
-   bash smoke_test.sh   # 23项全绿才能提交
+   bash smoke_test.sh   # 24项全绿才能提交
    ```
 4. **分支流程**：功能改动先提交到 develop 分支，CI（ubuntu+macOS）通过后再合并 main
 5. **提交规范**：`type: 简短中文描述`（type: feat/fix/docs/chore）

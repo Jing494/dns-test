@@ -1,35 +1,77 @@
 #!/bin/bash
 # ============================================================================
 # 自动安装依赖脚本（缺失才装，自动检测 apt/yum/dnf/brew）
-# 用法: bash install.sh [--smoke]
-#   直接跑: 检测 dig/perl/curl，缺失才安装，装完强制校验，通过后给下一步指引
-#   --smoke: 校验通过后直接跑冒烟测试（23项自动化验证）
-# 安装: dig(bind-utils/dnsutils/bind) + perl + curl
+# 用法: bash install.sh [--smoke|--all|--help]
+#   直接跑: 检测必需依赖 dig/perl/curl，缺失才安装，装完强制校验；校验时检测 dig 的 DoT 能力（bind 9.18+ 才支持 +tls）
+#           末尾检测可选依赖 shellcheck——终端下会询问"是否现在一并安装？"（y/N 默认不装），非交互/管道自动跳过
+#   --smoke: 校验通过后直接跑冒烟测试（24项自动化验证）
+#   --all:   连同可选依赖 shellcheck 一起安装（verify.sh 的 shell 静态检查需要）
+#   --help:  打印用法说明；未知参数报错退出（退出码 1）
+# 必需安装: dig(bind-utils/dnsutils/bind) + perl + curl
+# 可选安装: shellcheck（shell 静态检查，verify.sh 使用；不装则 verify 跳过该项，CI 已兜底）
 # ============================================================================
+MODE="${1:-}"
+case "$MODE" in
+  -h|--help|help)
+    echo "用法: bash install.sh [--smoke|--all]"
+    echo ""
+    echo "  直接跑: 检测必需依赖 dig/perl/curl，缺失才安装（自动检测包管理器），装完强制校验"
+    echo "           校验时检测 dig 的 DoT 能力（bind 9.18+ 才支持 +tls）"
+    echo "           末尾检测可选依赖 shellcheck——终端下会询问是否一并安装（y/N 默认不装）"
+    echo "  --smoke: 校验通过后直接跑冒烟测试（24项自动化验证）"
+    echo "  --all  : 连同可选依赖 shellcheck 一起安装（verify.sh 的 shell 静态检查用）"
+    echo ""
+    echo "  手动安装（无包管理器时按系统选一条）:"
+    echo "    Debian/Ubuntu/WSL:  sudo apt-get install -y dnsutils perl curl"
+    echo "    RHEL/CentOS/Fedora: sudo dnf install -y bind-utils perl curl"
+    echo "    macOS (Homebrew):   brew install bind perl curl"
+    echo "    可选 shellcheck: sudo apt-get install -y shellcheck / brew install shellcheck"
+    exit 0
+    ;;
+  "") ;;
+  --smoke|--all) ;;
+  *)
+    echo "⚠️ 未知参数: $MODE（可用 bash install.sh --help 查看用法）"
+    exit 1
+    ;;
+esac
+MODE_ALL=0
+[ "$MODE" = "--all" ] && MODE_ALL=1
 echo "════ 依赖检测 ════"
 
-# 先检测包管理器，决定 dig 的包名
+# 先检测包管理器，决定 dig / shellcheck 的包名
 PM=""
 if command -v apt-get >/dev/null 2>&1; then
-  PM="apt"; PKG_DIG="dnsutils"
+  PM="apt"; PKG_DIG="dnsutils"; PKG_SC="shellcheck"
 elif command -v dnf >/dev/null 2>&1; then
-  PM="dnf"; PKG_DIG="bind-utils"
+  PM="dnf"; PKG_DIG="bind-utils"; PKG_SC="shellcheck"
 elif command -v yum >/dev/null 2>&1; then
-  PM="yum"; PKG_DIG="bind-utils"
+  PM="yum"; PKG_DIG="bind-utils"; PKG_SC="shellcheck"
 elif command -v brew >/dev/null 2>&1; then
-  PM="brew"; PKG_DIG="bind"
+  PM="brew"; PKG_DIG="bind"; PKG_SC="shellcheck"
+elif command -v apk >/dev/null 2>&1; then
+  PM="apk"; PKG_DIG="bind-tools"; PKG_SC="shellcheck"
+elif command -v pacman >/dev/null 2>&1; then
+  PM="pacman"; PKG_DIG="bind"; PKG_SC="shellcheck"
+elif command -v zypper >/dev/null 2>&1; then
+  PM="zypper"; PKG_DIG="bind-utils"; PKG_SC="ShellCheck"
 fi
 
-# 检测缺失项
+# 检测缺失项（必需：dig/perl/curl；可选：shellcheck，仅 --all 时并入安装）
 NEED=()
+NEED_SC=()
 command -v dig >/dev/null 2>&1   || NEED+=("$PKG_DIG")
 command -v perl >/dev/null 2>&1  || NEED+=("perl")
 command -v curl >/dev/null 2>&1  || NEED+=("curl")
+if [ "$MODE_ALL" = "1" ] && ! command -v shellcheck >/dev/null 2>&1; then
+  NEED_SC+=("$PKG_SC")
+fi
 
-if [ ${#NEED[@]} -eq 0 ]; then
+if [ ${#NEED[@]} -eq 0 ] && [ ${#NEED_SC[@]} -eq 0 ]; then
   echo "  ✅ dig / perl / curl 已全部齐全，无需安装（跳过 sudo）"
+  [ "$MODE_ALL" = "1" ] && echo "  ✅ shellcheck 已安装（--all 模式，可选依赖就绪）"
 elif [ -z "$PM" ]; then
-  echo "  ❌ 未检测到 apt/yum/dnf/brew，且缺少: dig perl curl"
+  echo "  ❌ 未检测到 apt/yum/dnf/brew，且缺少: dig perl curl${MODE_ALL:+ / $PKG_SC}"
   echo ""
   echo "════ 手动安装指引（按你的系统选一条） ════"
   echo "  Debian/Ubuntu/WSL:   sudo apt-get install -y dnsutils perl curl"
@@ -39,30 +81,52 @@ elif [ -z "$PM" ]; then
   echo "  Arch Linux:          sudo pacman -S bind perl curl"
   echo "  openSUSE:            sudo zypper install -y bind-utils perl curl"
   echo "  静态二进制(无包管理器): 从 https://github.com/ 搜索 dig/perl 静态包，或改用系统包管理"
+  [ "$MODE_ALL" = "1" ] && echo ""
+  [ "$MODE_ALL" = "1" ] && echo "  可选依赖 shellcheck（--all 模式需要）:"
+  [ "$MODE_ALL" = "1" ] && echo "    Debian/Ubuntu: sudo apt-get install -y shellcheck | macOS: brew install shellcheck | Arch: sudo pacman -S shellcheck | openSUSE: sudo zypper install -y ShellCheck"
   echo ""
   echo "  💡 极简/精简环境（busybox 等）建议：改用 WSL(Ubuntu) 或完整发行版——"
   echo "     本工具集依赖 dig + perl + curl，busybox 的替代命令不完整"
   echo "  📌 装好后重新运行: bash install.sh"
   exit 1
 else
-  echo "  缺失: ${NEED[*]}"
+  if [ ${#NEED[@]} -gt 0 ]; then
+    echo "  必需缺失: ${NEED[*]}"
+  fi
+  if [ ${#NEED_SC[@]} -gt 0 ]; then
+    echo "  可选缺失(--all): ${NEED_SC[*]}（shellcheck）"
+  fi
+  [ ${#NEED[@]} -eq 0 ] && [ ${#NEED_SC[@]} -gt 0 ] && echo "  必需依赖已齐，仅补装可选依赖 shellcheck"
   echo "  包管理器: $PM"
   case "$PM" in
     apt)
       echo "════ 安装（apt-get） ════"
-      sudo apt-get update && sudo apt-get install -y "${NEED[@]}" || { echo "❌ 安装失败（可能需 sudo 权限或网络问题）"; exit 1; }
+      sudo apt-get update && sudo apt-get install -y "${NEED[@]}" "${NEED_SC[@]}" || { echo "❌ 安装失败（可能需 sudo 权限或网络问题）"; exit 1; }
       ;;
     dnf)
       echo "════ 安装（dnf） ════"
-      sudo dnf install -y "${NEED[@]}" || { echo "❌ 安装失败"; exit 1; }
+      sudo dnf install -y "${NEED[@]}" "${NEED_SC[@]}" || { echo "❌ 安装失败"; exit 1; }
       ;;
     yum)
       echo "════ 安装（yum） ════"
-      sudo yum install -y "${NEED[@]}" || { echo "❌ 安装失败"; exit 1; }
+      sudo yum install -y "${NEED[@]}" "${NEED_SC[@]}" || { echo "❌ 安装失败"; exit 1; }
       ;;
     brew)
       echo "════ 安装（brew） ════"
-      brew install "${NEED[@]}" || { echo "❌ 安装失败"; exit 1; }
+      brew install "${NEED[@]}" "${NEED_SC[@]}" || { echo "❌ 安装失败"; exit 1; }
+      ;;
+    apk|pacman|zypper)
+      # 无自动分支的包管理器：必需项给出对应命令，可选项单独提示
+      case "$PM" in
+        apk)    CMD="apk add ${NEED[*]}" ;;
+        pacman) CMD="sudo pacman -S ${NEED[*]}" ;;
+        zypper) CMD="sudo zypper install -y ${NEED[*]}" ;;
+      esac
+      echo "  ⚠️ $PM 暂未内置自动安装分支，请手动执行:"
+      echo "    $CMD"
+      [ ${#NEED_SC[@]} -gt 0 ] && echo "    可选 shellcheck: ${PKG_SC}（Debian 系 sudo apt-get install -y shellcheck / macOS brew install shellcheck）"
+      echo "  📌 装好后重新运行: bash install.sh"
+      exit 1
       ;;
   esac
 fi
@@ -70,9 +134,23 @@ fi
 echo ""
 echo "════ 验证安装（强制校验） ════"
 FAIL=0
-if command -v dig >/dev/null 2>&1; then echo "  ✅ dig: $(dig -v 2>&1 | head -1)"; else echo "  ❌ dig 未安装"; FAIL=1; fi
+if command -v dig >/dev/null 2>&1; then
+  echo "  ✅ dig: $(dig -v 2>&1 | head -1)"
+  if dig -h 2>&1 | grep -q '+\[no\]tls'; then
+    echo "       DoT 检测: 支持（dig +tls 可用）"
+  else
+    echo "  ⚠️  DoT 检测: 当前 dig 不支持 +tls（bind < 9.18）——DoT 检测降级为端口级，其余功能不受影响"
+  fi
+else echo "  ❌ dig 未安装"; FAIL=1; fi
 if command -v perl >/dev/null 2>&1; then echo "  ✅ perl: $(perl -v 2>/dev/null | sed -n '2p')"; else echo "  ❌ perl 未安装"; FAIL=1; fi
 if command -v curl >/dev/null 2>&1; then echo "  ✅ curl: $(curl --version | head -1)"; else echo "  ⚠️  curl 未安装（DoH检测降级为端口级，不影响主功能）"; fi
+if [ "$MODE_ALL" = "1" ]; then
+  if command -v shellcheck >/dev/null 2>&1; then
+    echo "  ✅ shellcheck: $(shellcheck --version 2>/dev/null | grep -m1 '^version:')"
+  else
+    echo "  ❌ shellcheck 未安装（--all 模式要求）"; FAIL=1
+  fi
+fi
 
 if [ "$FAIL" = "1" ]; then
   echo ""
@@ -81,14 +159,46 @@ if [ "$FAIL" = "1" ]; then
 fi
 
 echo ""
-if [ "$1" = "--smoke" ]; then
+echo "════ 可选依赖检测 ════"
+if command -v shellcheck >/dev/null 2>&1; then
+  echo "  ✅ shellcheck: $(shellcheck --version 2>/dev/null | grep -m1 '^version:')"
+else
+  echo "  ⚠️  shellcheck 未安装（可选，不影响主功能）——verify.sh 的 shell 静态检查会跳过该项"
+  if [ -t 0 ] && [ -n "$PM" ]; then
+    read -r -p "  是否现在一并安装？(y/N): " ANS
+    if [ "$ANS" = "y" ] || [ "$ANS" = "Y" ]; then
+      echo "════ 安装 shellcheck（可选依赖） ════"
+      case "$PM" in
+        apt) sudo apt-get update >/dev/null 2>&1 && sudo apt-get install -y "$PKG_SC" >/dev/null 2>&1 && echo "  ✅ 安装成功" || echo "  ❌ 安装失败（可能需 sudo 权限或网络问题）" ;;
+        dnf) sudo dnf install -y "$PKG_SC" >/dev/null 2>&1 && echo "  ✅ 安装成功" || echo "  ❌ 安装失败" ;;
+        yum) sudo yum install -y "$PKG_SC" >/dev/null 2>&1 && echo "  ✅ 安装成功" || echo "  ❌ 安装失败" ;;
+        brew) brew install "$PKG_SC" >/dev/null 2>&1 && echo "  ✅ 安装成功" || echo "  ❌ 安装失败" ;;
+        apk|pacman|zypper) echo "  ⚠️ $PM 暂无自动分支，请手动: ${PKG_SC}（Debian 系 sudo apt-get install -y shellcheck / macOS brew install shellcheck）" ;;
+      esac
+      if command -v shellcheck >/dev/null 2>&1; then
+        echo "  ✅ shellcheck 就绪: $(shellcheck --version 2>/dev/null | grep -m1 '^version:')"
+      else
+        echo "  ⚠️ 未安装成功，可稍后重试: bash install.sh --all"
+      fi
+    else
+      echo "  好的，跳过（想装随时: bash install.sh --all；代码质量已由 CI 兜底）"
+    fi
+  else
+    echo "     · 想装: bash install.sh --all   或手动: sudo apt-get install -y shellcheck / brew install shellcheck"
+    echo "     · 不装也行：代码质量已由 CI 兜底（GitHub Actions 每轮自动 shellcheck）"
+  fi
+fi
+
+echo ""
+if [ "$MODE" = "--smoke" ]; then
   echo "════ 依赖就绪，运行冒烟测试 ════"
   bash smoke_test.sh
 else
   echo "✅ 依赖就绪！下一步（任选）:"
-  echo "  bash install.sh --smoke            # 一键验证环境（23项自动化）"
-  echo "  bash smoke_test.sh                 # 验证环境（23项自动化）"
+  echo "  bash install.sh --smoke            # 一键验证环境（24项自动化）"
+  echo "  bash smoke_test.sh                 # 验证环境（24项自动化）"
   echo "  bash verify.sh                     # 一键全量深度自检（含单测/compare/trends，约5分钟）"
+  echo "  bash verify.sh --strict            # 严格模式（shellcheck 未装算失败，开发者用）"
   echo "  bash dns-test.sh                   # 交互引导测试（选DNS/版本/专项）"
   echo "  bash lite.sh 223.5.5.5 0           # 快速测一个DNS"
   echo "  bash compare.sh 223.5.5.5 119.29.29.29  # 多DNS横向对比"

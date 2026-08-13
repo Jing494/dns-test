@@ -15,6 +15,23 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || exit 1
 cd "$SCRIPT_DIR" || exit 1
 source "${SCRIPT_DIR}/lib/core.sh"
 
+case "$1" in
+  -h|--help|help)
+    echo "用法: bash dns-preset.sh [预设组] [lite|full] [索引]"
+    echo "  预设组: yunnan(默认) / ali / tencent / all"
+    echo "  版本:   lite(默认) / full"
+    echo "  索引:   只测第N个DNS（0=第1个）"
+    echo "  示例:"
+    echo "    bash dns-preset.sh                     # 云南电信+lite"
+    echo "    bash dns-preset.sh ali                 # 阿里云+lite"
+    echo "    bash dns-preset.sh tencent             # 腾讯DNSPod+lite"
+    echo "    bash dns-preset.sh yunnan full         # 云南电信+完整版"
+    echo "    bash dns-preset.sh ali lite 0          # 阿里第1个DNS"
+    echo "    bash dns-preset.sh all lite            # 全部预设（可能较慢）"
+    exit 0
+    ;;
+esac
+
 PRESET="${1:-yunnan}"
 VERSION="${2:-lite}"
 IDX="${3:--1}"

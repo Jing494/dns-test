@@ -3,8 +3,8 @@
 > 🌐 **English**：[README.en.md](./README.en.md) ｜ **中文**：本文档
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Release: v1.5.1](https://img.shields.io/badge/Release-v1.5.2-blue.svg)
-![Version: v2026.08.3](https://img.shields.io/badge/Version-v2026.08.4-blue.svg)
+![Release: v1.5.3](https://img.shields.io/badge/Release-v1.5.3-blue.svg)
+![Version: v2026.08.5](https://img.shields.io/badge/Version-v2026.08.5-blue.svg)
 ![Platform: Linux/macOS/WSL](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20WSL-green.svg)
 ![Bash 3.2+](https://img.shields.io/badge/Bash-3.2%2B-blue.svg)
 ![Perl 5.10+](https://img.shields.io/badge/Perl-5.10%2B-blue.svg)
@@ -12,9 +12,9 @@
 
 > 📍 **目录可自由放置**：脚本全部相对定位（`BASH_SOURCE`），拉取/复制到任意目录都能运行。文档示例中的 `dns-test/` 路径请按你的实际目录替换。
 
-> 🏷️ **版本号规则（双轨制）**：`vYYYY.MM.N` 日期式（N=当月发布序号）↔ 语义 `vX.Y`（X=主版本，重大重构才升；Y=次版本，功能更新）。当前 **v1.5.2 = v2026.08.4**（工程化+单测+verify）；补丁 v1.5.1 = v2026.08.3（compat抽离+CI分层）；初始 v1.0 = v2026.08。补丁级修复仅递增日期式 N。
+> 🏷️ **版本号规则（双轨制）**：`vYYYY.MM.N` 日期式（N=当月发布序号）↔ 语义 `vX.Y`（X=主版本，重大重构才升；Y=次版本，功能更新）。当前 **v1.5.3 = v2026.08.5**（可选依赖引导）；补丁 v1.5.2 = v2026.08.4（工程化+单测+verify）；补丁 v1.5.1 = v2026.08.3（compat抽离+CI分层）；初始 v1.0 = v2026.08。补丁级修复仅递增日期式 N。
 
-> 🔧 **版本历程**： **v1.5 = v2026.08.2**（功能大更新）；补丁 **v1.5.1 = v2026.08.3**；当前 **v1.5.2 = v2026.08.4**（工程化+单测+verify） ；初始 v1.0 = v2026.08。
+> 🔧 **版本历程**： **v1.5 = v2026.08.2**（功能大更新）；补丁 **v1.5.1 = v2026.08.3**；补丁 **v1.5.2 = v2026.08.4**（工程化+单测+verify）；当前 **v1.5.3 = v2026.08.5**（可选依赖引导） ；初始 v1.0 = v2026.08。
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
@@ -25,11 +25,11 @@
 ```bash
 git clone https://github.com/Jing494/dns-test.git && cd dns-test
 bash install.sh        # 缺失才装 dig/perl/curl（已齐全则跳过 sudo）
-bash smoke_test.sh     # 23 项自动化验证环境
+bash smoke_test.sh     # 24 项自动化验证环境
 bash dns-test.sh       # 交互引导测试（或 bash lite.sh 223.5.5.5 0 快速测）
 ```
 
-**快速全量自检**（真机推荐）：`bash verify.sh`——语法+shellcheck+单测+冒烟+compare+trends+专项 一键跑完，输出汇总报告（约 5 分钟）。
+**快速全量自检**（真机推荐）：`bash verify.sh`——语法+shellcheck+单测+冒烟+compare+trends+专项 一键跑完，输出汇总报告（约 5 分钟）。shellcheck 为**可选依赖**：未装则该项提示跳过（不阻塞，CI 已兜底）；开发者可 `bash verify.sh --strict` 强制要求（未装算失败）。
 
 **典型输出**（`bash lite.sh 223.5.5.5 0` 结尾）：
 
@@ -63,7 +63,7 @@ dns-test/
 ├── dns-preset.sh               # DNS预设快捷测试（云南电信/阿里/腾讯一键测）
 ├── compare.sh                  # 多DNS对比模式（并行+延迟中位数+HTML报告+JSON结果）
 ├── trends.sh                   # DNS趋势洞察（聚合compare历史JSON：趋势总览/CSV/HTML折线图/定时采集）
-├── verify.sh                   # 一键全面验证（语法+shellcheck+单测+冒烟+compare+trends+专项）
+├── verify.sh                   # 一键全面验证（语法+shellcheck+单测+冒烟+compare+trends+专项；--strict 强制 shellcheck）
 ├── smoke_test.sh               # 自动化冒烟测试（一键验证核心功能）
 ├── install.sh                  # 一键安装（依赖检查+快捷方式）
 ├── release.sh                  # 打包发布脚本（生成 tar.gz + 上传指引）
@@ -115,14 +115,15 @@ cd dns-test
 
 # 方式2: Releases 下载（免 git，直接拿成品包）
 #   前往 https://github.com/Jing494/dns-test/releases
-#   下载 dns-test-v2026.08.3.tar.gz 后解压即可
+#   下载 dns-test-v2026.08.5.tar.gz 后解压即可
 
 # 方式3: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
 ```
 
 **自动安装依赖**（可选，替代手动命令）：
 ```bash
-bash install.sh    # 自动检测 apt/yum/dnf/brew，缺失才装 dig + perl + curl（已齐则跳过sudo）
+bash install.sh          # 自动检测 apt/yum/dnf/brew，缺失才装必需依赖 dig + perl + curl（已齐则跳过sudo）
+bash install.sh --all    # 连可选依赖 shellcheck 一起装（verify.sh 静态检查用）
 ```
 
 **依赖安装**（按你的系统执行）：
@@ -133,6 +134,8 @@ bash install.sh    # 自动检测 apt/yum/dnf/brew，缺失才装 dig + perl + c
 | macOS | `brew install bind curl` | 同上 |
 
 > dig 必需（来自 dnsutils/bind-utils；**DoT 检测需 bind 9.18+** 才支持 `dig +tls`）；perl 一般系统自带（专项测试需要）；curl 可选（无 curl 时 DoH 检测降级为端口级）。
+
+> 🧰 **可选依赖 shellcheck**（shell 静态检查，仅 `verify.sh` 使用）：不装不影响主功能——verify 会提示跳过该项，代码质量已由 CI 兜底（GitHub Actions 每轮自动检查）。想装：`bash install.sh --all`，或按系统 `sudo apt-get install -y shellcheck` / `brew install shellcheck` / `sudo pacman -S shellcheck` / `sudo zypper install -y ShellCheck`。
 
 **快速验证（5 分钟确认可用）**：
 ```bash
@@ -280,7 +283,7 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 - **DoH 检测**：无 curl 环境降级为端口级探测（非真实 DoH 验证）；有 curl 才实测
 - **DoT 检测**：需要 bind 9.18+ 的 dig（`+tls` 支持），旧版 dig 无法实测
-- **Windows**：不支持原生运行，需 WSL / Git Bash（详见 FAQ）
+- **Windows**：不支持原生运行，推荐 **WSL**（一条命令开装：`wsl --install` → 装依赖 → 跑 smoke，完整步骤见 [FAQ](./docs/FAQ.md)"Windows 用户"）；Git Bash 仅部分功能可用
 - **IPv6 相关**（[7b] 连通性 / v6 DNS 测试）：依赖本机 IPv6 网络，无 IPv6 时自动跳过（环境标注会说明）
 - **运营商 ePDG 检测**：公共 DNS 查不到运营商内部记录属正常（需用省级 DNS）；仅反映解析/部署，实际可用性需自测
 - **网络波动**：加速器/代理环境会导致延迟偏高、国际域名解析不稳——测试结果以真实网络为准

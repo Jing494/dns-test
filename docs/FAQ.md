@@ -4,6 +4,11 @@
 
 ## ❓ 常见问题
 
+### Q: verify.sh 提示"未安装 shellcheck，跳过"，需要装吗？
+不需要也行——shellcheck 是**可选依赖**（shell 静态检查工具），只影响 verify.sh 的"代码质量检查"这一项，**不影响任何 DNS 测试功能**；代码质量已由 CI 兜底（GitHub Actions 每轮自动检查）。
+- 想装（推荐开发者）：`bash install.sh --all`（自动检测包管理器一键装），或按系统手动 `sudo apt-get install -y shellcheck` / `brew install shellcheck`
+- 装完后 `bash verify.sh` 该项会显示 "shellcheck(0告警)"；`bash verify.sh --strict` 可强制要求该项必须存在
+
 ### Q: 运行超时怎么办？
 完整版测试单DNS约2-4分钟，多DNS完整跑完会超过大多数调用超时限制。解决方案：
 - **推荐**：命令末尾加索引参数，只测第N个DNS：`bash full.sh 8.8.8.8 114.114.114.114 0`
@@ -22,16 +27,32 @@
 ### Q: 支持哪些操作系统？
 支持所有安装了`dig`、`ping`工具的Linux/macOS系统，Perl脚本需要Perl 5.10+环境。
 
-**Windows 用户**（不支持原生，请用以下方式）：
-```bash
-# 方式1: WSL（推荐，体验与Linux一致）
-wsl --install                    # 首次安装WSL
-wsl -d Ubuntu -- apt install dnsutils curl perl   # 装依赖
-wsl -d Ubuntu -- bash smoke_test.sh               # 验证
+**Windows 用户**（不支持原生运行，推荐 **WSL**——体验与 Linux 完全一致，全功能可用）：
 
-# 方式2: Git Bash / MSYS2（部分功能可用，需自行装 dig/perl）
-#   注意: DoH/DoT检测的 /dev/tcp 在Git Bash下不可靠
+**方式1: WSL（推荐，一条命令开装）**
+```bash
+# ① 安装 WSL（管理员 PowerShell 或 CMD 运行，装完按提示重启，重启后自动进入 Ubuntu 并让你设置 Linux 用户名/密码）
+wsl --install
+
+# ② 若未自动装好发行版，可手动指定
+wsl --install -d Ubuntu
+
+# ③ 进入 WSL（Ubuntu 窗口）后，更新系统并安装依赖
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y dnsutils perl curl
+
+# ④ 在 WSL 内验证环境（把工具包放到 WSL 能访问的位置，如 /mnt/d/dns-test）
+cd /mnt/d/dns-test        # D盘在WSL里挂载为 /mnt/d
+bash smoke_test.sh        # 24 项自动化验证，全绿 = 环境就绪
+bash dns-test.sh          # 交互引导测试
 ```
+> 💡 要点：`wsl --install` 需 Win10 2004+/Win11；老版本先 `wsl --update` 升到 WSL2；Windows 文件（D 盘等）在 WSL 里挂载为 `/mnt/<盘符>`，可直接访问；装完依赖也可直接 `bash install.sh` 自动补齐。
+
+**方式2: Git Bash / MSYS2（部分功能可用，需自行装 dig/perl/curl）**
+- 可用: lite/full 多数项、compare、trends（前提：自行装好 dig/perl/curl）
+- 不可靠: DoH/DoT 检测的 `/dev/tcp` 端口探测
+- 换行: 仓库已带 `.gitattributes` 强制 LF，clone 不会出现 CRLF 报错
+
 > 不建议尝试原生 cmd/PowerShell 运行——脚本依赖 bash 特性（BASH_SOURCE、/dev/tcp 等）与 GNU 工具（dig/sed/awk）。
 
 ### Q: 可以测试多少个DNS？

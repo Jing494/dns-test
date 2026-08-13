@@ -1,0 +1,7 @@
+# 统一 LF 换行：防止 Windows 用户 clone 时 autocrlf 把脚本转成 CRLF 导致 bash 报 \r 错
+* text=auto
+*.sh text eol=lf
+*.pl text eol=lf
+*.pm text eol=lf
+*.yml text eol=lf
+*.md text eol=lf

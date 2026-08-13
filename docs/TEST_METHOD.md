@@ -208,7 +208,7 @@ bash dns-preset.sh ali lite 0
 - **自动化回归**：`bash smoke_test.sh` 一键验证核心功能（改动后必跑）
 - **域名外置**：`CONFIG_DOMAINS=配置 bash lite.sh` 可覆盖测试域名列表
 - **日志保存**：`SAVE_LOG=1 bash lite.sh 8.8.8.8 0` 自动存 `results/lite-YYYYMMDD-HHMMSS.log`（Linux tee 同步终端+文件 / macOS 写文件；也可手动 `| tee results/x.log`）
-- **DoH/DoT**：`bash tools/network/doh_dot_check.sh [DNS1,DNS2]`——**环境自适应**：DoT 用 `dig +tls=dot` 实测；DoH 有 curl 则 `curl --doh-url` 实测，无 curl 回退 443 端口级探测（实测结果受网络环境影响）
+- **DoH/DoT**：`bash tools/network/doh_dot_check.sh [DNS1,DNS2]`——**环境自适应**：DoT 用 `dig +tls=dot` 实测；DoH 有 curl 则 `curl --doh-url` 实测，无 curl 回退 443 端口级探测（实测结果受网络环境影响）。`bash install.sh` 校验时会检测 dig 是否支持 `+tls`（bind 9.18+），不支持则提示"DoT 检测降级为端口级"
 
 ### 直接运行
 

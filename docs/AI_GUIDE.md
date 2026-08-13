@@ -12,8 +12,8 @@
 
 AI 在**新环境**（新沙箱/新机器/刚 clone）使用本工具时，按此顺序走通，避免"依赖缺失/环境未验证"导致的假故障：
 
-1. **确认依赖**：`bash install.sh`（缺失才装 dig+perl+curl，已齐全则跳过 sudo；无包管理器环境会给手动安装指引；装完可加 `--smoke` 直接跑验证）
-2. **验证环境**：`bash smoke_test.sh`（23 项自动化，全绿 = 环境就绪；有失败先看失败项，多为网络项——对照第十一章环境差异判断）
+1. **确认依赖**：`bash install.sh`（缺失才装 dig+perl+curl，已齐全则跳过 sudo；无包管理器环境会给手动安装指引；装完可加 `--smoke` 直接跑验证；`--all` 连可选依赖 shellcheck 一起装——verify 静态检查用，不装则该项跳过）
+2. **验证环境**：`bash smoke_test.sh`（24 项自动化，全绿 = 环境就绪；有失败先看失败项，多为网络项——对照第十一章环境差异判断）
 3. **开始测试**：按第一章标准流程（先问 DNS → 版本 → 专项），或直接 `bash dns-test.sh` 交交互引导
 4. **路径确认**：若命令报 "command not found" 或文件缺失，先 `find / -name "dns-test.sh" 2>/dev/null` 确认仓库实际位置
 
@@ -130,7 +130,8 @@ bash dns-test.sh
 | 多DNS横向对比 | `bash compare.sh 223.5.5.5 119.29.29.29`（`--html` 生成响应式报告；`COMPARE_MAX_CONCURRENCY=1` 串行最稳） |
 | DNS历史趋势洞察 | `bash trends.sh --html --csv`（需先积累 compare 数据；`--cron DNS列表` 配 crontab 定时采集） |
 | 单元测试（DNSUtil） | `perl -Ilib tests/01_dnsutil.t`（sockaddr/报文构建/响应解析/PTR/畸形包 18 用例，CI 已接入） |
-| 一键全面自检 | `bash verify.sh`（语法+shellcheck+单测+冒烟+compare+trends+专项，约5分钟，真机推荐） |
+| 依赖安装/校验 | `bash install.sh`（缺失才装 dig/perl/curl + DoT 能力检测；`--all` 连可选依赖 shellcheck 一起装；`--smoke` 装完直接冒烟；`--help` 看用法） |
+| 一键全面自检 | `bash verify.sh`（语法+shellcheck+单测+冒烟+compare+trends+专项，约5分钟，真机推荐；shellcheck 可选依赖未装则跳过，`--strict` 可强制要求，`--help` 看用法） |
 
 ---
 

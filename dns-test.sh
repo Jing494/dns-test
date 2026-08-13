@@ -134,7 +134,7 @@ if [ -t 0 ]; then
       echo "7. DoH/DoT支持检测（判断DNS是否提供加密解析）"
       echo "8. 多DNS对比（compare.sh，横向对比评分/延迟，可生成HTML报告）"
       echo "9. DNS趋势洞察（trends.sh，聚合历史compare数据看趋势，需先积累）"
-      echo "10. 一键全面验证（verify.sh，语法+单测+冒烟+对比+趋势全自检，约5分钟）"
+      echo "10. 一键全面验证（verify.sh，语法+单测+冒烟+对比+趋势全自检，约5分钟；--strict 强制 shellcheck）"
       read -t 30 -p "请输入选项(1-10): " professional_test
       echo ""
       case $professional_test in

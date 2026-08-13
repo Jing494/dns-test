@@ -5,6 +5,20 @@
 # 用法：同full.sh
 # ============================================================================
 
+case "$1" in
+  -h|--help|help)
+    echo "用法: bash lite.sh [DNS...] [索引]"
+    echo "  DNS列表: 一个或多个DNS地址（默认云南电信 61.166.150.123），支持v4/v6混合"
+    echo "  索引:    只测第N个DNS（0=第1个），避免多DNS时超时"
+    echo "  示例:"
+    echo "    bash lite.sh                          # 默认DNS精简测试"
+    echo "    bash lite.sh 223.5.5.5 0              # 只测阿里云第1个DNS"
+    echo "    bash lite.sh 240e:52:4800::8888 8.8.8.8  # 混合v4/v6"
+    echo "  环境变量: SAVE_LOG=1 保存日志到 results/；DEFAULT_DNS_CSV=... 自定义默认DNS组"
+    exit 0
+    ;;
+esac
+
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/lib/core.sh"
 # 异常退出时清理并行临时目录
@@ -57,7 +71,7 @@ for _a in "${DNS_ADDR[@]}"; do
   valid_dns_addr "$_a" || { echo "❌ 非法DNS地址: $_a（仅支持IPv4/IPv6格式）"; exit 1; }
 done
 
-print_header "DNS 基础测试 (精简版 v2026.08.4)"
+print_header "DNS 基础测试 (精简版 v2026.08.5)"
 START_TIME=$(date +%s)
 print_env_info
 echo "待测DNS数量: ${#DNS_ADDR[@]} 个"

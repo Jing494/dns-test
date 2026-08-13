@@ -8,6 +8,20 @@
 #   DoH: 有 curl → curl --doh-url 实测；无 curl → 443 端口级探测
 # 注意: 实测失败可能因未提供/网络不通/路径不同，非绝对结论
 # ============================================================================
+
+case "$1" in
+  -h|--help|help)
+    echo "用法: bash doh_dot_check.sh [DNS1[,DNS2...]]"
+    echo "  默认: 223.5.5.5；多DNS用逗号分隔"
+    echo "  方法: DoT=dig +tls=dot 实测；DoH=有curl实测/无curl端口级"
+    echo "  示例:"
+    echo "    bash doh_dot_check.sh                    # 默认DNS"
+    echo "    bash doh_dot_check.sh 223.5.5.5,119.29.29.29"
+    echo "  提示: dig 需 bind 9.18+ 才支持 +tls（bash install.sh 会检测）"
+    exit 0
+    ;;
+esac
+
 DNS_LIST="${1:-223.5.5.5}"
 
 # 平台兼容层（timeout 兼容函数，macOS 无 timeout 命令；仅端口级探测用）

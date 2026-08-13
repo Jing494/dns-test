@@ -9,6 +9,21 @@
 #   bash full.sh 240e:52:4800::8888 8.8.8.8       # 混合v4/v6
 # ============================================================================
 
+case "$1" in
+  -h|--help|help)
+    echo "用法: bash full.sh [DNS...] [索引]"
+    echo "  DNS列表: 一个或多个DNS地址（默认云南电信 61.166.150.123），支持v4/v6混合"
+    echo "  索引:    只测第N个DNS（0=第1个），避免多DNS时超时"
+    echo "  示例:"
+    echo "    bash full.sh                                   # 默认DNS完整测试"
+    echo "    bash full.sh 8.8.8.8                           # 单个自定义DNS"
+    echo "    bash full.sh 8.8.8.8 114.114.114.114          # 多个自定义DNS"
+    echo "    bash full.sh 240e:52:4800::8888 8.8.8.8       # 混合v4/v6"
+    echo "  环境变量: SAVE_LOG=1 保存日志到 results/；DEFAULT_DNS_CSV=... 自定义默认DNS组"
+    exit 0
+    ;;
+esac
+
 # 引入核心库
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/lib/core.sh"
@@ -63,7 +78,7 @@ for _a in "${DNS_ADDR[@]}"; do
 done
 
 # 打印头部
-print_header "DNS 地毯式综合测试 (完整版 v2026.08.4)"
+print_header "DNS 地毯式综合测试 (完整版 v2026.08.5)"
 START_TIME=$(date +%s)
 print_env_info
 echo "待测DNS数量: ${#DNS_ADDR[@]} 个"
