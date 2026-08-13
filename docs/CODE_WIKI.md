@@ -495,6 +495,7 @@ perl examples/04_reverse_dns.pl 222.172.200.68             # 反向解析
 | [README.en.md](file:///workspace/README.en.md) | 英文精简简介 |
 | [docs/AI_GUIDE.md](file:///workspace/docs/AI_GUIDE.md) | AI 助手操作手册（12 章） |
 | [docs/TEST_METHOD.md](file:///workspace/docs/TEST_METHOD.md) | 测试方法论 / 评分标准 / 实测结果 |
+| [docs/CODE_WIKI.md](file:///workspace/docs/CODE_WIKI.md) | 本文档（架构/模块/函数/CI/插件） |
 | [docs/SANDBOX_GUIDE.md](file:///workspace/docs/SANDBOX_GUIDE.md) | 沙箱环境使用指南 |
 | [docs/FAQ.md](file:///workspace/docs/FAQ.md) | 常见问题 |
 | [docs/CHANGELOG.md](file:///workspace/docs/CHANGELOG.md) | 完整变更记录 |

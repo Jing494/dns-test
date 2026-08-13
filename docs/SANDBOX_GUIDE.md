@@ -132,8 +132,9 @@ dns-test/
 ├── docs/
 │   ├── TEST_METHOD.md          # 测试方法论/评分标准/实测结果
 │   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
+│   ├── CODE_WIKI.md            # 开发者代码 Wiki（架构/模块/函数/CI）
 │   ├── SANDBOX_GUIDE.md        # 本文档
-│   ├── CHANGELOG.md            # 完整变更记录（第1~72轮）
+│   ├── CHANGELOG.md            # 完整变更记录（每轮）
 │   └── FAQ.md                  # 常见问题
 ├── examples/
 │   ├── 01_dns_query.pl         # 基础DNS查询（v4/v6）

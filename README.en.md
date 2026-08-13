@@ -74,6 +74,7 @@ Detailed docs are in Chinese (the primary audience is China's telecom/DNS commun
 - [README.md](./README.md) — full usage guide
 - [docs/AI_GUIDE.md](./docs/AI_GUIDE.md) — AI operator manual (12 chapters)
 - [docs/TEST_METHOD.md](./docs/TEST_METHOD.md) — test methodology & scoring
+- [docs/CODE_WIKI.md](./docs/CODE_WIKI.md) — developer code wiki (architecture/modules/functions/CI)
 - [docs/SANDBOX_GUIDE.md](./docs/SANDBOX_GUIDE.md) — sandbox environment guide
 - [docs/FAQ.md](./docs/FAQ.md) — frequently asked questions
 - [docs/CHANGELOG.md](./docs/CHANGELOG.md) — full change history

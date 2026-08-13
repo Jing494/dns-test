@@ -47,6 +47,7 @@ bash dns-test.sh       # 交互引导测试（或 bash lite.sh 223.5.5.5 0 快�
 | 🌐 [README.en.md](./README.en.md) | English overview |
 | 🧠 [docs/AI_GUIDE.md](./docs/AI_GUIDE.md) | AI 助手操作手册（先问DNS/版本/专项，交互双模式） |
 | 🧪 [docs/TEST_METHOD.md](./docs/TEST_METHOD.md) | 测试方法论 / 评分标准 / 测试维度明细 |
+| 🧩 [docs/CODE_WIKI.md](./docs/CODE_WIKI.md) | 开发者代码 Wiki（架构/模块/函数/依赖/CI） |
 | ❓ [docs/FAQ.md](./docs/FAQ.md) | 常见问题（含 Windows/WSL 引导） |
 | 📜 [docs/CHANGELOG.md](./docs/CHANGELOG.md) | 完整变更记录（每轮） |
 | 🏖️ [docs/SANDBOX_GUIDE.md](./docs/SANDBOX_GUIDE.md) | 沙箱环境使用指南 |
@@ -91,8 +92,9 @@ dns-test/
 ├── docs/                       # 详细技术文档
 │   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
 │   ├── TEST_METHOD.md          # DNS测试方法论/评分标准
+│   ├── CODE_WIKI.md            # 开发者代码 Wiki（架构/模块/函数/CI）
 │   ├── SANDBOX_GUIDE.md        # 沙箱环境使用指南
-│   ├── CHANGELOG.md            # 完整变更记录（第1~72轮）
+│   ├── CHANGELOG.md            # 完整变更记录（每轮）
 │   └── FAQ.md                  # 常见问题
 ├── examples/                   # 通用示例脚本
 │   ├── README.md               # 示例说明
@@ -312,4 +314,4 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 ## 🔄 更新记录
 
-完整变更历史（第 1~72 轮）见 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**。
+完整变更历史（每轮）见 **[docs/CHANGELOG.md](./docs/CHANGELOG.md)**。
