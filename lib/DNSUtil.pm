@@ -113,6 +113,7 @@ sub parse_dns_response {
             $offset++;
             last if ($byte == 0);
             if ($byte >= 192) { $offset++; last; }
+            last if ($byte > 63);   # 64-191 保留位=畸形标签，停止解析该名字（防越界跳变）
             $offset += $byte;
         }
         $offset += 4;
@@ -123,7 +124,7 @@ sub parse_dns_response {
             my $byte = unpack("C", substr($response, $offset, 1));
             if ($byte >= 192) { $offset += 2; last; }
             elsif ($byte == 0) { $offset++; last; }
-            else { $offset += $byte + 1; }
+            else { last if ($byte > 63); $offset += $byte + 1; }   # 64-191 畸形标签，停止
         }
 
         last if ($offset + 10 > length($response));
