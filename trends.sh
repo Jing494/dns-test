@@ -19,7 +19,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
 cd "$SCRIPT_DIR" || exit 1
 source lib/core.sh
 
-VERSION="v2026.08.6"
+VERSION="v2026.08.7"
 SRC_DIR="${COMPARE_RESULTS_DIR:-results}"   # compare JSON 数据源
 OUT_DIR="${TRENDS_DIR:-trends}"             # 趋势产物目录
 GEN_HTML=0
