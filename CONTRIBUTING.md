@@ -22,6 +22,7 @@ dns-test/
 │   └── DNSUtil.pm           # DNS纯函数模块（可单测）
 ├── tests/                   # 单元测试
 │   └── 01_dnsutil.t         # DNSUtil 18用例
+├── tools/manifest.sh        # 插件注册表（专项插件清单，新增专项加一行）
 ├── tools/vowifi/            # VoWiFi专项（ePDG检测/路由器转发）
 ├── tools/network/           # 端口测试 / DoH-DoT检测
 ├── examples/                # 示例脚本（可传参）
