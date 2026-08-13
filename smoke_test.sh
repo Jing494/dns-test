@@ -18,7 +18,7 @@ echo "════ DNS工具集 冒烟测试 ════"
 
 echo "--- 1. 全量语法检查"
 OK=1
-for f in *.sh lib/*.sh tools/network/*.sh; do bash -n "$f" 2>/dev/null || OK=0; done
+for f in *.sh lib/*.sh tools/*.sh tools/network/*.sh; do bash -n "$f" 2>/dev/null || OK=0; done
 while IFS= read -r f; do perl -c "$f" >/dev/null 2>&1 || OK=0; done < <(find . -name '*.pl')
 check "全量语法" $((1-OK))
 

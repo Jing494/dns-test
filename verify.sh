@@ -43,13 +43,13 @@ echo ""
 
 echo "--- 1. 语法检查"
 OK=1
-for f in *.sh lib/*.sh tools/network/*.sh; do bash -n "$f" 2>/dev/null || OK=0; done
+for f in *.sh lib/*.sh tools/*.sh tools/network/*.sh; do bash -n "$f" 2>/dev/null || OK=0; done
 while IFS= read -r f; do perl -c "$f" >/dev/null 2>&1 || OK=0; done < <(find . -name '*.pl')
 tick "语法(.sh+.pl)" $((1-OK))
 
 echo "--- 2. shellcheck（可选依赖；未安装则提示跳过）"
 if command -v shellcheck >/dev/null 2>&1; then
-  n=$(shellcheck -S warning *.sh lib/*.sh tools/network/*.sh 2>/dev/null | grep -cE "SC[0-9]{4}")
+  n=$(shellcheck -S warning *.sh lib/*.sh tools/*.sh tools/network/*.sh 2>/dev/null | grep -cE "SC[0-9]{4}")
   [ "$n" -eq 0 ] && tick "shellcheck(0告警)" 0 || tick "shellcheck(${n}告警)" 1
 elif [ "$STRICT" = "1" ]; then
   echo "  ❌ --strict 模式：未安装 shellcheck（可选依赖，但严格模式要求安装）"

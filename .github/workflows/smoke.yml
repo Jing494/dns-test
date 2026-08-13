@@ -23,11 +23,11 @@ jobs:
       - name: Strict checks (deterministic, no network)
         run: |
           echo "--- 1. 语法检查"
-          for f in *.sh tools/network/*.sh; do bash -n "$f" || { echo "❌ $f"; exit 1; }; done
+          for f in *.sh tools/*.sh tools/network/*.sh; do bash -n "$f" || { echo "❌ $f"; exit 1; }; done
           for f in $(find . -name '*.pl'); do perl -c "$f" >/dev/null 2>&1 || { echo "❌ $f"; exit 1; }; done
           echo "  ✅ 语法OK"
           echo "--- 2. shellcheck（严格）"
-          shellcheck -S warning *.sh tools/network/*.sh lib/*.sh || { echo "❌ shellcheck 有告警"; exit 1; }
+          shellcheck -S warning *.sh tools/*.sh tools/network/*.sh lib/*.sh || { echo "❌ shellcheck 有告警"; exit 1; }
           echo "  ✅ shellcheck 0 告警"
           echo "--- 3. 注入拦截（断言退出码=1，不依赖输出文本）"
           if bash lite.sh '1.1.1.1;id' >/dev/null 2>&1; then
@@ -78,7 +78,7 @@ jobs:
           fi
       - name: Syntax check
         run: |
-          for f in *.sh tools/network/*.sh; do bash -n "$f" || exit 1; done
+          for f in *.sh tools/*.sh tools/network/*.sh; do bash -n "$f" || exit 1; done
           for f in $(find . -name '*.pl'); do perl -c "$f" >/dev/null 2>&1 || exit 1; done
       - name: Run smoke test
         # 注意：macOS runner 默认 /bin/bash 是 3.2（无关联数组），
