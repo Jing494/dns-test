@@ -78,7 +78,10 @@ plugin_run() {
       #   2) 引导为空 + P_FWD=1 → 透传 DNS_LIST（如 DoH"回车用当前组"）
       #   3) 引导为空 + P_FWD=0 → 无参数执行（如 carrier_epdg/端口测试，用脚本默认/内置）
       if [ -n "$args" ]; then
-        "$P_EXEC" "$path" $args
+        # read -a 按 IFS 分词为字面值数组（不触发 glob），防通配符/特殊字符被误展开
+        local -a args_arr
+        read -r -a args_arr <<< "$args"
+        "$P_EXEC" "$path" "${args_arr[@]}"
       elif [ "$P_FWD" = "1" ]; then
         "$P_EXEC" "$path" "$@"
       else

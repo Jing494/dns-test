@@ -9,6 +9,9 @@
 # 功能：公共变量、辅助函数、测试逻辑入口
 # ============================================================================
 
+# 临时目录清理清单（各测试函数 mktemp 后追加，EXIT/INT/TERM 统一清理防泄漏）
+TMPDIR_LIST=()
+
 # 前置检查：dig + perl 必需（perl 用于专项测试）
 command -v dig >/dev/null 2>&1 || { echo "❌ 未找到 dig 命令，请先安装 dnsutils/bind-utils"; exit 1; }
 command -v perl >/dev/null 2>&1 || { echo "❌ 未找到 perl 命令，请先安装 perl（专项测试需要）"; exit 1; }
@@ -126,7 +129,13 @@ DOMAINS_TTL=(
 
 # 域名列表外置覆盖（可用 CONFIG_DOMAINS 环境变量指定配置文件，格式同本文件变量定义，如 DOMAINS_MAIN=("a.com" "b.com")）
 if [ -n "$CONFIG_DOMAINS" ] && [ -f "$CONFIG_DOMAINS" ]; then
-  source "$CONFIG_DOMAINS"
+  # 安全校验（P2修复）：配置文件是 source 执行，若含命令执行特征则拒绝加载——只允许纯域名定义
+  # 仅信任你自己生成的配置文件；来源不明的文件一律不要用（详见 README 警告）
+  if grep -qE '[$`;|&<>]|\beval\b|\brm\b|\bexec\b' "$CONFIG_DOMAINS"; then
+    echo "⚠️ CONFIG_DOMAINS 疑似包含非域名内容，已拒绝加载（仅支持 DOMAINS_MAIN/GLOBAL 数组定义）" >&2
+  else
+    source "$CONFIG_DOMAINS"
+  fi
 fi
 
 # CDN多节点域名（劫持检测时用于判定，含国内常见负载均衡域名）
@@ -273,6 +282,8 @@ run_full_test() {
   echo "  ━━━ [1] A记录批量测试 (${#DOMAINS_MAIN[@]} 国内 + ${#DOMAINS_GLOBAL[@]} 国际) ━━━"
   local a_success=0; local a_total=0; local a_time_sum=0
   local a_tmpdir=$(mktemp -d)
+  TMPDIR_LIST+=("$a_tmpdir")
+  trap 'rm -rf "$PARR_TMPDIR" "${TMPDIR_LIST[@]}"' EXIT INT TERM
   local a_i=0
   local a_domains=("${DOMAINS_MAIN[@]}" "${DOMAINS_GLOBAL[@]}")
   for d in "${a_domains[@]}"; do
@@ -290,8 +301,8 @@ run_full_test() {
     is_valid_response "$result" && a_success=$((a_success + 1))
   done
   rm -rf "$a_tmpdir"
-  local a_rate=$((a_success * 100 / a_total))
-  local a_avg=$((a_time_sum / a_total))
+  local a_rate=$((a_total ? a_success * 100 / a_total : 0))
+  local a_avg=$((a_total ? a_time_sum / a_total : 0))
   printf "  📊 A记录: %d/%d (%d%%) | 平均延迟: %dms\n" "$a_success" "$a_total" "$a_rate" "$a_avg"
   total_all=$((total_all + a_total)); success_all=$((success_all + a_success))
 
@@ -311,7 +322,7 @@ run_full_test() {
     is_valid_response "$result" && aaaa_success=$((aaaa_success + 1))
   done
   rm -rf "$PARR_TMPDIR"
-  local aaaa_rate=$((aaaa_success * 100 / aaaa_total))
+  local aaaa_rate=$((aaaa_total ? aaaa_success * 100 / aaaa_total : 0))
   printf "  📊 AAAA记录: 有记录 %d/%d (%d%%)\n" "$aaaa_success" "$aaaa_total" "$aaaa_rate"
   total_all=$((total_all + aaaa_total)); success_all=$((success_all + aaaa_success))
 
@@ -414,7 +425,7 @@ run_full_test() {
       [ "$t" -lt "$min_t" ] && min_t=$t; [ "$t" -gt "$max_t" ] && max_t=$t; sum=$((sum + t))
     done
     local avg_t=$((sum / ${#stab_times[@]}))
-    local stab_rate=$((stab_success * 100 / stab_total))
+    local stab_rate=$((stab_total ? stab_success * 100 / stab_total : 0))
     printf "  📊 稳定性: %d/%d (%d%%)\n" "$stab_success" "$stab_total" "$stab_rate"
     printf "  ⏱️  延迟: 最小%dms | 最大%dms | 平均%dms\n" "$min_t" "$max_t" "$avg_t"
     echo "  📈 数据: ${stab_times[*]}"
@@ -513,7 +524,7 @@ run_full_test() {
     fi
   done
   rm -rf "$PARR_TMPDIR"
-  local carrier_rate=$((carrier_success * 100 / carrier_total))
+  local carrier_rate=$((carrier_total ? carrier_success * 100 / carrier_total : 0))
   printf "  📊 运营商域名: %d/%d (%d%%)\n" "$carrier_success" "$carrier_total" "$carrier_rate"
   total_all=$((total_all + carrier_total)); success_all=$((success_all + carrier_success))
 
@@ -540,7 +551,7 @@ run_full_test() {
     fi
   done
   rm -rf "$PARR_TMPDIR"
-  local dnssec_rate=$((dnssec_found * 100 / dnssec_total))
+  local dnssec_rate=$((dnssec_total ? dnssec_found * 100 / dnssec_total : 0))
   printf "  📊 DNSSEC: %d/%d (%d%%)\n" "$dnssec_found" "$dnssec_total" "$dnssec_rate"
   total_all=$((total_all + dnssec_total)); success_all=$((success_all + dnssec_found))
 
@@ -584,7 +595,7 @@ run_full_test() {
     fi
   done
   rm -rf "$PARR_TMPDIR"
-  local ptr_rate=$((ptr_success * 100 / ptr_total))
+  local ptr_rate=$((ptr_total ? ptr_success * 100 / ptr_total : 0))
   printf "  📊 PTR解析: %d/%d (%d%%)\n" "$ptr_success" "$ptr_total" "$ptr_rate"
   total_all=$((total_all + ptr_total)); success_all=$((success_all + ptr_success))
 
@@ -670,7 +681,7 @@ run_full_test() {
   # ===== 综合评分 =====
   echo ""
   echo "  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
-  local overall=$((success_all * 100 / total_all))
+  local overall=$((total_all ? success_all * 100 / total_all : 0))
   printf "  ┃ 📊 综合评分: %d%% (%d/%d 项通过)\n" "$overall" "$success_all" "$total_all"
   printf "  ┃ ⏱️  平均延迟: %dms | 稳定性: %d%%\n" "$avg_t" "$stab_rate"
   printf "  ┃ 🔑 关键指标: A记录%d%% 稳定性%d%% 劫持%d/%d\n" "$a_rate" "$stab_rate" "$hijack_safe" "$hijack_judged"
@@ -702,6 +713,8 @@ run_lite_test() {
   echo "  ━━━ [1] A记录批量测试 ━━━"
   local a_success=0; local a_total=0
   local a_tmpdir=$(mktemp -d)
+  TMPDIR_LIST+=("$a_tmpdir")
+  trap 'rm -rf "$PARR_TMPDIR" "${TMPDIR_LIST[@]}"' EXIT INT TERM
   local a_i=0
   local a_domains=("${DOMAINS_MAIN[@]}" "${DOMAINS_GLOBAL[@]}")
   for d in "${a_domains[@]}"; do
@@ -717,7 +730,7 @@ run_lite_test() {
     is_valid_response "$result" && a_success=$((a_success + 1))
   done
   rm -rf "$a_tmpdir"
-  local a_rate=$((a_success * 100 / a_total))
+  local a_rate=$((a_total ? a_success * 100 / a_total : 0))
   printf "  📊 A记录: %d/%d (%d%%)\n" "$a_success" "$a_total" "$a_rate"
   total_all=$((total_all + a_total)); success_all=$((success_all + a_success))
 
@@ -737,7 +750,7 @@ run_lite_test() {
     is_valid_response "$result" && aaaa_success=$((aaaa_success + 1))
   done
   rm -rf "$PARR_TMPDIR"
-  local aaaa_rate=$((aaaa_success * 100 / aaaa_total))
+  local aaaa_rate=$((aaaa_total ? aaaa_success * 100 / aaaa_total : 0))
   printf "  📊 AAAA记录: %d/%d (%d%%)\n" "$aaaa_success" "$aaaa_total" "$aaaa_rate"
   total_all=$((total_all + aaaa_total)); success_all=$((success_all + aaaa_success))
 
@@ -805,7 +818,7 @@ run_lite_test() {
     [ $((i % 5)) -eq 0 ] && printf "."
   done
   echo ""
-  local stab_rate=$((stab_success * 100 / stab_total))
+  local stab_rate=$((stab_total ? stab_success * 100 / stab_total : 0))
   printf "  📊 稳定性: %d/%d (%d%%)\n" "$stab_success" "$stab_total" "$stab_rate"
   total_all=$((total_all + stab_total)); success_all=$((success_all + stab_success))
 
@@ -898,14 +911,14 @@ run_lite_test() {
     fi
   done
   rm -rf "$PARR_TMPDIR"
-  local carrier_rate=$((carrier_success * 100 / carrier_total))
+  local carrier_rate=$((carrier_total ? carrier_success * 100 / carrier_total : 0))
   printf "  📊 运营商域名: %d/%d (%d%%)\n" "$carrier_success" "$carrier_total" "$carrier_rate"
   total_all=$((total_all + carrier_total)); success_all=$((success_all + carrier_success))
 
   # 综合评分
   echo ""
   echo "  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
-  local overall=$((success_all * 100 / total_all))
+  local overall=$((total_all ? success_all * 100 / total_all : 0))
   printf "  ┃ 📊 综合评分: %d%% (%d/%d 项通过)\n" "$overall" "$success_all" "$total_all"
   printf "  ┃ ⏱️  稳定性: %d%%\n" "$stab_rate"
   printf "  ┃ 🔑 关键指标: A记录%d%% 稳定性%d%%\n" "$a_rate" "$stab_rate"

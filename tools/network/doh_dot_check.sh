@@ -44,7 +44,7 @@ for DNS in "${DNS_ARR[@]}"; do
   if [[ "$DNS" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || [[ "$DNS" =~ ^[0-9a-fA-F:]+$ && "$DNS" == *":"* ]]; then
     echo "════ DoH/DoT 检测: $DNS ════"
     # ===== DoT: dig +tls 实测（dig 自带 +time 超时，无需外部 timeout） =====
-    if dig +tls=dot @$DNS www.baidu.com A +short +time=3 +tries=1 2>/dev/null | grep -qE "\."; then
+    if dig +tls=dot "@${DNS}" www.baidu.com A +short +time=3 +tries=1 2>/dev/null | grep -qE "\."; then
       echo "  DoT: ✅ dig +tls=dot 实测成功（提供DoT）"
     else
       echo "  DoT: ⚠️ dig +tls 失败（未提供DoT / 网络不通）"
@@ -61,7 +61,7 @@ for DNS in "${DNS_ARR[@]}"; do
         echo "  DoH: ⚠️ curl DoH 失败（未提供/路径不同/网络不通，code=$code）"
       fi
     else
-      port_hit=$({ timeout 3 bash -c "echo > /dev/tcp/$DNS/443" 2>/dev/null; } && echo 1 || echo 0)
+      port_hit=$({ timeout 3 bash -c "echo > \"/dev/tcp/${DNS}/443\"" 2>/dev/null; } && echo 1 || echo 0)
       if [ "$port_hit" = "1" ]; then
         echo "  DoH: ✅ 443端口开放（无curl，仅端口级探测）"
       else
