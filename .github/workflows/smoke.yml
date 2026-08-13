@@ -2,7 +2,7 @@ name: Smoke Test
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, tool_list-test]
   pull_request:
 
 # 同分支/同PR重复推送只保留最新一次运行（省 runner 时间）
