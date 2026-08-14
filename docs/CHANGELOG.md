@@ -18,6 +18,8 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-14（第八十三轮-补充）：**doh_dot_check 非法地址退出码统一（实际运行发现）**
+  - `tools/network/doh_dot_check.sh` 非法 DNS 地址原先仅打印提示但 `exit 0`（与 full.sh/lite.sh/compare.sh 的 `exit 1` 不一致，脚本自动化判断会误判"成功"），已改为 `exit 1`，与其余入口统一
 - 2026-08-14（第八十三轮）：**审阅收尾两项小修（在 v1.7.1 = v2026.08.11 基础上，不升版本）**
   - ① **trap 空参数报错**：`full.sh`/`lite.sh`/`compare.sh` 异常清理 trap 改为"非空才 rm"——`PARR_TMPDIR=""` 且 `TMPDIR_LIST=()` 时（如非法地址提前 `exit 1`），macOS 的 rm 会对空串参数打印 `rm: cannot remove ''`，已用 `[ -n ... ] && rm -rf` 条件判断消除
   - ② **doh_dot_check IPv4 范围校验**：`tools/network/doh_dot_check.sh` 原正则 `[0-9]{1,3}` 不校验 0-255，会接受 `999.999.999.999`；已改为与 `core.sh valid_dns_addr` 同规格的每段 0-255 校验（拒绝超范围地址）
