@@ -4,7 +4,7 @@
 # 用法: bash install.sh [--smoke|--all|--help]
 #   直接跑: 检测必需依赖 dig/perl/curl，缺失才安装，装完强制校验；校验时检测 dig 的 DoT 能力（bind 9.18+ 才支持 +tls）
 #           末尾检测可选依赖 shellcheck——终端下会询问"是否现在一并安装？"（y/N 默认不装），非交互/管道自动跳过
-#   --smoke: 校验通过后直接跑冒烟测试（25项自动化验证）
+#   --smoke: 校验通过后直接跑冒烟测试（24项自动化验证）
 #   --all:   连同可选依赖 shellcheck 一起安装（verify.sh 的 shell 静态检查需要）
 #   --help:  打印用法说明；未知参数报错退出（退出码 1）
 # 必需安装: dig(bind-utils/dnsutils/bind) + perl + curl
@@ -18,7 +18,7 @@ case "$MODE" in
     echo "  直接跑: 检测必需依赖 dig/perl/curl，缺失才安装（自动检测包管理器），装完强制校验"
     echo "           校验时检测 dig 的 DoT 能力（bind 9.18+ 才支持 +tls）"
     echo "           末尾检测可选依赖 shellcheck——终端下会询问是否一并安装（y/N 默认不装）"
-    echo "  --smoke: 校验通过后直接跑冒烟测试（25项自动化验证）"
+    echo "  --smoke: 校验通过后直接跑冒烟测试（24项自动化验证）"
     echo "  --all  : 连同可选依赖 shellcheck 一起安装（verify.sh 的 shell 静态检查用）"
     echo ""
     echo "  手动安装（无包管理器时按系统选一条）:"
@@ -223,8 +223,8 @@ if [ "$MODE" = "--smoke" ]; then
   bash smoke_test.sh
 else
   echo "✅ 依赖就绪！下一步（任选）:"
-  echo "  bash install.sh --smoke            # 一键验证环境（25项自动化）"
-  echo "  bash smoke_test.sh                 # 验证环境（25项自动化）"
+  echo "  bash install.sh --smoke            # 一键验证环境（24项自动化）"
+  echo "  bash smoke_test.sh                 # 验证环境（24项自动化）"
   echo "  bash verify.sh                     # 一键全量深度自检（含单测/compare/trends，约5分钟）"
   echo "  bash verify.sh --strict            # 严格模式（shellcheck 未装算失败，开发者用）"
   echo "  bash dns-test.sh                   # 交互引导测试（选DNS/版本/专项）"

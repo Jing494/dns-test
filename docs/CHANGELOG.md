@@ -19,7 +19,7 @@
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
 - 2026-08-14（第八十四轮）：**文档数字一致性 + 入口脚本去重（审阅#1/#2）**
-  - ① **README 冒烟项数修正**：`smoke_test.sh` 实际 24 项（编号 1-24，2.5 为 full 子项），但 README L28 写"25 项"、L128 写"14 项"——两处均修正为 24 项，并全量同步 FAQ/CODE_WIKI(3处)/AI_GUIDE 的"25 项"→"24 项"（CHANGELOG 历史轮次保留当时口径）
+  - ① **README 冒烟项数修正**：`smoke_test.sh` 实际 24 项（编号 1-24，2.5 为 full 子项），但 README L28 写"25 项"、L128 写"14 项"——两处均修正为 24 项，并全量同步 FAQ/CODE_WIKI(5处)/AI_GUIDE/CONTRIBUTING/install.sh/verify.sh(含 grep "25 通过"硬编码) 的"25 项"→"24 项"（CHANGELOG 历史轮次保留当时口径）
   - ② **入口脚本去重**：`full.sh`(125→58行) 与 `lite.sh`(117→52行) 的 DNS 列表/索引解析、列表打印、逐个测试循环、收尾退出码——约 70 行完全雷同代码抽到 `lib/core.sh` 4 个共享函数（`parse_dns_args`/`print_dns_list`/`run_all_dns_tests`/`finish_dns_tests`），两入口各剩 help/version/source/trap/SAVE_LOG + 4 行调用
   - ③ **测试补充**：`tests/04_core_functions.sh` 新增 `parse_dns_args` 3 用例（带索引拆分/索引越界忽略/无参数默认组），core 函数用例 15→18；实测验证：越界索引提示忽略、单DNS+索引、无参数默认 4 个云南电信 DNS、非法地址/注入 exit 1、`--version`/`--help` 正常，与原版行为完全一致
   - ④ 回归：语法 + 单测(18+9+4+18+9) 全绿，shellcheck 0 告警

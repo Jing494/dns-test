@@ -384,7 +384,7 @@ dns-test.sh 选"专项测试"
 
 ### 8.2 冒烟测试（smoke_test.sh）
 
-25 项自动化验证，覆盖：全量语法、lite/full 功能、不可达预检、注入拦截、入口非交互、预设、环境变量自定义、carrier_epdg、路由器转发、反向解析、DoH/DoT、SAVE_LOG、VoWiFi 解析/交叉验证、端口测试、示例 01/02、trends 聚合/产物、compare 多 DNS、单测、verify --help、插件注册表。
+24 项自动化验证，覆盖：全量语法、lite/full 功能、不可达预检、注入拦截、入口非交互、预设、环境变量自定义、carrier_epdg、路由器转发、反向解析、DoH/DoT、SAVE_LOG、VoWiFi 解析/交叉验证、端口测试、示例 01/02、trends 聚合/产物、compare 多 DNS、单测、verify --help、插件注册表。
 
 网络敏感项（路由器/省级 DNS）会做可达性预检，不可达自动跳过不算失败。
 
