@@ -25,7 +25,7 @@
 ```bash
 git clone https://github.com/Jing494/dns-test.git && cd dns-test
 bash install.sh        # 缺失才装 dig/perl/curl（已齐全则跳过 sudo）
-bash smoke_test.sh     # 25 项自动化验证环境
+bash smoke_test.sh     # 24 项自动化验证环境
 bash dns-test.sh       # 交互引导测试（或 bash lite.sh 223.5.5.5 0 快速测）
 ```
 
@@ -125,7 +125,7 @@ bash install.sh --all    # 连可选依赖 shellcheck 一起装（verify.sh 静�
 
 **快速验证（5 分钟确认可用）**：
 ```bash
-bash smoke_test.sh         # 自动化 14 项验证，全绿 = 环境 OK
+bash smoke_test.sh         # 自动化 24 项验证，全绿 = 环境 OK
 bash lite.sh 223.5.5.5 0   # 测一个 DNS 看看输出
 ```
 
@@ -268,7 +268,7 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 按优先级排序：
 
-- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截）+ `tests/03_dig_target.sh` 4 用例（IPv6 加方括号）+ `tests/04_core_functions.sh` 15 用例（地址校验/响应判断/CDN 判定）+ `tests/05_run_common_tests.sh` 9 用例（lite 计分口径/稳定性降轮/CONFIG_DOMAINS 安全解析/dig @server 前缀回归），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh` / `bash tests/03_dig_target.sh` / `bash tests/04_core_functions.sh` / `bash tests/05_run_common_tests.sh`
+- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截）+ `tests/03_dig_target.sh` 4 用例（IPv6 加方括号）+ `tests/04_core_functions.sh` 18 用例（地址校验/响应判断/CDN 判定/入口参数解析）+ `tests/05_run_common_tests.sh` 9 用例（lite 计分口径/稳定性降轮/CONFIG_DOMAINS 安全解析/dig @server 前缀回归），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh` / `bash tests/03_dig_target.sh` / `bash tests/04_core_functions.sh` / `bash tests/05_run_common_tests.sh`
   - bats 评估结论（2026-08-13）：**不引入**——现有 perl 单测 + smoke/verify 集成已够，bash 纯函数用零依赖轻量断言（tests/02_plugins.sh）补充，避免增加依赖
 - **par_run 通用化（✅ 已完成）**：PARR_MAX 环境变量可调并发数（默认 8），临时目录自动注册 TMPDIR_LIST 统一清理
 - **trends svg_chart 模板化**：HTML/SVG 内联字符串改 heredoc/独立模板文件（当前功能正常，纯可读性优化）

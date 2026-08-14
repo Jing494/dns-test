@@ -105,7 +105,7 @@ dns-test/
 ├── compare.sh                    # 多 DNS 对比（并行+延迟中位数+HTML/JSON）
 ├── trends.sh                     # DNS 趋势洞察（聚合 compare 历史）
 ├── verify.sh                     # 一键全面验证（语法+单测+冒烟+对比+趋势）
-├── smoke_test.sh                 # 自动化冒烟测试（25 项）
+├── smoke_test.sh                 # 自动化冒烟测试（24 项）
 ├── install.sh                    # 依赖自动安装
 ├── release.sh                    # 打包发布
 ├── lib/                          # 公共库
@@ -117,7 +117,7 @@ dns-test/
 │   ├── 01_dnsutil.t              # DNSUtil 18 用例（perl）
 │   ├── 02_plugins.sh             # 插件系统 9 用例（bash）
 │   ├── 03_dig_target.sh          # dig_target 4 用例（IPv6加方括号）
-│   ├── 04_core_functions.sh      # core 纯函数 15 用例（地址校验/响应判断/CDN）
+│   ├── 04_core_functions.sh      # core 纯函数 18 用例（地址校验/响应判断/CDN/入口参数解析）
 │   └── 05_run_common_tests.sh    # lite 计分口径 9 用例（稳定性降轮/CONFIG_DOMAINS安全解析/dig @server回归，mock dig/ping 离线）
 ├── tools/                        # 专项测试工具
 │   ├── manifest.sh               # 插件注册表
@@ -149,7 +149,7 @@ dns-test/
 | [compare.sh](file:///workspace/compare.sh) | 多 DNS 横向对比 | 延迟中位数 + 批量并发 + JSON/HTML 报告 |
 | [trends.sh](file:///workspace/trends.sh) | 聚合 compare 历史 JSON 出趋势 | 线性回归 + SVG 折线图 + CSV + `--cron` 定时采集 |
 | [verify.sh](file:///workspace/verify.sh) | 一键全面自检 | 7 步：语法/shellcheck/单测/冒烟/compare/trends/专项 |
-| [smoke_test.sh](file:///workspace/smoke_test.sh) | 自动化冒烟（25 项） | CI 与改动后回归必跑 |
+| [smoke_test.sh](file:///workspace/smoke_test.sh) | 自动化冒烟（24 项） | CI 与改动后回归必跑 |
 | [install.sh](file:///workspace/install.sh) | 依赖检测与安装 | 自动识别 apt/yum/dnf/brew/apk/pacman/zypper |
 | [release.sh](file:///workspace/release.sh) | 打包 tar.gz + 上传指引 | 排除 .git/results 内容 |
 
@@ -377,7 +377,7 @@ dns-test.sh 选"专项测试"
 | [tests/01_dnsutil.t](file:///workspace/tests/01_dnsutil.t) | DNSUtil 18 用例（dns_sockaddr/inet_pton_ipv6/build_dns_query/parse_dns_response/check_ips/PTR 系列 + 畸形包防崩） | `perl -Ilib tests/01_dnsutil.t` |
 | [tests/02_plugins.sh](file:///workspace/tests/02_plugins.sh) | 插件系统 9 用例（注册表加载/字段拆分/输出格式/无效编号拦截/未知执行器拦截/脚本缺失检测） | `bash tests/02_plugins.sh` |
 | [tests/03_dig_target.sh](file:///workspace/tests/03_dig_target.sh) | dig_target 4 用例（IPv4 原样/IPv6 加方括号/特殊 IPv6/空输入） | `bash tests/03_dig_target.sh` |
-| [tests/04_core_functions.sh](file:///workspace/tests/04_core_functions.sh) | core 纯函数 15 用例（valid_dns_addr 合法/非法+超范围/IPv6 畸形结构、is_valid_response 错误/纯 OPT、is_cdn_domain） | `bash tests/04_core_functions.sh` |
+| [tests/04_core_functions.sh](file:///workspace/tests/04_core_functions.sh) | core 纯函数 18 用例（valid_dns_addr 合法/非法+超范围/IPv6 畸形结构、is_valid_response 错误/纯 OPT、is_cdn_domain、parse_dns_args 入口参数） | `bash tests/04_core_functions.sh` |
 | [tests/05_run_common_tests.sh](file:///workspace/tests/05_run_common_tests.sh) | lite 计分口径 9 用例（稳定性降轮 20→10、AAAA 空响应计分、综合评分 45/53、CONFIG_DOMAINS 注入不执行/非法 token 忽略、dig @server 前缀回归；mock dig/ping 离线） | `bash tests/05_run_common_tests.sh` |
 
 `02/03/04/05_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
@@ -394,8 +394,8 @@ dns-test.sh 选"专项测试"
 
 1. 语法检查（.sh + .pl）
 2. shellcheck（可选依赖，`--strict` 强制）
-3. 单元测试（18+9+4+15+9 用例）
-4. 冒烟测试（25 项）
+3. 单元测试（18+9+4+18+9 用例）
+4. 冒烟测试（24 项）
 5. compare 快测（2 DNS）
 6. trends 聚合（无数据/超时跳过）
 7. 专项抽查（示例 02 / DoH）
@@ -418,7 +418,7 @@ dns-test.sh 选"专项测试"
 ```bash
 git clone https://github.com/Jing494/dns-test.git && cd dns-test
 bash install.sh            # 缺失才装 dig/perl/curl（--all 连 shellcheck）
-bash smoke_test.sh         # 25 项自动化验证环境
+bash smoke_test.sh         # 24 项自动化验证环境
 bash verify.sh             # 一键全量深度自检（约 5 分钟）
 ```
 

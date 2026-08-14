@@ -816,3 +816,95 @@ run_full_test() {
 run_lite_test() {
   run_common_tests "$1" "$2" "lite"
 }
+
+# ============================================================================
+# 入口公共逻辑：DNS列表/索引解析 + 列表打印 + 逐个测试（full.sh 与 lite.sh 共用，
+# 消除两入口约70行雷同代码；审阅#2）
+# ============================================================================
+
+# 解析入口参数：支持 [DNS...] [索引]，结果写入全局 DNS_ADDR/DNS_NAME/IDX
+# 默认 DNS 组来自 core.sh 的 DEFAULT_DNS_ADDR/DEFAULT_DNS_NAME（DEFAULT_DNS_CSV 可覆盖）
+# 用法: parse_dns_args "$@"（解析后需对 DNS_ADDR 调用 valid_dns_addr 校验，见 print_dns_list）
+parse_dns_args() {
+  local last_arg=""
+  if [ $# -ge 1 ]; then
+    # 检查最后一个参数是否是数字（索引），仅当参数≥2个时才判定，避免纯数字DNS被误判
+    last_arg="${!#}"
+    if [ $# -ge 2 ] && [[ "$last_arg" =~ ^[0-9]+$ ]]; then
+      IDX=$last_arg
+      # 去掉最后一个参数（索引）
+      DNS_ADDR=("${@:1:$#-1}")
+      [ ${#DNS_ADDR[@]} -eq 0 ] && DNS_ADDR=("${DEFAULT_DNS_ADDR[@]}")
+      # 索引越界校验：超出范围则忽略索引，改为测试全部
+      if [ "$IDX" -ge "${#DNS_ADDR[@]}" ]; then
+        echo "⚠️  索引 $IDX 超出范围（共 ${#DNS_ADDR[@]} 个DNS），已忽略索引"
+        IDX=-1
+      fi
+    else
+      DNS_ADDR=("$@")
+      IDX=-1  # -1表示跑所有
+    fi
+    DNS_NAME=()
+    for addr in "${DNS_ADDR[@]}"; do
+      DNS_NAME+=("自定义DNS(${addr})")
+    done
+  else
+    DNS_ADDR=("${DEFAULT_DNS_ADDR[@]}")
+    DNS_NAME=("${DEFAULT_DNS_NAME[@]}")
+    IDX=-1
+  fi
+}
+
+# 打印头部与待测DNS列表（$1=标题，如 "DNS 基础测试 (精简版 ...)"）
+# 内部含 DNS 地址格式校验（防命令注入/误传），非法地址 exit 1
+print_dns_list() {
+  local _a idx
+  for _a in "${DNS_ADDR[@]}"; do
+    valid_dns_addr "$_a" || { echo "❌ 非法DNS地址: $_a（仅支持IPv4/IPv6格式）"; exit 1; }
+  done
+  print_header "$1"
+  START_TIME=$(date +%s)
+  print_env_info
+  echo "待测DNS数量: ${#DNS_ADDR[@]} 个"
+  echo "DNS列表:"
+  for idx in "${!DNS_ADDR[@]}"; do
+    printf "  %d. %s [%s]\n" $((idx+1)) "${DNS_NAME[$idx]}" "${DNS_ADDR[$idx]}"
+  done
+  echo ""
+}
+
+# 逐个测试（$1=测试函数名，如 run_lite_test/run_full_test）
+# 测试指定索引 或 全部（DNS_PAUSE 控制请求间隔）；成功数写入全局 tested
+run_all_dns_tests() {
+  local run_fn="$1"
+  local idx
+  tested=0
+  if [ $IDX -ge 0 ]; then
+    # 测试指定索引的DNS
+    "$run_fn" "${DNS_ADDR[$IDX]}" "${DNS_NAME[$IDX]}" && tested=1
+  else
+    # 测试所有DNS
+    DNS_PAUSE="${DNS_PAUSE:-3}"
+    for idx in "${!DNS_ADDR[@]}"; do
+      if "$run_fn" "${DNS_ADDR[$idx]}" "${DNS_NAME[$idx]}"; then
+        tested=$((tested + 1))
+        # 最后一个不休息
+        [ $idx -lt $((${#DNS_ADDR[@]} - 1)) ] && sleep $DNS_PAUSE
+      fi
+    done
+  fi
+}
+
+# 收尾：打印总耗时 + 完成框 + 退出码（0=至少1个DNS测过；2=所有DNS不可达）
+finish_dns_tests() {
+  local elapsed=$(( $(date +%s) - START_TIME ))
+  echo ""
+  echo "  ⏱️  总耗时: $((elapsed / 60))分 $((elapsed % 60))秒"
+  echo "╔════════════════════════════════════════════════════════════════════════════╗"
+  echo "║                       基础测试完成 ✓                                      ║"
+  echo "╚════════════════════════════════════════════════════════════════════════════╝"
+  [ "$tested" -gt 0 ] && { echo ""
+    echo "  💡 想对比多个DNS？ → bash compare.sh DNS1 DNS2   （横向对比评分/延迟，可生成HTML报告）"
+    echo "  💡 想看历史趋势？   → bash trends.sh --html      （先积累 compare 数据，长期观察）"
+    exit 0; } || exit 2
+}

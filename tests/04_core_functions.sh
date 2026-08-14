@@ -139,5 +139,32 @@ else
 fi
 
 echo ""
+echo "═══ parse_dns_args 单测（full.sh/lite.sh 入口共享） ═══"
+
+# 14. 带索引参数：DNS 列表 + 索引拆分正确
+parse_dns_args 223.5.5.5 8.8.8.8 1
+if [ "$IDX" = "1" ] && [ "${#DNS_ADDR[@]}" -eq 2 ] && [ "${DNS_ADDR[0]}" = "223.5.5.5" ] && [ "${DNS_ADDR[1]}" = "8.8.8.8" ]; then
+  ok "带索引参数解析正确"
+else
+  notok "带索引参数解析正确"
+fi
+
+# 15. 索引越界 → 忽略索引改测全部（IDX=-1，DNS 列表保留）
+parse_dns_args 223.5.5.5 8.8.8.8 9
+if [ "$IDX" = "-1" ] && [ "${#DNS_ADDR[@]}" -eq 2 ]; then
+  ok "索引越界自动忽略改测全部"
+else
+  notok "索引越界自动忽略改测全部"
+fi
+
+# 16. 无参数 → 默认 DNS 组（云南电信 4 个）
+parse_dns_args
+if [ "$IDX" = "-1" ] && [ "${#DNS_ADDR[@]}" -eq "${#DEFAULT_DNS_ADDR[@]}" ]; then
+  ok "无参数用默认DNS组"
+else
+  notok "无参数用默认DNS组"
+fi
+
+echo ""
 echo "════ 结果: $PASS 通过 / $FAIL 失败 ════"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

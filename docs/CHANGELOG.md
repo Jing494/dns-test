@@ -18,21 +18,26 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-14（第八十四轮）：**文档数字一致性 + 入口脚本去重（审阅#1/#2）**
+  - ① **README 冒烟项数修正**：`smoke_test.sh` 实际 24 项（编号 1-24，2.5 为 full 子项），但 README L28 写"25 项"、L128 写"14 项"——两处均修正为 24 项，并全量同步 FAQ/CODE_WIKI(3处)/AI_GUIDE 的"25 项"→"24 项"（CHANGELOG 历史轮次保留当时口径）
+  - ② **入口脚本去重**：`full.sh`(125→58行) 与 `lite.sh`(117→52行) 的 DNS 列表/索引解析、列表打印、逐个测试循环、收尾退出码——约 70 行完全雷同代码抽到 `lib/core.sh` 4 个共享函数（`parse_dns_args`/`print_dns_list`/`run_all_dns_tests`/`finish_dns_tests`），两入口各剩 help/version/source/trap/SAVE_LOG + 4 行调用
+  - ③ **测试补充**：`tests/04_core_functions.sh` 新增 `parse_dns_args` 3 用例（带索引拆分/索引越界忽略/无参数默认组），core 函数用例 15→18；实测验证：越界索引提示忽略、单DNS+索引、无参数默认 4 个云南电信 DNS、非法地址/注入 exit 1、`--version`/`--help` 正常，与原版行为完全一致
+  - ④ 回归：语法 + 单测(18+9+4+18+9) 全绿，shellcheck 0 告警
 - 2026-08-14（第八十三轮-补充）：**doh_dot_check 非法地址退出码统一（实际运行发现）**
   - `tools/network/doh_dot_check.sh` 非法 DNS 地址原先仅打印提示但 `exit 0`（与 full.sh/lite.sh/compare.sh 的 `exit 1` 不一致，脚本自动化判断会误判"成功"），已改为 `exit 1`，与其余入口统一
 - 2026-08-14（第八十三轮）：**审阅收尾两项小修（在 v1.7.1 = v2026.08.11 基础上，不升版本）**
   - ① **trap 空参数报错**：`full.sh`/`lite.sh`/`compare.sh` 异常清理 trap 改为"非空才 rm"——`PARR_TMPDIR=""` 且 `TMPDIR_LIST=()` 时（如非法地址提前 `exit 1`），macOS 的 rm 会对空串参数打印 `rm: cannot remove ''`，已用 `[ -n ... ] && rm -rf` 条件判断消除
   - ② **doh_dot_check IPv4 范围校验**：`tools/network/doh_dot_check.sh` 原正则 `[0-9]{1,3}` 不校验 0-255，会接受 `999.999.999.999`；已改为与 `core.sh valid_dns_addr` 同规格的每段 0-255 校验（拒绝超范围地址）
-  - ③ 回归：语法 + 单测(18+9+4+15+9) 全绿，shellcheck 0 告警，实测非法地址被拒/合法地址正常
+  - ③ 回归：语法 + 单测(18+9+4+18+9) 全绿，shellcheck 0 告警，实测非法地址被拒/合法地址正常
 - 2026-08-14（第八十二轮）：**审阅收尾两项小改（在 v1.7.1 = v2026.08.11 基础上，不升版本）**
   - ① **缩进统一**：`tools/network/doh_dot_check.sh` DoT 块缩进 2→4 格，与 DoH 块对齐（纯颜值，shellcheck 本就通过）
   - ② **dig @ 目标统一抽变量**：`lib/core.sh` `run_common_tests` 函数级新增 `local t=$(dig_target "$addr")` 只算一次，替换全部 21 处 `dig @$(dig_target "$addr")` 为 `"@$t"`（含 PARR_CMDS 数组字面量、稳定性/NXDOMAIN/连通性/IPv6/flags 等直接调用），A 记录循环内重复的 `local t=` 一并删除；结果对比基准 `ref_dns` 单独抽 `local ref_t`；消除 SC2046 隐患点、减少重复计算
-  - ③ 回归：语法 + 单测(18+9+4+15+9) 全绿，shellcheck 0 告警
+  - ③ 回归：语法 + 单测(18+9+4+18+9) 全绿，shellcheck 0 告警
 - 2026-08-14（第八十一轮）：**修复 dig @server 回归 bug（审阅复核新发现，在 v1.7.1 = v2026.08.11 基础上，不升版本）**
   - ① **关键修复**：`lib/core.sh` `dns_health_check`（2 处）与 A 记录批量循环（1 处）在"局部变量 `local t=$(dig_target)`"重构时**漏写 `@` 前缀**，实测 `dig "8.8.8.8" www.alidns.com` 会走**本地默认解析器**而非目标 DNS（正确 `dig @8.8.8.8` 形式才命中目标）。后果：预检恒"可达"（不可达 DNS 不再被跳过）、A 记录/延迟全部测成本地解析器结果。已改为 `dig "@$t"` 恢复正确行为
   - ② **回归防护**：`tests/05_run_common_tests.sh` 新增第 9 用例——mock dig 记录完整参数并断言每次调用均以 `@` 开头（已用负向用例验证：单行漏 `@` 立即失败 exit=1）；mock dig 增加"无 @server 即报错退出"断言，覆盖 dns_health_check OR 语义盲区
   - ③ **用例计数同步**：05 单测 8→9 用例（verify.sh / CI smoke.yml / CODE_WIKI / AI_GUIDE / README / SANDBOX_GUIDE / CHANGELOG 全量），并顺带修正 README/SANDBOX_GUIDE 目录树 core 用例数 13→15 的历史漏网
-  - ④ 回归：语法 + 单测(18+9+4+15+9) 全绿
+  - ④ 回归：语法 + 单测(18+9+4+18+9) 全绿
 - 2026-08-14（第八十轮）：**审阅模型建议优化（在 v1.7.1 = v2026.08.11 基础上，不升版本）**
   - ① **安全加固**：`CONFIG_DOMAINS` 不再 `source` 执行，改为逐行解析 `DOMAINS_MAIN/GLOBAL` 双引号数组并校验纯域名 token（命令注入行忽略不执行）；`par_run` 增加 dig 命令白名单（任一非 dig 命令整体拒绝）
   - ② **macOS/海外兼容**：IPv6 可用性检测改用本地 loopback `::1`（仅验协议栈，海外/无 IPv6 路由网络不再误报"不可用"）；`dns_health_check` 双域名并行探测（不可达 DNS 等待 4s→2s）
