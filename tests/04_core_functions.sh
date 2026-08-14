@@ -157,7 +157,7 @@ else
   notok "索引越界自动忽略改测全部"
 fi
 
-# 16. 无参数 → 默认 DNS 组（云南电信 4 个）
+# 16. 无参数 → 默认 DNS 组（默认 4 个）
 parse_dns_args
 if [ "$IDX" = "-1" ] && [ "${#DNS_ADDR[@]}" -eq "${#DEFAULT_DNS_ADDR[@]}" ]; then
   ok "无参数用默认DNS组"

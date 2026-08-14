@@ -23,7 +23,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
 # 版本号单一来源（PROJECT_VERSION 日期式 / PROJECT_RELEASE 语义式）
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/version.sh"
 
-# 默认DNS组（云南电信，可用环境变量 DEFAULT_DNS_CSV 覆盖，逗号分隔地址；名称可用 DEFAULT_DNS_NAME_CSV 覆盖）
+# 默认DNS组（示例为运营商DNS，可用环境变量 DEFAULT_DNS_CSV 覆盖，逗号分隔地址；名称可用 DEFAULT_DNS_NAME_CSV 覆盖）
 if [ -n "$DEFAULT_DNS_CSV" ]; then
   IFS=',' read -ra DEFAULT_DNS_ADDR <<< "$DEFAULT_DNS_CSV"
   if [ -n "$DEFAULT_DNS_NAME_CSV" ]; then
@@ -45,10 +45,10 @@ else
     "61.166.150.123"
   )
   DEFAULT_DNS_NAME=(
-    "云南电信IPv6-DNS-1"
-    "云南电信IPv6-DNS-2"
-    "云南电信IPv4-DNS-1"
-    "云南电信IPv4-DNS-2"
+    "默认IPv6-DNS-1"
+    "默认IPv6-DNS-2"
+    "默认IPv4-DNS-1"
+    "默认IPv4-DNS-2"
   )
 fi
 
@@ -175,7 +175,7 @@ STAB_ROUNDS="${STAB_ROUNDS:-20}"
 # 校验必须为正整数，非法值回退默认20（防除零）
 [[ "$STAB_ROUNDS" =~ ^[1-9][0-9]*$ ]] || STAB_ROUNDS=20
 
-# ECS测试使用的subnet（默认云南电信IPv6前缀，测其他DNS时可设环境变量 ECS_SUBNET 覆盖）
+# ECS测试使用的subnet（默认运营商IPv6前缀，示例为运营商DNS；测其他DNS时可设环境变量 ECS_SUBNET 覆盖）
 ECS_SUBNET="${ECS_SUBNET:-240e:52:4800::/48}"
 
 # ping超时参数（Linux -W 单位=秒，macOS -W 单位=毫秒，需区分）

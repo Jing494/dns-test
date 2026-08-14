@@ -9,7 +9,7 @@ $| = 1;  # 立即刷新输出（管道/CI 下防块缓冲导致输出丢失误�
 
 my $TIMEOUT = 5;
 
-# 云南电信DNS
+# 默认DNS（示例为运营商DNS）
 my @dns_servers;
 if (@ARGV) {
     foreach my $addr (@ARGV) {
@@ -17,8 +17,8 @@ if (@ARGV) {
     }
 } else {
     @dns_servers = (
-        { name => "云南电信DNS 1", address => "240e:52:4800::8888" },
-        { name => "云南电信DNS v4", address => "222.172.200.68" },
+        { name => "默认DNS v6", address => "240e:52:4800::8888" },
+        { name => "默认DNS v4", address => "222.172.200.68" },
         { name => "阿里云 DNS v4", address => "223.5.5.5" },
         { name => "阿里云 DNS", address => "2400:3200::1" },
         { name => "CNNIC DNS", address => "2402:4e00::" },

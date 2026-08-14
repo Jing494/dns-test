@@ -4,7 +4,7 @@
 #       判断该运营商在当前省份是否部署了 VoWiFi 服务
 # 用法:
 #   perl carrier_epdg.pl                    # 交互模式：选运营商 + 选DNS来源
-#   perl carrier_epdg.pl all                # 全部运营商，默认云南电信DNS
+#   perl carrier_epdg.pl all                # 全部运营商，默认省级DNS（示例为运营商DNS）
 #   perl carrier_epdg.pl ct                 # 只测电信
 #   perl carrier_epdg.pl cmcc 223.5.5.5     # 移动，自定义DNS
 #   perl carrier_epdg.pl cucc router        # 联通，家宽路由器DNS
@@ -62,7 +62,7 @@ my %carriers = (
     },
 );
 
-# 默认 DNS（云南电信，可用环境变量 PROVINCE_DNS 覆盖——用你所在省份的省级DNS测当地ePDG部署）
+# 默认 DNS（示例为运营商DNS，可用环境变量 PROVINCE_DNS 覆盖——用你所在省份的省级DNS测当地ePDG部署）
 my @default_dns;
 if ($ENV{PROVINCE_DNS}) {
     @default_dns = split(/,/, $ENV{PROVINCE_DNS});
@@ -93,7 +93,7 @@ if (!defined $carrier_arg) {
     my %sel_map = (1 => "ct", 2 => "cmcc", 3 => "cucc", 4 => "cbn", 5 => "all");
     $carrier_arg = $sel_map{$sel} || "all";
     print "\n请选择DNS来源:\n";
-    print "  1. 默认云南电信（省级DNS）\n";
+    print "  1. 默认省级DNS（示例为运营商DNS）\n";
     print "  2. 家宽路由器 (192.168.1.1/192.168.2.1)\n";
     print "  3. 自定义（输入DNS，多个用逗号分隔）\n";
     print "请输入选项(1-3): ";

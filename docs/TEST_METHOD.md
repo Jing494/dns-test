@@ -182,7 +182,7 @@ VoWiFi 域名改为**信息项，不参与综合评分**：
 
 AI 使用本工具集时，请遵循 [AI_GUIDE.md](./AI_GUIDE.md) 的完整操作手册。核心流程：
 
-1. **先问用户测哪个 DNS**（云南电信/阿里/腾讯/自定义），不要自作主张
+1. **先问用户测哪个 DNS**（默认运营商/阿里/腾讯/自定义），不要自作主张
 2. **再问版本**：精简版(lite) / 完整版(full)
 3. **用户要求"专业/深入"** → 引导专项测试（VoWiFi/路由器转发/端口/DNS64/反向解析）
 4. **有交互提问工具**（如 ask_user / user_interaction 等，命名因 agent 而异）：直接弹选项问；**无交互提问工具**（纯文本/API）：引导用户跑 `bash dns-test.sh` 或用索引参数直接执行
@@ -191,13 +191,13 @@ AI 使用本工具集时，请遵循 [AI_GUIDE.md](./AI_GUIDE.md) 的完整操�
 ### 引导使用
 
 ```bash
-# 交互式引导（推荐，可先选DNS组：1云南电信/2阿里/3腾讯/4全部）
+# 交互式引导（推荐，可先选DNS组：1默认运营商/2阿里/3腾讯/4全部）
 bash dns-test.sh
 
 # 非交互（自动精简版+单DNS，防超时）
 bash dns-test.sh 8.8.8.8 </dev/null
 
-# 预设快捷测试（云南电信/阿里/腾讯）
+# 预设快捷测试（默认运营商/阿里/腾讯）
 bash dns-preset.sh ali lite 0
 ```
 
@@ -222,7 +222,7 @@ bash dns-preset.sh ali lite 0
 ### 直接运行
 
 ```bash
-# 精简版（默认云南电信4个DNS）
+# 精简版（默认运营商DNS 4 个）
 bash lite.sh
 
 # 完整版（自定义DNS）
@@ -250,7 +250,7 @@ perl tools/vowifi/02_vowifi_verify.pl 8.8.8.8 114.114.114.114
 # 路由器DNS转发测试（对比省级DNS，支持--分隔自定义基准）
 perl tools/vowifi/03_test_router_dns.pl 192.168.1.1
 perl tools/vowifi/03_test_router_dns.pl 192.168.1.1 -- 223.5.5.5
-# 说明: --前=路由器IP，--后=省级对比基准(逗号分隔)；默认云南电信；也可用 PROVINCE_DNS 环境变量
+# 说明: --前=路由器IP，--后=省级对比基准(逗号分隔)；默认省级DNS（示例为运营商DNS）；也可用 PROVINCE_DNS 环境变量
 
 # 端口连通性测试
 perl tools/network/01_port_test.pl 223.5.5.5 53 udp
@@ -270,7 +270,7 @@ perl tools/network/01_port_test.pl 223.5.5.5 53 udp
 | `DEFAULT_DNS_CSV` | 覆盖基础测试默认DNS组（逗号分隔） | `DEFAULT_DNS_CSV="219.141.136.10,219.141.140.10" bash lite.sh` |
 | `DEFAULT_DNS_NAME_CSV` | 覆盖默认DNS组显示名（可选） | `DEFAULT_DNS_NAME_CSV="北京电信1,北京电信2" bash lite.sh` |
 | `PROVINCE_DNS` | 覆盖路由器测试对比基准 | `PROVINCE_DNS="223.5.5.5" perl tools/vowifi/03_test_router_dns.pl 192.168.1.1` |
-| `ECS_SUBNET` | 覆盖 ECS 测试的 subnet（默认云南电信IPv6前缀） | `ECS_SUBNET="223.5.5.0/24" bash full.sh 8.8.8.8 0` |
+| `ECS_SUBNET` | 覆盖 ECS 测试的 subnet（默认运营商 IPv6 前缀） | `ECS_SUBNET="223.5.5.0/24" bash full.sh 8.8.8.8 0` |
 | `PRESET_DNS_CSV` | dns-preset 自定义预设组 | `PRESET_DNS_CSV="1.2.4.8,8.8.8.8" bash dns-preset.sh custom lite 0` |
 | `DNS_SERVER` / `DNS_LIST` | examples 默认 DNS | `DNS_SERVER="8.8.8.8" perl examples/01_dns_query.pl` |
 

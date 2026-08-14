@@ -20,7 +20,7 @@ if (@ARGV) {
     @dns_servers = (
         { name => "电信DNS 1", address => "240e:52:4800::8888" },
         { name => "电信DNS 2", address => "240e:52:4000::8888" },
-        { name => "云南电信 v4", address => "222.172.200.68" },
+        { name => "默认DNS v4", address => "222.172.200.68" },
         { name => "阿里 DNS v4", address => "223.5.5.5" },
         { name => "CNNIC DNS",  address => "2402:4e00::" },
     );

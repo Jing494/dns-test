@@ -1,12 +1,12 @@
 #!/bin/bash
 # ============================================================================
 # DNS预设快捷测试脚本
-# 功能：一键测试指定预设DNS组（云南电信/阿里/腾讯/全部）
+# 功能：一键测试指定预设DNS组（默认/阿里/腾讯/全部）
 # 用法：
-#   bash dns-preset.sh                     # 默认云南电信+lite
+#   bash dns-preset.sh                     # 默认+lite
 #   bash dns-preset.sh ali                 # 阿里云+lite
 #   bash dns-preset.sh tencent             # 腾讯DNSPod+lite
-#   bash dns-preset.sh yunnan full         # 云南电信+完整版
+#   bash dns-preset.sh default full         # 默认+完整版
 #   bash dns-preset.sh ali lite 0          # 阿里第1个DNS
 #   bash dns-preset.sh all lite            # 全部预设（可能较慢）
 # ============================================================================
@@ -18,14 +18,14 @@ source "${SCRIPT_DIR}/lib/core.sh"
 case "$1" in
   -h|--help|help)
     echo "用法: bash dns-preset.sh [预设组] [lite|full] [索引]"
-    echo "  预设组: yunnan(默认) / ali / tencent / all"
+    echo "  预设组: default(默认) / ali / tencent / all"
     echo "  版本:   lite(默认) / full"
     echo "  索引:   只测第N个DNS（0=第1个）"
     echo "  示例:"
-    echo "    bash dns-preset.sh                     # 云南电信+lite"
+    echo "    bash dns-preset.sh                     # 默认+lite"
     echo "    bash dns-preset.sh ali                 # 阿里云+lite"
     echo "    bash dns-preset.sh tencent             # 腾讯DNSPod+lite"
-    echo "    bash dns-preset.sh yunnan full         # 云南电信+完整版"
+    echo "    bash dns-preset.sh default full         # 默认+完整版"
     echo "    bash dns-preset.sh ali lite 0          # 阿里第1个DNS"
     echo "    bash dns-preset.sh all lite            # 全部预设（可能较慢）"
     exit 0
@@ -37,7 +37,7 @@ case "$1" in
     ;;
 esac
 
-PRESET="${1:-yunnan}"
+PRESET="${1:-default}"
 VERSION="${2:-lite}"
 IDX="${3:--1}"
 
@@ -50,10 +50,10 @@ if [ -n "$PRESET_DNS_CSV" ]; then
 else
 # 解析预设
 case $PRESET in
-  yunnan|yn|1)
+  default|def|yunnan|yn|1)
     DNS_ADDR=("${DEFAULT_DNS_ADDR[@]}")
     DNS_NAME=("${DEFAULT_DNS_NAME[@]}")
-    LABEL="云南电信（${#DNS_ADDR[@]}个）"
+    LABEL="默认（${#DNS_ADDR[@]}个）"
     ;;
   ali|alibaba|2)
     DNS_ADDR=("${ALI_DNS_ADDR[@]}")
@@ -68,11 +68,11 @@ case $PRESET in
   all|4)
     DNS_ADDR=("${DEFAULT_DNS_ADDR[@]}" "${ALI_DNS_ADDR[@]}" "${TENCENT_DNS_ADDR[@]}")
     DNS_NAME=("${DEFAULT_DNS_NAME[@]}" "${ALI_DNS_NAME[@]}" "${TENCENT_DNS_NAME[@]}")
-    LABEL="全部（${#DNS_ADDR[@]}个：云南电信+阿里+腾讯）"
+    LABEL="全部（${#DNS_ADDR[@]}个：默认+阿里+腾讯）"
     ;;
   *)
     echo "❌ 未知预设: $PRESET"
-    echo "可选: yunnan(1) / ali(2) / tencent(3) / all(4)，或用环境变量 PRESET_DNS_CSV 自定义"
+    echo "可选: default(1) / ali(2) / tencent(3) / all(4)，或用环境变量 PRESET_DNS_CSV 自定义（yunnan 为默认组的兼容别名）"
     exit 1
     ;;
 esac

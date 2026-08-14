@@ -22,7 +22,7 @@
 - VoWiFi域名返回127.0.0.1：表示该运营商未部署ePDG，属于正常现象
 
 ### Q: 如何验证路由器DNS是否转发到省级DNS？
-运行路由器DNS转发测试（`perl tools/vowifi/03_test_router_dns.pl 192.168.1.1`），脚本会先取云南电信省级DNS的解析结果作为基准，再对比路由器DNS的解析结果——完全一致则说明路由器将DNS请求转发到了省级DNS；不一致则可能是自建DNS或转发了其他DNS。
+运行路由器DNS转发测试（`perl tools/vowifi/03_test_router_dns.pl 192.168.1.1`），脚本会先取省级DNS（默认示例为运营商DNS）的解析结果作为基准，再对比路由器DNS的解析结果——完全一致则说明路由器将DNS请求转发到了省级DNS；不一致则可能是自建DNS或转发了其他DNS。
 
 ### Q: 支持哪些操作系统？
 支持所有安装了`dig`、`ping`工具的Linux/macOS系统，Perl脚本需要Perl 5.10+环境。

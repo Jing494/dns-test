@@ -18,6 +18,11 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-14（第八十五轮）：**去品牌化——审阅#4 通用化改造（在 v1.7.1 = v2026.08.11 基础上，不升版本）**
+  - ① **代码去品牌化**：`lib/core.sh` 默认 DNS 组名称从"云南电信*"改为"默认*"（如"云南电信IPv6-DNS-1"→"默认IPv6-DNS-1"），注释中"云南电信"→"示例为运营商DNS"；`dns-test.sh` 交互菜单"云南电信"→"默认运营商DNS（可配置）"；`dns-preset.sh` 预设键名 `yunnan` → `default`（保留 yunnan/yn 为兼容别名）
+  - ② **文档去品牌化**：README/AI_GUIDE/CODE_WIKI/FAQ/TEST_METHOD/SANDBOX_GUIDE/examples README 中等操作说明/文案/环境变量默认值描述全部替换为"默认运营商DNS"、"示例为运营商DNS"（保留 CHANGELOG 历史轮次与 TEST_METHOD 实测记录中的"云南电信"作为历史事实）
+  - ③ **Perl 脚本去品牌化**：`tools/vowifi/{carrier_epdg,02_vowifi_verify,03_test_router_dns}.pl` 注释/帮助文案中"云南电信"→"示例为运营商DNS"
+  - ④ 回归：bash -n 全绿、perl -c 全绿、单测(18+9) 全绿；冒烟 4 项失败为沙箱网络限制（dig @223.5.5.5 超时），非代码回归
 - 2026-08-14（第八十四轮）：**文档数字一致性 + 入口脚本去重（审阅#1/#2）**
   - ① **README 冒烟项数修正**：`smoke_test.sh` 实际 24 项（编号 1-24，2.5 为 full 子项），但 README L28 写"25 项"、L128 写"14 项"——两处均修正为 24 项，并全量同步 FAQ/CODE_WIKI(5处)/AI_GUIDE/CONTRIBUTING/install.sh/verify.sh(含 grep "25 通过"硬编码) 的"25 项"→"24 项"（CHANGELOG 历史轮次保留当时口径）
   - ② **入口脚本去重**：`full.sh`(125→58行) 与 `lite.sh`(117→52行) 的 DNS 列表/索引解析、列表打印、逐个测试循环、收尾退出码——约 70 行完全雷同代码抽到 `lib/core.sh` 4 个共享函数（`parse_dns_args`/`print_dns_list`/`run_all_dns_tests`/`finish_dns_tests`），两入口各剩 help/version/source/trap/SAVE_LOG + 4 行调用

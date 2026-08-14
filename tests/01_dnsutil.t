@@ -39,7 +39,7 @@ subtest 'inet_pton_ipv6 合法地址' => sub {
     ok(defined inet_pton_ipv6("::"), "::");
     ok(defined inet_pton_ipv6("2001:db8::1"), "2001:db8::1 压缩");
     ok(defined inet_pton_ipv6("fe80::1"), "fe80::1");
-    ok(defined inet_pton_ipv6("240e:52:4800::8888"), "云南电信IPv6");
+    ok(defined inet_pton_ipv6("240e:52:4800::8888"), "运营商IPv6");
     ok(defined inet_pton_ipv6("2001:4860:4860:0:0:0:0:8888"), "全展开无冒号压缩");
 };
 
@@ -51,7 +51,7 @@ subtest 'inet_pton_ipv6 非法地址' => sub {
 
 subtest 'inet_pton_ipv6 输出长度' => sub {
     is(length(inet_pton_ipv6("::1")), 16, "::1 展开为16字节");
-    is(length(inet_pton_ipv6("240e:52:4800::8888")), 16, "云南电信v6 为16字节");
+    is(length(inet_pton_ipv6("240e:52:4800::8888")), 16, "运营商v6 为16字节");
 };
 
 # ---------- build_dns_query ----------
@@ -132,7 +132,7 @@ subtest 'build_reverse_name 反向域名' => sub {
 
 subtest 'expand_ipv6' => sub {
     is(expand_ipv6("::1"), "00000000000000000000000000000001", "::1 展开32hex");
-    is(length(expand_ipv6("240e:52:4800::8888")), 32, "云南电信v6 32字符");
+    is(length(expand_ipv6("240e:52:4800::8888")), 32, "运营商v6 32字符");
     is(expand_ipv6("gg::1"), undef, "非法hex返回undef");
 };
 

@@ -3,7 +3,7 @@
 # DNS测试统一入口脚本
 # 功能：智能引导用户选择测试类型，支持自定义DNS参数
 # 用法：
-#   bash dns-test.sh                     # 默认测试云南电信DNS
+#   bash dns-test.sh                     # 默认测试运营商DNS
 #   bash dns-test.sh 8.8.8.8             # 测试自定义DNS
 #   bash dns-test.sh 8.8.8.8 114.114.114.114  # 测试多个自定义DNS
 # ============================================================================
@@ -26,7 +26,7 @@ if [ $# -ge 1 ]; then
   DNS_DISPLAY="自定义DNS: $*"
 else
   DNS_LIST=()
-  DNS_DISPLAY="默认云南电信4个DNS"
+  DNS_DISPLAY="默认运营商DNS 4个"
 fi
 
 # 检查是否支持终端交互
@@ -40,17 +40,17 @@ if [ -t 0 ]; then
   # 无参数时先选择DNS组
   if [ $# -lt 1 ]; then
     echo "请选择测试DNS组："
-    echo "1. 云南电信（默认）"
+    echo "1. 默认运营商DNS（可配置）"
     echo "2. 阿里云公共DNS"
     echo "3. 腾讯DNSPod"
-    echo "4. 全部（云南电信+阿里+腾讯，串行会很久，建议配合索引参数）"
+    echo "4. 全部（默认+阿里+腾讯，串行会很久，建议配合索引参数）"
     read -r -t 30 -p "请输入选项(1-4): " dns_group
     echo ""
     case $dns_group in
       2) DNS_LIST=("${ALI_DNS_ADDR[@]}"); DNS_DISPLAY="阿里云公共DNS（4个）" ;;
       3) DNS_LIST=("${TENCENT_DNS_ADDR[@]}"); DNS_DISPLAY="腾讯DNSPod（3个）" ;;
       4) DNS_LIST=("${DEFAULT_DNS_ADDR[@]}" "${ALI_DNS_ADDR[@]}" "${TENCENT_DNS_ADDR[@]}"); DNS_DISPLAY="全部（11个DNS）" ;;
-      *) DNS_LIST=(); DNS_DISPLAY="默认云南电信4个DNS" ;;
+      *) DNS_LIST=(); DNS_DISPLAY="默认运营商DNS 4个" ;;
     esac
   fi
 

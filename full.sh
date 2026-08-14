@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================================
 # DNS完整版测试脚本
-# 功能：16项全面DNS测试，支持自定义DNS参数，默认使用云南电信DNS
+# 功能：16项全面DNS测试，支持自定义DNS参数，默认使用运营商DNS
 # 用法：
 #   bash full.sh                                   # 测试默认DNS
 #   bash full.sh 8.8.8.8                           # 测试单个自定义DNS
@@ -12,7 +12,7 @@
 case "$1" in
   -h|--help|help)
     echo "用法: bash full.sh [DNS...] [索引]"
-    echo "  DNS列表: 一个或多个DNS地址（默认云南电信 4 个 DNS，v4/v6 各 2 个），支持v4/v6混合"
+    echo "  DNS列表: 一个或多个DNS地址（默认 4 个 DNS，v4/v6 各 2 个），支持v4/v6混合"
     echo "  索引:    只测第N个DNS（0=第1个），避免多DNS时超时"
     echo "  示例:"
     echo "    bash full.sh                                   # 默认DNS完整测试"

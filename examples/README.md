@@ -12,16 +12,16 @@
 ```bash
 cd dns-test   # 或你 clone 的目录
 
-# 示例1: 基础DNS查询（默认云南电信DNS）
+# 示例1: 基础DNS查询（默认运营商DNS）
 perl examples/01_dns_query.pl
 
-# 示例2: 多DNS对比（默认云南电信+114+阿里混合）
+# 示例2: 多DNS对比（默认运营商DNS+114+阿里混合）
 perl examples/02_multi_dns_compare.pl
 
-# 示例3: DNS64检测（默认Google/Cloudflare DNS64 + 云南电信对照）
+# 示例3: DNS64检测（默认Google/Cloudflare DNS64 + 运营商DNS对照）
 perl examples/03_dns64_check.pl
 
-# 示例4: 反向DNS解析（默认云南电信DNS）
+# 示例4: 反向DNS解析（默认运营商DNS）
 perl examples/04_reverse_dns.pl
 ```
 
@@ -31,10 +31,10 @@ perl examples/04_reverse_dns.pl
 
 | 脚本 | 参数 | 示例 | 默认值 |
 |------|------|------|--------|
-| `01_dns_query.pl` | `[DNS地址]` | `perl examples/01_dns_query.pl 8.8.8.8` | `222.172.200.68`（云南电信v4） |
-| `02_multi_dns_compare.pl` | `[DNS1] [DNS2] ...` | `perl examples/02_multi_dns_compare.pl 8.8.8.8 114.114.114.114` | 云南电信×2 + 114 + 阿里 + 云南v6 |
-| `03_dns64_check.pl` | `[DNS1] [DNS2] ...` | `perl examples/03_dns64_check.pl 2001:4860:4860::6464` | Google/Cloudflare DNS64 + 云南电信对照 |
-| `04_reverse_dns.pl` | `[DNS地址]` | `perl examples/04_reverse_dns.pl 114.114.114.114` | `222.172.200.68`（云南电信v4） |
+| `01_dns_query.pl` | `[DNS地址]` | `perl examples/01_dns_query.pl 8.8.8.8` | `222.172.200.68`（运营商v4示例） |
+| `02_multi_dns_compare.pl` | `[DNS1] [DNS2] ...` | `perl examples/02_multi_dns_compare.pl 8.8.8.8 114.114.114.114` | 运营商DNS×2 + 114 + 阿里 + 运营商v6 |
+| `03_dns64_check.pl` | `[DNS1] [DNS2] ...` | `perl examples/03_dns64_check.pl 2001:4860:4860::6464` | Google/Cloudflare DNS64 + 运营商DNS对照 |
+| `04_reverse_dns.pl` | `[DNS地址]` | `perl examples/04_reverse_dns.pl 114.114.114.114` | `222.172.200.68`（运营商v4示例） |
 
 > 💡 **v4/v6 任意混传**：传 `8.8.8.8`、`240e:52:4800::8888`、混合都可以，脚本自动识别双栈。
 > 💡 **查看用法**：所有脚本支持 `--help` / `-h` 打印用法与默认值说明（如 `perl examples/01_dns_query.pl --help`）。
@@ -87,7 +87,7 @@ perl examples/04_reverse_dns.pl
 my $DNS_SERVER = $ARGV[0] || $ENV{DNS_SERVER} || "222.172.200.68";
 
 # 默认DNS列表（02/03）
-@DNS_SERVERS = ( { name => "云南电信DNS", address => "222.172.200.68" }, ... );
+@DNS_SERVERS = ( { name => "默认DNS", address => "222.172.200.68" }, ... );
 
 # 默认测试域名/IP（01/02/03/04）
 my @DOMAINS = ("www.baidu.com", ...);

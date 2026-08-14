@@ -13,7 +13,7 @@ use DNSUtil;
 # --help/-h 用法提示
 if (@ARGV && $ARGV[0] =~ /^(-h|--help)$/) {
     print "用法: perl 03_dns64_check.pl [DNS1] [DNS2] ...\n";
-    print "  默认 Google/Cloudflare DNS64 + 云南电信对照；支持环境变量 DNS_LIST\n";
+    print "  默认 Google/Cloudflare DNS64 + 运营商DNS对照；支持环境变量 DNS_LIST\n";
     exit 0;
 }
 
@@ -32,8 +32,8 @@ if (@ARGV) {
     @DNS_SERVERS = (
         { name => "Google DNS64", address => "2001:4860:4860::6464" },
         { name => "Cloudflare DNS64", address => "2606:4700:4700::64" },
-        { name => "云南电信DNS(对照)", address => "222.172.200.68" },
-        { name => "云南电信DNS v6(对照)", address => "240e:52:4800::8888" },
+        { name => "默认DNS(对照)", address => "222.172.200.68" },
+        { name => "默认DNS v6(对照)", address => "240e:52:4800::8888" },
     );
 }
 

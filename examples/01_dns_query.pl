@@ -13,12 +13,12 @@ use DNSUtil;
 # --help/-h 用法提示
 if (@ARGV && $ARGV[0] =~ /^(-h|--help)$/) {
     print "用法: perl 01_dns_query.pl [DNS地址]\n";
-    print "  默认 222.172.200.68（云南电信）；支持环境变量 DNS_SERVER\n";
+    print "  默认 222.172.200.68（示例）；支持环境变量 DNS_SERVER\n";
     exit 0;
 }
 
 # 配置
-my $DNS_SERVER = $ARGV[0] || $ENV{DNS_SERVER} || "222.172.200.68";  # 默认云南电信DNS，支持传参/环境变量DNS_SERVER（v4/v6均可）
+my $DNS_SERVER = $ARGV[0] || $ENV{DNS_SERVER} || "222.172.200.68";  # 默认运营商DNS，支持传参/环境变量DNS_SERVER（v4/v6均可）
 my @DOMAINS = ("www.baidu.com", "www.qq.com", "www.taobao.com");
 
 # 主程序

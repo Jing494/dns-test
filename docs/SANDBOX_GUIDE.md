@@ -139,9 +139,9 @@ bash dns-test.sh
 bash dns-test.sh 8.8.8.8 </dev/null
 ```
 
-### 云南电信 DNS 测试（默认目标）
+### 默认运营商 DNS 测试（默认目标）
 ```bash
-# 精简版（默认测云南电信4个DNS；注意多DNS会串行跑，建议加索引参数）
+# 精简版（默认测运营商DNS 4 个；注意多DNS会串行跑，建议加索引参数）
 bash lite.sh 222.172.200.68 0
 
 # 完整版（单DNS，避免超时）
@@ -153,7 +153,7 @@ bash full.sh 222.172.200.68 0
 # VoWiFi 全域名解析
 perl tools/vowifi/01_resolve_vowifi.pl 222.172.200.68
 
-# 路由器DNS转发测试（对比云南电信省级DNS）
+# 路由器DNS转发测试（对比省级DNS）
 perl tools/vowifi/03_test_router_dns.pl 192.168.1.1
 
 # 示例：反向解析（v4/v6均可）

@@ -13,7 +13,7 @@ use DNSUtil;
 # --help/-h 用法提示
 if (@ARGV && $ARGV[0] =~ /^(-h|--help)$/) {
     print "用法: perl 02_multi_dns_compare.pl [DNS1] [DNS2] ...\n";
-    print "  默认 云南电信×2 + 114 + 阿里 + 云南v6；支持环境变量 DNS_LIST\n";
+    print "  默认 运营商DNS×2 + 114 + 阿里 + 运营商v6；支持环境变量 DNS_LIST\n";
     exit 0;
 }
 
@@ -30,11 +30,11 @@ if (@ARGV) {
     }
 } else {
     @DNS_SERVERS = (
-        { name => "云南电信DNS 1", address => "222.172.200.68" },
-        { name => "云南电信DNS 2", address => "61.166.150.123" },
+        { name => "默认DNS v4-1", address => "222.172.200.68" },
+        { name => "默认DNS v4-2", address => "61.166.150.123" },
         { name => "114DNS", address => "114.114.114.114" },
         { name => "阿里云DNS", address => "223.5.5.5" },
-        { name => "云南电信DNS v6", address => "240e:52:4800::8888" },
+        { name => "默认DNS v6", address => "240e:52:4800::8888" },
     );
 }
 

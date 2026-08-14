@@ -27,7 +27,7 @@
 
 ### 1.1 简介
 
-`dns-test` 是一套面向中国电信网络（以云南电信 DNS 为默认基线，阿里/腾讯公共 DNS 为对照）的 **DNS 基准测试与网络诊断工具集**。覆盖 DNS 基础评分、运营商 VoWiFi/ePDG 部署检测、路由器 DNS 转发验证、DoH/DoT 支持检测、DNS64、反向解析等专业场景，并支持多 DNS 横向对比与历史趋势洞察。
+`dns-test` 是一套以默认运营商 DNS 为基线（示例为运营商DNS，可用环境变量覆盖），阿里/腾讯公共 DNS 为对照的 **DNS 基准测试与网络诊断工具集**。覆盖 DNS 基础评分、运营商 VoWiFi/ePDG 部署检测、路由器 DNS 转发验证、DoH/DoT 支持检测、DNS64、反向解析等专业场景，并支持多 DNS 横向对比与历史趋势洞察。
 
 ### 1.2 技术栈
 
@@ -100,7 +100,7 @@
 dns-test/
 ├── README.md / README.en.md      # 中/英文说明
 ├── dns-test.sh                   # 统一交互入口（选 DNS 组/测试类型/专项）
-├── dns-preset.sh                 # 预设快捷测试（云南电信/阿里/腾讯）
+├── dns-preset.sh                 # 预设快捷测试（默认/阿里/腾讯）
 ├── full.sh / lite.sh             # 基础测试入口（完整版 16 项 / 精简版 10 项）
 ├── compare.sh                    # 多 DNS 对比（并行+延迟中位数+HTML/JSON）
 ├── trends.sh                     # DNS 趋势洞察（聚合 compare 历史）
@@ -143,7 +143,7 @@ dns-test/
 | 脚本 | 职责 | 关键特性 |
 |------|------|---------|
 | [dns-test.sh](file:///workspace/dns-test.sh) | 统一交互入口，引导选 DNS 组/测试类型/专项 | 交互双模式（有/无终端）；非交互自动降级 lite+单 DNS |
-| [dns-preset.sh](file:///workspace/dns-preset.sh) | 预设快捷测试（yunnan/ali/tencent/all） | 支持 `PRESET_DNS_CSV` 自定义；索引参数避免超时 |
+| [dns-preset.sh](file:///workspace/dns-preset.sh) | 预设快捷测试（default/ali/tencent/all） | 支持 `PRESET_DNS_CSV` 自定义；索引参数避免超时 |
 | [full.sh](file:///workspace/full.sh) | 完整版基础测试（16 项，77~78 评分点） | `SAVE_LOG=1` 存日志；`trap` 清理临时目录 |
 | [lite.sh](file:///workspace/lite.sh) | 精简版基础测试（10 项，53~54 评分点） | 同上，输出更短 |
 | [compare.sh](file:///workspace/compare.sh) | 多 DNS 横向对比 | 延迟中位数 + 批量并发 + JSON/HTML 报告 |
@@ -225,14 +225,14 @@ use DNSUtil;
 
 | 变量 | 类型 | 说明 |
 |------|------|------|
-| `DEFAULT_DNS_ADDR` / `DEFAULT_DNS_NAME` | 数组 | 云南电信默认 DNS（4 个，v6+v4）；可由 `DEFAULT_DNS_CSV` / `DEFAULT_DNS_NAME_CSV` 覆盖 |
+| `DEFAULT_DNS_ADDR` / `DEFAULT_DNS_NAME` | 数组 | 默认 DNS 组（4 个，v6+v4，示例为运营商DNS）；可由 `DEFAULT_DNS_CSV` / `DEFAULT_DNS_NAME_CSV` 覆盖 |
 | `ALI_DNS_ADDR` / `ALI_DNS_NAME` | 数组 | 阿里云公共 DNS（4 个） |
 | `TENCENT_DNS_ADDR` / `TENCENT_DNS_NAME` | 数组 | 腾讯 DNSPod（3 个） |
 | `DOMAINS_MAIN` / `DOMAINS_GLOBAL` | 数组 | 国内 15 个 / 国际 10 个测试域名 |
 | `DOMAINS_3GPP` / `DOMAINS_CNAME` / `DOMAINS_CARRIER` / `DOMAINS_DNSSEC` / `DOMAINS_TTL` | 数组 | 各测试维度域名 |
 | `TEST_IPS` | 数组 | PTR 反向解析测试 IP |
 | `STAB_ROUNDS` | 整数 | 稳定性轮次（默认 20，`STAB_ROUNDS` 环境变量覆盖，非法回退 20） |
-| `ECS_SUBNET` | 字符串 | ECS 测试 subnet（默认云南电信 IPv6 前缀） |
+| `ECS_SUBNET` | 字符串 | ECS 测试 subnet（默认运营商 IPv6 前缀，示例为运营商DNS） |
 | `PING_OPTS` | 字符串 | ping 超时参数（Linux/macOS 单位不同，自动区分） |
 
 #### 关键函数
@@ -311,14 +311,14 @@ tools/network/doh_dot_check.sh ─► lib/compat.sh（相对定位 ../../lib/）
 
 | 环境变量 | 作用 | 默认值 |
 |---------|------|--------|
-| `DEFAULT_DNS_CSV` | 覆盖基础测试默认 DNS 组（逗号分隔） | 云南电信 4 个 |
+| `DEFAULT_DNS_CSV` | 覆盖基础测试默认 DNS 组（逗号分隔） | 默认 4 个（示例为运营商DNS） |
 | `DEFAULT_DNS_NAME_CSV` | 覆盖默认 DNS 组显示名 | 自动补齐 |
 | `STAB_ROUNDS` | 稳定性测试轮次（**未显式设置时 lite 自动减半为 10**，full 保持 20） | 20 |
 | `ECS_SUBNET` | ECS 测试 subnet | `240e:52:4800::/48` |
 | `CONFIG_DOMAINS` | 域名列表外置配置文件（**不 source**，仅解析 `DOMAINS_MAIN/GLOBAL=("a" "b")` 双引号数组，注入特征行忽略） | — |
-| `PROVINCE_DNS` | 路由器/ePDG 测试的省级基准 | 云南电信 |
+| `PROVINCE_DNS` | 路由器/ePDG 测试的省级基准 | 默认省级DNS（示例为运营商DNS） |
 | `PRESET_DNS_CSV` | `dns-preset.sh` 自定义预设组 | — |
-| `DNS_SERVER` / `DNS_LIST` | examples 默认 DNS | 云南电信 |
+| `DNS_SERVER` / `DNS_LIST` | examples 默认 DNS | 默认（示例为运营商DNS） |
 | `COMPARE_MAX_CONCURRENCY` | compare 并行数 | 3 |
 | `SAVE_LOG` | 保存日志到 results/ | 关闭 |
 | `DNS_PAUSE` | full/lite 多 DNS 测试间隔秒数（请求间隔，设 0 可关掉提速） | 3 |

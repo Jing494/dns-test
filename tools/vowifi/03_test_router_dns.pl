@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # 路由器DNS转发测试
-# 功能: 测试内网路由器DNS的解析结果是否与省级DNS（云南电信）一致
+# 功能: 测试内网路由器DNS的解析结果是否与省级DNS（默认示例为运营商DNS）一致
 #      一致 → 路由器将DNS请求转发到省级DNS；不一致 → 路由器自建DNS或转发到其他DNS
 # 用法: perl 03_test_router_dns.pl [路由器IP1] [路由器IP2] ...
 #       不传默认测试 192.168.1.1 / 192.168.2.1（请按自己网络环境传入路由器网关IP）
@@ -51,7 +51,7 @@ if ($sep_idx >= 0) {
         "240e:52:4000::8888",
     );
     print "用法: perl 03_test_router_dns.pl [路由器IP1] [路由器IP2] [-- 省级DNS1,省级DNS2]\n";
-    print "  例: perl 03_test_router_dns.pl 192.168.1.1              # 默认对比云南电信\n";
+    print "  例: perl 03_test_router_dns.pl 192.168.1.1              # 默认对比省级DNS（示例为运营商DNS）\n";
     print "  例: perl 03_test_router_dns.pl 192.168.1.1 -- 223.5.5.5  # 自定义省级基准\n";
     print "  也可用环境变量 PROVINCE_DNS=\"223.5.5.5\" 指定基准\n\n";
 }
@@ -65,12 +65,12 @@ my @domains = (
 );
 
 print "=" x 70 . "\n";
-print "路由器DNS转发测试（对比省级DNS: 云南电信）\n";
+print "路由器DNS转发测试（对比省级DNS: 默认运营商DNS）\n";
 print "=" x 70 . "\n\n";
 
 # ========== 第一步：用省级DNS建立基准 ==========
 my %baseline;   # domain => [ip1, ip2, ...]
-print "--- 省级基准（云南电信）解析结果 ---\n";
+print "--- 省级基准（默认运营商DNS）解析结果 ---\n";
 foreach my $domain (@domains) {
     my %seen;
     $baseline{$domain} = [];  # 初始化，防止自定义基准全空时解引用报错
