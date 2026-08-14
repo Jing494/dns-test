@@ -74,7 +74,7 @@
 | 1 | A 记录 | 25 个域名 |
 | 2 | AAAA 记录 | 8 个域名 |
 | 3 | 3GPP/VoWiFi | 3 个域名（信息项，不计入评分） |
-| 4 | 记录类型 | MX/NS/TXT/CNAME/SOA |
+| 4 | 记录类型 | MX/NS/TXT（精简版仅测 3 种，完整版另加 CNAME/SOA） |
 | 5 | 稳定性 | 20 次连续查询 |
 | 6 | 异常测试 | NXDOMAIN |
 | 7 | 连通性 | Ping（IPv4） |
