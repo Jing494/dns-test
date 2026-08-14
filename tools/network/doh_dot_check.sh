@@ -47,15 +47,15 @@ for DNS in "${DNS_ARR[@]}"; do
   DNS="$(echo "$DNS" | tr -d ' ')"
   # 合法地址校验（v4/v6）
 if [[ "$DNS" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || ( [[ "$DNS" =~ ^[0-9a-fA-F:]+$ ]] && [[ "$DNS" == *":"* ]] ); then
-  echo "════ DoH/DoT 检测: $DNS ════"
-  # ===== DoT: dig +tls 实测（dig 自带 +time 超时，无需外部 timeout） =====
-  # IPv6 地址需方括号（与下方 DoH curl 分支同规则），否则 dig @IPv6 解析歧义
-  dot_target="$DNS"; [[ "$DNS" == *":"* ]] && dot_target="[$DNS]"
-  if dig +tls=dot "@${dot_target}" www.baidu.com A +short +time=3 +tries=1 2>/dev/null | grep -qE "\."; then
-    echo "  DoT: ✅ dig +tls=dot 实测成功（提供DoT）"
-  else
-    echo "  DoT: ⚠️ dig +tls 失败（未提供DoT / 网络不通）"
-  fi
+    echo "════ DoH/DoT 检测: $DNS ════"
+    # ===== DoT: dig +tls 实测（dig 自带 +time 超时，无需外部 timeout） =====
+    # IPv6 地址需方括号（与下方 DoH curl 分支同规则），否则 dig @IPv6 解析歧义
+    dot_target="$DNS"; [[ "$DNS" == *":"* ]] && dot_target="[$DNS]"
+    if dig +tls=dot "@${dot_target}" www.baidu.com A +short +time=3 +tries=1 2>/dev/null | grep -qE "\."; then
+      echo "  DoT: ✅ dig +tls=dot 实测成功（提供DoT）"
+    else
+      echo "  DoT: ⚠️ dig +tls 失败（未提供DoT / 网络不通）"
+    fi
     # ===== DoH: curl 实测或端口级 =====
     if [ "$HAS_CURL" = "1" ]; then
       # IPv6 地址需要方括号
