@@ -23,8 +23,8 @@ VERSION="${PROJECT_VERSION}"
 GEN_HTML=0
 SAVE_JSON=1
 MODE="lite"    # lite(默认) / full
-# lite默认计分点（无IPv6环境=63；IPv6可用时7b项参与计分=64，环境相关）
-LITE_ITEMS="63"
+# lite默认计分点（无IPv6环境=53；IPv6可用时7b项参与计分=54，环境相关；稳定性lite降轮为10）
+LITE_ITEMS="53"
 
 # ---------- 参数解析 ----------
 DNS_ARGS=()
@@ -186,6 +186,14 @@ fi
 # ============================================================================
 # 4) 结构化JSON结果（默认保存，供趋势积累）
 # ============================================================================
+# JSON 字符串编码：优先 python3（macOS/Linux 自带），无则 sed 转义回退（审阅#15，零新增硬依赖）
+json_enc() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import sys,json; print(json.dumps(sys.argv[1], ensure_ascii=False))' "$1"
+  else
+    printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  fi
+}
 TS=$(date '+%Y%m%d-%H%M%S')
 if [ "$SAVE_JSON" = "1" ]; then
   mkdir -p results
@@ -200,10 +208,10 @@ if [ "$SAVE_JSON" = "1" ]; then
     echo "  \"dns\": ["
     i=0
     for d in "${DNS_ARGS[@]}"; do
-      esc_d=$(printf '%s' "$d" | sed 's/\\/\\\\/g; s/"/\\"/g')
+      esc_d=$(json_enc "$d")
       [ "${SCORE_VAL[$i]}" = "不可达" ] && reachable=false || reachable=true
       comma=""; [ $i -lt $(( ${#DNS_ARGS[@]} - 1 )) ] && comma=","
-      echo "    {\"addr\": \"${esc_d}\", \"score\": \"${SCORE_VAL[$i]}\", \"stab\": \"${STAB_VAL[$i]}\", \"delay_ms\": ${DELAY_VAL[$i]:-0}, \"reachable\": ${reachable}}${comma}"
+      echo "    {\"addr\": ${esc_d}, \"score\": \"${SCORE_VAL[$i]}\", \"stab\": \"${STAB_VAL[$i]}\", \"delay_ms\": ${DELAY_VAL[$i]:-0}, \"reachable\": ${reachable}}${comma}"
       i=$((i+1))
     done
     echo "  ]"

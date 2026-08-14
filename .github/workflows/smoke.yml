@@ -50,20 +50,21 @@ jobs:
           echo "--- 5. trends 本地数据聚合（无网络）"
           TMPR=$(mktemp -d)
           cat > "$TMPR/compare-20260810-090000.json" <<'EOF'
-          {"tool":"x","version":"v2026.08.3","timestamp":"2026-08-10 09:00:00 +0800","mode":"lite(63项)","cost_s":1,"dns":[{"addr":"223.5.5.5","score":"96","stab":"100","delay_ms":60,"reachable":true}]}
+          {"tool":"x","version":"v2026.08.3","timestamp":"2026-08-10 09:00:00 +0800","mode":"lite(53项)","cost_s":1,"dns":[{"addr":"223.5.5.5","score":"96","stab":"100","delay_ms":60,"reachable":true}]}
           EOF
           cat > "$TMPR/compare-20260811-090000.json" <<'EOF'
-          {"tool":"x","version":"v2026.08.3","timestamp":"2026-08-11 09:00:00 +0800","mode":"lite(63项)","cost_s":1,"dns":[{"addr":"223.5.5.5","score":"98","stab":"100","delay_ms":50,"reachable":true}]}
+          {"tool":"x","version":"v2026.08.3","timestamp":"2026-08-11 09:00:00 +0800","mode":"lite(53项)","cost_s":1,"dns":[{"addr":"223.5.5.5","score":"98","stab":"100","delay_ms":50,"reachable":true}]}
           EOF
           COMPARE_RESULTS_DIR="$TMPR" TRENDS_DIR="$TMPR/out" bash trends.sh 223.5.5.5 --html --csv >/dev/null || { echo "❌ trends聚合失败"; exit 1; }
           ls "$TMPR/out/report.html" "$TMPR/out/trends.csv" >/dev/null 2>&1 || { echo "❌ trends产物缺失"; exit 1; }
           rm -rf "$TMPR"
           echo "  ✅ trends 聚合+产物"
-          echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 13）"
+          echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 13 + 计分口径 8）"
           perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 || { echo "❌ perl单测失败"; exit 1; }
           bash tests/02_plugins.sh >/dev/null 2>&1 || { echo "❌ bash单测失败"; exit 1; }
           bash tests/03_dig_target.sh >/dev/null 2>&1 || { echo "❌ dig_target单测失败"; exit 1; }
           bash tests/04_core_functions.sh >/dev/null 2>&1 || { echo "❌ core函数单测失败"; exit 1; }
+          bash tests/05_run_common_tests.sh >/dev/null 2>&1 || { echo "❌ 计分口径单测失败"; exit 1; }
           echo "  ✅ 单元测试通过"
           echo "--- 7. 插件系统（清单/脚本存在/拦截，无网络）"
           source lib/plugins.sh

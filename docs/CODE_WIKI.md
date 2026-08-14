@@ -303,15 +303,18 @@ examples/*.pl ─────┴─► lib/DNSUtil.pm（Perl Socket）
 tools/network/doh_dot_check.sh ─► lib/compat.sh（相对定位 ../../lib/）
 ```
 
-### 6.3 关键环境变量
+### 6.3 关键环境变量（全量清单 · 单一来源）
+
+> 本节为全量环境变量**单一来源**，README/其它文档只作指针；新增/修改环境变量时只需同步本节。
+> 来源：lib/core.sh / compare.sh / trends.sh / tools/vowifi/*.pl / lib/plugins.sh。
 
 | 环境变量 | 作用 | 默认值 |
 |---------|------|--------|
 | `DEFAULT_DNS_CSV` | 覆盖基础测试默认 DNS 组（逗号分隔） | 云南电信 4 个 |
 | `DEFAULT_DNS_NAME_CSV` | 覆盖默认 DNS 组显示名 | 自动补齐 |
-| `STAB_ROUNDS` | 稳定性测试轮次 | 20 |
+| `STAB_ROUNDS` | 稳定性测试轮次（**未显式设置时 lite 自动减半为 10**，full 保持 20） | 20 |
 | `ECS_SUBNET` | ECS 测试 subnet | `240e:52:4800::/48` |
-| `CONFIG_DOMAINS` | 域名列表外置配置文件 | — |
+| `CONFIG_DOMAINS` | 域名列表外置配置文件（**不 source**，仅解析 `DOMAINS_MAIN/GLOBAL=("a" "b")` 双引号数组，注入特征行忽略） | — |
 | `PROVINCE_DNS` | 路由器/ePDG 测试的省级基准 | 云南电信 |
 | `PRESET_DNS_CSV` | `dns-preset.sh` 自定义预设组 | — |
 | `DNS_SERVER` / `DNS_LIST` | examples 默认 DNS | 云南电信 |

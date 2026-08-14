@@ -131,21 +131,46 @@ DOMAINS_TTL=(
   "www.github.com" "www.google.com"
 )
 
-# 域名列表外置覆盖（可用 CONFIG_DOMAINS 环境变量指定配置文件，格式同本文件变量定义，如 DOMAINS_MAIN=("a.com" "b.com")）
+# 域名列表外置覆盖（可用 CONFIG_DOMAINS 环境变量指定配置文件，格式同本文件：DOMAINS_MAIN=("a.com" "b.com")）
+# 安全加固（审阅#6）：不 source——仅逐行提取 DOMAINS_MAIN/GLOBAL 的双引号数组字面量手动解析，
+# 外部文件无法触发命令执行；仅信任你自己生成的配置文件，来源不明的文件一律不要用（详见 README 警告）
 if [ -n "$CONFIG_DOMAINS" ] && [ -f "$CONFIG_DOMAINS" ]; then
-  # 安全校验（P2修复）：配置文件是 source 执行，若含命令执行特征则拒绝加载——只允许纯域名定义
-  # 仅信任你自己生成的配置文件；来源不明的文件一律不要用（详见 README 警告）
-  if grep -qE '[$`;|&<>]|\beval\b|\brm\b|\bexec\b' "$CONFIG_DOMAINS"; then
-    echo "⚠️ CONFIG_DOMAINS 疑似包含非域名内容，已拒绝加载（仅支持 DOMAINS_MAIN/GLOBAL 数组定义）" >&2
-  else
-    source "$CONFIG_DOMAINS"
-  fi
+  while IFS= read -r _cfg_line; do
+    case "$_cfg_line" in
+      DOMAINS_MAIN=\(*|DOMAINS_GLOBAL=\(*)
+        _cfg_name="${_cfg_line%%=*}"
+        _cfg_body="${_cfg_line#*=}"
+        _cfg_clean=(); _cfg_ok=1
+        # 仅提取双引号包裹的 token，逐个校验为纯域名，任一非法则整行忽略
+        while IFS= read -r _cfg_tok; do
+          [ -n "$_cfg_tok" ] || continue
+          _cfg_d="${_cfg_tok#\"}"; _cfg_d="${_cfg_d%\"}"
+          if [[ "$_cfg_d" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+            _cfg_clean+=("$_cfg_d")
+          else
+            _cfg_ok=0; break
+          fi
+        done <<< "$(printf '%s\n' "$_cfg_body" | grep -oE '"[^"]*"')"
+        if [ "$_cfg_ok" -eq 1 ] && [ ${#_cfg_clean[@]} -gt 0 ]; then
+          [ "$_cfg_name" = "DOMAINS_MAIN" ]   && DOMAINS_MAIN=( "${_cfg_clean[@]}" )
+          [ "$_cfg_name" = "DOMAINS_GLOBAL" ] && DOMAINS_GLOBAL=( "${_cfg_clean[@]}" )
+        else
+          echo "⚠️ CONFIG_DOMAINS ${_cfg_name} 行内容非法，已忽略（仅支持 DOMAINS_MAIN/GLOBAL=(\"a\" \"b\") 双引号域名）" >&2
+        fi
+        ;;
+      \#*|'') ;;
+      *) echo "⚠️ CONFIG_DOMAINS 存在不支持的行，已忽略: $_cfg_line" >&2 ;;
+    esac
+  done < "$CONFIG_DOMAINS"
+  unset _cfg_line _cfg_name _cfg_body _cfg_clean _cfg_ok _cfg_tok _cfg_d
 fi
 
 # CDN多节点域名（结果对比时用于判定，含国内常见负载均衡域名）
 CDN_DOMAINS="www.bilibili.com www.douyin.com www.iqiyi.com www.youku.com www.google.com www.youtube.com www.qq.com www.taobao.com www.jd.com www.163.com www.sina.com.cn www.zhihu.com www.baidu.com"
 
 # 稳定性测试轮次（可用环境变量 STAB_ROUNDS 覆盖，快速模式可调小，如 STAB_ROUNDS=5）
+# 记录用户是否显式设置：未设置时 lite 默认减半（20→10）缩短耗时，full 保持 20（审阅#8）
+STAB_ROUNDS_USER=0; [ -n "${STAB_ROUNDS+x}" ] && STAB_ROUNDS_USER=1
 STAB_ROUNDS="${STAB_ROUNDS:-20}"
 # 校验必须为正整数，非法值回退默认20（防除零）
 [[ "$STAB_ROUNDS" =~ ^[1-9][0-9]*$ ]] || STAB_ROUNDS=20
@@ -168,14 +193,15 @@ print_env_info() {
   command -v dig >/dev/null 2>&1 && deps="dig✅" || deps="dig❌"
   command -v perl >/dev/null 2>&1 && deps="${deps} perl✅" || deps="${deps} perl❌"
   command -v ping >/dev/null 2>&1 && deps="${deps} ping✅" || deps="${deps} ping❌"
-  # IPv6 可用性快测（平台区分 -W 单位）
+  # IPv6 可用性快测（平台区分 -W 单位；用 loopback ::1 只验协议栈是否可用，
+  # 不依赖外网 IPv6 可达性——海外/无 IPv6 路由网络不再误报"不可用"）
   local v6="不可用"
   local v6opts="-c 1 -W 1"
   [ "$(uname)" = "Darwin" ] && v6opts="-c 1 -W 1000"
   if command -v ping6 >/dev/null 2>&1; then
-    ping6 $v6opts 2400:3200::1 >/dev/null 2>&1 && v6="可用"
+    ping6 $v6opts ::1 >/dev/null 2>&1 && v6="可用"
   elif command -v ping >/dev/null 2>&1; then
-    ping -6 $v6opts 2400:3200::1 >/dev/null 2>&1 && v6="可用"
+    ping -6 $v6opts ::1 >/dev/null 2>&1 && v6="可用"
   fi
   echo "  🌐 环境: ${os} | ${deps} | IPv6:${v6} | 端口测试需真机(UDP受限环境不可用)"
 }
@@ -195,11 +221,12 @@ valid_dns_addr() {
 }
 
 # DNS可达性预检函数：不可达返回1（快速跳过，避免59~90次查询白等）
-# 双域名探测：任一成功即可达（避免 baidu.com 在海外网络解析慢导致误判）
+# 双域名并行探测：任一成功即可达（避免 baidu.com 在海外网络解析慢导致误判，且不可达 DNS 最多等 2s 而非 4s）
 dns_health_check() {
-  local addr="$1"
-  if dig @$(dig_target "$addr") www.alidns.com A +short +time=2 +tries=1 >/dev/null 2>&1 \
-     || dig @$(dig_target "$addr") www.baidu.com A +short +time=2 +tries=1 >/dev/null 2>&1; then
+  local addr="$1" p1 p2
+  dig @$(dig_target "$addr") www.alidns.com A +short +time=2 +tries=1 >/dev/null 2>&1 & p1=$!
+  dig @$(dig_target "$addr") www.baidu.com A +short +time=2 +tries=1 >/dev/null 2>&1 & p2=$!
+  if wait "$p1" 2>/dev/null || wait "$p2" 2>/dev/null; then
     return 0
   fi
   return 1
@@ -220,7 +247,15 @@ PARR_MAX="${PARR_MAX:-8}"
 par_run() {
   PARR_TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/dns-test.XXXXXX")
   TMPDIR_LIST+=("$PARR_TMPDIR")
-  local i=0
+  local i=0 cmd
+  # 安全兜底（审阅#7）：par_run 只允许执行 dig 命令——bash 3.2（macOS）不支持数组套数组，
+  # 以"命令白名单 + 地址/域名前置校验"把 eval 注入面收窄到零；任一非法命令立即整体拒绝
+  for cmd in "${PARR_CMDS[@]}"; do
+    case "$cmd" in
+      dig\ *) ;;
+      *) echo "par_run: 仅允许 dig 命令，已拒绝: $cmd" >&2; PARR_COUNT=0; return 1 ;;
+    esac
+  done
   for cmd in "${PARR_CMDS[@]}"; do
     (eval "$cmd" > "${PARR_TMPDIR}/${i}.out") &
     i=$((i + 1))
@@ -439,11 +474,16 @@ run_common_tests() {
   fi
 
   # ===== 5. 稳定性压力测试（min/max/avg 与原始数据仅 full 输出，lite 只看成功率） =====
+  # lite 未显式设置 STAB_ROUNDS 时默认减半（20→10），缩短 lite 耗时（审阅#8）
+  local stab_rounds=$STAB_ROUNDS
+  if [ "$full" -eq 0 ] && [ "$STAB_ROUNDS_USER" -eq 0 ]; then
+    stab_rounds=$((STAB_ROUNDS / 2))
+  fi
   echo ""
-  echo "  ━━━ [5] 稳定性压力测试 (${STAB_ROUNDS} 次连续查询) ━━━"
-  local stab_success=0; local stab_total=$STAB_ROUNDS; local stab_times=()
+  echo "  ━━━ [5] 稳定性压力测试 (${stab_rounds} 次连续查询) ━━━"
+  local stab_success=0; local stab_total=$stab_rounds; local stab_times=()
   echo -n "     进度: "
-  for i in $(seq 1 $STAB_ROUNDS); do
+  for i in $(seq 1 $stab_rounds); do
     local qtime=$(dig @$(dig_target "$addr") www.baidu.com A +time=3 +tries=1 2>/dev/null | sed -n 's/.*Query time: \([0-9]*\).*/\1/p' | head -1)
     if [ -n "$qtime" ]; then
       stab_success=$((stab_success + 1)); stab_times+=("$qtime")
@@ -691,9 +731,10 @@ run_common_tests() {
     fi
   done
   local hijack_judged=$((hijack_total - hijack_unknown))
-  local hijack_rate=100
-  [ $hijack_judged -gt 0 ] && hijack_rate=$((hijack_safe * 100 / hijack_judged))
-  printf "  📊 对比一致: %d/%d (%d%%) 判定%d/%d\n" "$hijack_safe" "$hijack_judged" "$hijack_rate" "$hijack_judged" "$hijack_total"
+  # 无可判定项（基准全不可达）时显示 N/A，避免"对比一致 100%"误导（审阅#10）
+  local hijack_rate="N/A"
+  [ $hijack_judged -gt 0 ] && hijack_rate="$((hijack_safe * 100 / hijack_judged))%"
+  printf "  📊 对比一致: %d/%d (%s) 判定%d/%d\n" "$hijack_safe" "$hijack_judged" "$hijack_rate" "$hijack_judged" "$hijack_total"
   total_all=$((total_all + hijack_judged)); success_all=$((success_all + hijack_safe))
 
   # ===== 15. 递归/迭代查询类型测试 =====
