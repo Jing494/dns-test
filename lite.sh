@@ -8,7 +8,7 @@
 case "$1" in
   -h|--help|help)
     echo "用法: bash lite.sh [DNS...] [索引]"
-    echo "  DNS列表: 一个或多个DNS地址（默认云南电信 61.166.150.123），支持v4/v6混合"
+    echo "  DNS列表: 一个或多个DNS地址（默认云南电信 4 个 DNS，v4/v6 各 2 个），支持v4/v6混合"
     echo "  索引:    只测第N个DNS（0=第1个），避免多DNS时超时"
     echo "  示例:"
     echo "    bash lite.sh                          # 默认DNS精简测试"

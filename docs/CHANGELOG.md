@@ -25,6 +25,7 @@
   - ④ **测试**：新增 `tests/05_run_common_tests.sh` 离线回归 lite 计分口径 + CONFIG_DOMAINS 安全解析（8 用例，mock dig/ping，不发起真实网络请求），verify.sh/CI 同步纳入
   - ⑤ **修复**：hijack_rate 基准全不可达时显示 N/A（避免"对比一致 100%"误导）；compare lite 计分点 63→53 同步（稳定性降轮后的总分口径），README 评分示例同步
   - ⑥ **文档同步**：CODE_WIKI 环境变量表标注"全量清单·单一来源"，TEST_METHOD 更新 CONFIG_DOMAINS 安全说明（不 source）；回归：语法 + 单测(18+9+4+13+8) + 冒烟 25 项全绿，双分支（main/develop）同步，发行包 `dns-test-v2026.08.11.tar.gz` 重打包
+  - ⑦ **审阅复核补漏（同日）**：评分口径文档补同步（TEST_METHOD L70 精简版 64→54、L78 稳定性 20→10、L122/126-129 实测 63→53、L131 78/64→78/54；README L233 评分项 64/78→54/78）；full.sh/lite.sh `--help` 默认 DNS 文案对齐实际默认 4 个云南电信 DNS；新增 `.editorconfig`（LF+UTF-8，与 .gitattributes 配套）；05 单测两条预期 ⚠️ 噪音静音（2>/dev/null）
 - 2026-08-14（第七十九轮）：**文档重构——目录结构单一来源**
   - ① README/SANDBOX 目录树精简为关键目录概览并指向 CODE_WIKI 三、目录结构（修复 README 目录树漏 tests/03/04 的漂移）；CODE_WIKI 三、目录结构标注为权威单一来源（新增/移动文件只需改本节）
   - ② README 已知限制移入 FAQ（用户视角，README 留指针；CODE_WIKI 10.1 保留开发者视角）

@@ -122,7 +122,7 @@ fi
 # 7. CONFIG_DOMAINS 安全解析：合法配置覆盖数组，且注入行不执行
 CFG="$STUB/domains.conf"
 printf 'DOMAINS_MAIN=("a.com" "b.com")\n$(touch "%s/pwned") >/dev/null\n' "$STUB" > "$CFG"
-R=$(CONFIG_DOMAINS="$CFG" PATH="$STUB:$PATH" bash -c 'source lib/core.sh; printf "%d:%s" "${#DOMAINS_MAIN[@]}" "${DOMAINS_MAIN[0]}"')
+R=$(CONFIG_DOMAINS="$CFG" PATH="$STUB:$PATH" bash -c 'source lib/core.sh; printf "%d:%s" "${#DOMAINS_MAIN[@]}" "${DOMAINS_MAIN[0]}"' 2>/dev/null)
 if [ "$R" = "2:a.com" ] && [ ! -f "$STUB/pwned" ]; then
   ok "CONFIG_DOMAINS 合法覆盖 + 注入不执行"
 else
@@ -132,7 +132,7 @@ fi
 # 8. CONFIG_DOMAINS 非法 token 行被忽略（不覆盖数组）
 CFG2="$STUB/domains2.conf"
 printf 'DOMAINS_MAIN=("x.com" "y.com;id")\n' > "$CFG2"
-R2=$(CONFIG_DOMAINS="$CFG2" PATH="$STUB:$PATH" bash -c 'source lib/core.sh; printf "%s" "${DOMAINS_MAIN[0]}"')
+R2=$(CONFIG_DOMAINS="$CFG2" PATH="$STUB:$PATH" bash -c 'source lib/core.sh; printf "%s" "${DOMAINS_MAIN[0]}"' 2>/dev/null)
 if [ "$R2" = "www.baidu.com" ]; then
   ok "CONFIG_DOMAINS 非法 token 忽略"
 else

@@ -1,0 +1,12 @@
+# 编辑器统一约定：LF + UTF-8 + 无尾随空白（与 .gitattributes 的 LF 锁定配套，防 Windows/macOS 换行问题复发）
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{sh,pl}]
+indent_style = space
+indent_size = 2

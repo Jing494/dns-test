@@ -230,7 +230,7 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 ## 📋 测试维度说明
 
-**基础测试（lite/full）测试项明细与评分标准**详见 [docs/TEST_METHOD.md](./docs/TEST_METHOD.md) 第四章（精简版 10 项/完整版 16 项，评分项 64/78 点）。
+**基础测试（lite/full）测试项明细与评分标准**详见 [docs/TEST_METHOD.md](./docs/TEST_METHOD.md) 第四章（精简版 10 项/完整版 16 项，评分项 54/78 点）。
 
 ### 专项测试
 | 测试类型 | 功能说明 | 默认测试目标 |
