@@ -16,7 +16,7 @@
 
 > 🔧 **最新版本**：**v1.7.1 = v2026.08.11**（在 v2026.08.11 基础上完成审阅优化：CONFIG_DOMAINS 不再 source 执行防注入、par_run 增加 dig 命令白名单、IPv6 检测改 loopback 防海外误判、lite 稳定性轮次自动减半为 10 提速、JSON 序列化优先 python3、新增计分口径单测 05）。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
-> 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
+> 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；**默认 DNS 列表为公开可测试的运营商公网 DNS**，示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
 ---
 
@@ -79,7 +79,7 @@ dns-test/
 ├── verify.sh / smoke_test.sh       # 自检工具（一键验证 / 冒烟测试）
 ├── install.sh / release.sh         # 安装 / 打包发布
 ├── lib/                            # 公共库（core.sh / compat.sh / plugins.sh / DNSUtil.pm）
-├── tests/                          # 单元测试（perl 18 + bash 9 + 4 + 13 + 8 用例）
+├── tests/                          # 单元测试（perl 18 + bash 9 + 4 + 15 + 9 用例）
 ├── docs/                           # 技术文档（AI_GUIDE / TEST_METHOD / CODE_WIKI / FAQ / CHANGELOG / SANDBOX_GUIDE）
 ├── tools/                          # 专项测试（vowifi/ / network/）
 ├── examples/                       # 通用示例脚本（4 个 Perl）
@@ -268,7 +268,7 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 按优先级排序：
 
-- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截）+ `tests/03_dig_target.sh` 4 用例（IPv6 加方括号）+ `tests/04_core_functions.sh` 13 用例（地址校验/响应判断/CDN 判定）+ `tests/05_run_common_tests.sh` 8 用例（lite 计分口径/稳定性降轮/CONFIG_DOMAINS 安全解析），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh` / `bash tests/03_dig_target.sh` / `bash tests/04_core_functions.sh` / `bash tests/05_run_common_tests.sh`
+- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截）+ `tests/03_dig_target.sh` 4 用例（IPv6 加方括号）+ `tests/04_core_functions.sh` 15 用例（地址校验/响应判断/CDN 判定）+ `tests/05_run_common_tests.sh` 9 用例（lite 计分口径/稳定性降轮/CONFIG_DOMAINS 安全解析/dig @server 前缀回归），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh` / `bash tests/03_dig_target.sh` / `bash tests/04_core_functions.sh` / `bash tests/05_run_common_tests.sh`
   - bats 评估结论（2026-08-13）：**不引入**——现有 perl 单测 + smoke/verify 集成已够，bash 纯函数用零依赖轻量断言（tests/02_plugins.sh）补充，避免增加依赖
 - **par_run 通用化（✅ 已完成）**：PARR_MAX 环境变量可调并发数（默认 8），临时目录自动注册 TMPDIR_LIST 统一清理
 - **trends svg_chart 模板化**：HTML/SVG 内联字符串改 heredoc/独立模板文件（当前功能正常，纯可读性优化）

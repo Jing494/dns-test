@@ -17,6 +17,11 @@ case "$1" in
     echo "  环境变量: SAVE_LOG=1 保存日志到 results/；DEFAULT_DNS_CSV=... 自定义默认DNS组"
     exit 0
     ;;
+  --version)
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/version.sh"
+    echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
+    exit 0
+    ;;
 esac
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -87,11 +92,12 @@ if [ $IDX -ge 0 ]; then
   run_lite_test "${DNS_ADDR[$IDX]}" "${DNS_NAME[$IDX]}" && tested=1
 else
   # 测试所有DNS
+  DNS_PAUSE="${DNS_PAUSE:-3}"
   for idx in "${!DNS_ADDR[@]}"; do
     if run_lite_test "${DNS_ADDR[$idx]}" "${DNS_NAME[$idx]}"; then
       tested=$((tested + 1))
       # 最后一个不休息
-      [ $idx -lt $((${#DNS_ADDR[@]} - 1)) ] && sleep 3
+      [ $idx -lt $((${#DNS_ADDR[@]} - 1)) ] && sleep $DNS_PAUSE
     fi
   done
 fi

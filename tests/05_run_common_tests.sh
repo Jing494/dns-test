@@ -2,7 +2,7 @@
 # ============================================================================
 # 纯 bash 轻量断言单测：run_common_tests（lite 计分口径离线回归）
 # 用 mock dig/ping 固定响应，验证 lite 版各测试项计分与总分口径（含稳定性降轮），
-# 并回归 CONFIG_DOMAINS 安全解析（不 source、注入不执行）
+# 并回归 CONFIG_DOMAINS 安全解析（不 source、注入不执行）与 dig @server 前缀（漏 @ 会走本地解析器）
 # 用法: bash tests/05_run_common_tests.sh   （退出码 0=全过 1=有失败）
 # 说明: 不发起任何真实网络请求；mock dig 按查询域名/类型/+short 返回固定响应
 # ============================================================================
@@ -15,7 +15,9 @@ trap 'rm -rf "$STUB"' EXIT
 cat > "$STUB/dig" <<'EOF'
 #!/bin/bash
 args=("$@")
-name="" type="A" short=0
+name="" type="A" short=0 at=""
+# 记录被调用的完整参数（MOCK_DIG_LOG 设置时才写），供回归断言检查是否带 @server
+[ -n "$MOCK_DIG_LOG" ] && echo "$*" >> "$MOCK_DIG_LOG"
 for a in "${args[@]}"; do
   case "$a" in
     +short) short=1 ;;
@@ -24,10 +26,13 @@ for a in "${args[@]}"; do
     MX) type=MX ;;
     NS) type=NS ;;
     TXT) type=TXT ;;
-    @*|+*) ;;
+    @*) at=1 ;;
+    +*) ;;
     *) [ -z "$name" ] && name="$a" ;;
   esac
 done
+# 回归断言：run_common_tests 每次 dig 必须带 @server（漏 @ 会走本地解析器，见 core.sh dns_health_check/A记录循环）
+[ -n "$at" ] || { echo "MOCK-ERR: dig 缺少 @server（漏 @ 回归）" >&2; exit 1; }
 [ "$type" = "AAAA" ] && { echo ""; exit 0; }
 if [ "$type" != "A" ]; then
   # MX/NS/TXT +short 固定响应
@@ -137,6 +142,16 @@ if [ "$R2" = "www.baidu.com" ]; then
   ok "CONFIG_DOMAINS 非法 token 忽略"
 else
   notok "CONFIG_DOMAINS 非法 token 忽略 (got $R2)"
+fi
+
+# 9. 回归：dig 必须带 @server（漏 @ 会走本地默认解析器而非目标 DNS，见 core.sh 注释）
+rm -f "$STUB/args.log"
+MOCK_DIG_LOG="$STUB/args.log" PATH="$STUB:$PATH" dns_health_check 8.8.8.8 >/dev/null 2>&1
+sleep 0.2   # 等后台 dig 写日志
+if [ -s "$STUB/args.log" ] && ! grep -q '^[^@]' "$STUB/args.log"; then
+  ok "dig 均带 @server（漏 @ 回归防护）"
+else
+  notok "dig 均带 @server（漏 @ 回归防护）"
 fi
 
 echo ""

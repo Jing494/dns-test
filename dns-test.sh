@@ -13,6 +13,12 @@ cd "$SCRIPT_DIR" || exit 1
 # 引入核心库（获取默认DNS等公共变量）
 source "${SCRIPT_DIR}/lib/core.sh"
 
+# 版本号输出（统一入口约定）
+if [ "$1" = "--version" ]; then
+  echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
+  exit 0
+fi
+
 # 处理DNS参数
 DNS_LIST=()
 if [ $# -ge 1 ]; then
@@ -188,7 +194,6 @@ else
   if [ ${#DNS_LIST[@]} -ge 2 ]; then
     echo "  💡 检测到 ${#DNS_LIST[@]} 个DNS：横向对比可用 bash compare.sh ${DNS_LIST[*]}"
   fi
-  source "${SCRIPT_DIR}/lib/core.sh"
   local_dns="${DNS_LIST[0]:-${DEFAULT_DNS_ADDR[0]}}"
   bash lite.sh "$local_dns"
 fi

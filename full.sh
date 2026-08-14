@@ -22,6 +22,11 @@ case "$1" in
     echo "  环境变量: SAVE_LOG=1 保存日志到 results/；DEFAULT_DNS_CSV=... 自定义默认DNS组"
     exit 0
     ;;
+  --version)
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/version.sh"
+    echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
+    exit 0
+    ;;
 esac
 
 # 引入核心库
@@ -88,7 +93,8 @@ for idx in "${!DNS_ADDR[@]}"; do
 done
 echo ""
 
-# 逐个测试，每个之间休息3秒避免超时
+# 逐个测试，每个之间休息$DNS_PAUSE秒（请求间隔，避免过快触发网络限流）
+DNS_PAUSE="${DNS_PAUSE:-3}"
 tested=0
 if [ $IDX -ge 0 ]; then
   # 测试指定索引的DNS
@@ -99,7 +105,7 @@ else
     if run_full_test "${DNS_ADDR[$idx]}" "${DNS_NAME[$idx]}"; then
       tested=$((tested + 1))
       # 最后一个不休息
-      [ $idx -lt $((${#DNS_ADDR[@]} - 1)) ] && sleep 3
+      [ $idx -lt $((${#DNS_ADDR[@]} - 1)) ] && sleep $DNS_PAUSE
     fi
   done
 fi

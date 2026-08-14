@@ -33,6 +33,9 @@ for a in "$@"; do
     --html)     GEN_HTML=1 ;;
     --full)     MODE="full" ;;
     --no-save)  SAVE_JSON=0 ;;
+    --version)
+      echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
+      exit 0 ;;
     --help|-h)
       echo "用法: bash compare.sh DNS1 [DNS2] ... [--html] [--full] [--no-save]"
       echo "  例: bash compare.sh 223.5.5.5 119.29.29.29 222.172.200.68"

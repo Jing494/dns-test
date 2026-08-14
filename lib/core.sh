@@ -213,19 +213,53 @@ valid_dns_addr() {
   if [[ "$addr" =~ ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]]; then
     return 0
   fi
-  # IPv6 格式（含冒号、仅hex和冒号）
-  if [[ "$addr" =~ ^[0-9a-fA-F:]+$ ]] && [[ "$addr" == *":"* ]]; then
-    return 0
-  fi
+  # IPv6 格式校验（严格：段数/双冒号次数/边缘单冒号，拒绝 :::1、1:2:3、1::2::3 等畸形）
+  valid_ipv6_addr "$addr" && return 0
   return 1
+}
+
+# IPv6 地址严格校验（仅依赖正则+字符串运算，bash 3.2/macOS 兼容）
+# 规则：仅hex与冒号；至多一个 ::；非空段1-4位hex；无 :: 时恰8段，有 :: 时1-7段；单冒号不得位于首尾
+valid_ipv6_addr() {
+  local a="$1" left right seg rest nseg=0
+  [[ "$a" =~ ^[0-9a-fA-F:]+$ ]] || return 1     # 仅 hex 与冒号
+  [[ "$a" == *"::"*"::"* ]] && return 1         # 至多一个 ::
+  # 首/尾单冒号非法（仅允许 :: 位于首尾，如 ::1、1::）
+  case "$a" in
+    :*|*:) [[ "$a" == ::* || "$a" == *:: ]] || return 1 ;;
+  esac
+  if [[ "$a" == *"::"* ]]; then
+    left="${a%%::*}"; right="${a#*::}"
+    case "$left"  in *:) return 1 ;; esac       # :: 左侧不得以单冒号结尾（防 1:::x）
+    case "$right" in :*) return 1 ;; esac       # :: 右侧不得以单冒号开头（防 :::1）
+  fi
+  rest="$a"
+  while [ -n "$rest" ]; do
+    seg="${rest%%:*}"
+    if [ -n "$seg" ]; then
+      case "$seg" in *[!0-9a-fA-F]*) return 1 ;; esac
+      [ "${#seg}" -le 4 ] || return 1
+      nseg=$((nseg + 1))
+    fi
+    [ "$rest" = "${rest#*:}" ] && break         # 无冒号，结束
+    rest="${rest#*:}"
+  done
+  if [[ "$a" == *"::"* ]]; then
+    [ "$nseg" -ge 1 ] && [ "$nseg" -le 7 ] || return 1
+  else
+    [ "$nseg" -eq 8 ] || return 1
+  fi
+  return 0
 }
 
 # DNS可达性预检函数：不可达返回1（快速跳过，避免59~90次查询白等）
 # 双域名并行探测：任一成功即可达（避免 baidu.com 在海外网络解析慢导致误判，且不可达 DNS 最多等 2s 而非 4s）
 dns_health_check() {
   local addr="$1" p1 p2
-  dig @$(dig_target "$addr") www.alidns.com A +short +time=2 +tries=1 >/dev/null 2>&1 & p1=$!
-  dig @$(dig_target "$addr") www.baidu.com A +short +time=2 +tries=1 >/dev/null 2>&1 & p2=$!
+  local t=$(dig_target "$addr")
+  # 注意：必须保留 @ 前缀（dig_target 输出不含 @），否则 dig 会走本地默认解析器而非目标 DNS（回归防护见 tests/05）
+  dig "@$t" www.alidns.com A +short +time=2 +tries=1 >/dev/null 2>&1 & p1=$!
+  dig "@$t" www.baidu.com A +short +time=2 +tries=1 >/dev/null 2>&1 & p2=$!
   if wait "$p1" 2>/dev/null || wait "$p2" 2>/dev/null; then
     return 0
   fi
@@ -234,7 +268,7 @@ dns_health_check() {
 
 # 并行dig辅助：将 PARR_CMDS 数组中的dig命令并行执行（PARR_MAX 并发，默认8），结果存 $PARR_TMPDIR/N.out
 # 使用方式：
-#   PARR_CMDS=(); PARR_CMDS+=("dig @1.1.1.1 www.a.com A +time=3 +tries=1 2>/dev/null"); ...
+#   PARR_CMDS=(); PARR_CMDS+=("dig @1.1.1.1 www.a.com A ${DIG_OPTS} 2>/dev/null"); ...
 #   par_run
 #   for ((i=0; i<PARR_COUNT; i++)); do result=$(cat "$PARR_TMPDIR/$i.out"); ...; done
 #   临时目录由 par_run 自动注册进 TMPDIR_LIST，脚本退出/中断时由入口脚本 trap 统一清理
@@ -244,6 +278,8 @@ PARR_COUNT=0
 # 并行并发上限（环境变量 PARR_MAX 可覆盖，调小可降低负载）
 PARR_MAX="${PARR_MAX:-8}"
 [[ "$PARR_MAX" =~ ^[1-9][0-9]*$ ]] || PARR_MAX=8
+# dig 通用选项（超时/重试），集中定义一处改全局生效（审阅#9）
+DIG_OPTS="+time=3 +tries=1"
 par_run() {
   PARR_TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/dns-test.XXXXXX")
   TMPDIR_LIST+=("$PARR_TMPDIR")
@@ -344,9 +380,10 @@ run_common_tests() {
   local a_i=0
   local a_domains=("${DOMAINS_MAIN[@]}" "${DOMAINS_GLOBAL[@]}")
   for d in "${a_domains[@]}"; do
-    (dig @$(dig_target "$addr") ${d} A +time=3 +tries=1 2>/dev/null > "${a_tmpdir}/${a_i}.out") &
+    local t=$(dig_target "$addr")
+    (dig "@$t" ${d} A ${DIG_OPTS} 2>/dev/null > "${a_tmpdir}/${a_i}.out") &
     a_i=$((a_i + 1))
-    [ $((a_i % 8)) -eq 0 ] && wait
+    [ $((a_i % PARR_MAX)) -eq 0 ] && wait
   done
   wait
   a_total=${#a_domains[@]}
@@ -377,7 +414,7 @@ run_common_tests() {
   local aaaa_domains=("${DOMAINS_MAIN[@]:0:8}")
   PARR_CMDS=()
   for d in "${aaaa_domains[@]}"; do
-    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} AAAA +short +time=3 +tries=1 2>/dev/null")
+    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} AAAA +short ${DIG_OPTS} 2>/dev/null")
   done
   par_run
   aaaa_total=${#aaaa_domains[@]}
@@ -394,7 +431,7 @@ run_common_tests() {
   echo "  ━━━ [3] 3GPP/VoWiFi域名测试（信息项） ━━━"
   PARR_CMDS=()
   for d in "${DOMAINS_3GPP[@]}"; do
-    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A +short +time=3 +tries=1 2>/dev/null")
+    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A +short ${DIG_OPTS} 2>/dev/null")
   done
   par_run
   for ((i=0; i<${#DOMAINS_3GPP[@]}; i++)); do
@@ -416,15 +453,15 @@ run_common_tests() {
   echo ""
   echo "  ━━━ [4] 其他记录类型测试（并行） ━━━"
   PARR_CMDS=()
-  PARR_CMDS+=("dig @$(dig_target "$addr") qq.com MX +short +time=3 +tries=1 2>/dev/null")
-  PARR_CMDS+=("dig @$(dig_target "$addr") baidu.com NS +short +time=3 +tries=1 2>/dev/null")
-  PARR_CMDS+=("dig @$(dig_target "$addr") google.com TXT +short +time=3 +tries=1 2>/dev/null")
+  PARR_CMDS+=("dig @$(dig_target "$addr") qq.com MX +short ${DIG_OPTS} 2>/dev/null")
+  PARR_CMDS+=("dig @$(dig_target "$addr") baidu.com NS +short ${DIG_OPTS} 2>/dev/null")
+  PARR_CMDS+=("dig @$(dig_target "$addr") google.com TXT +short ${DIG_OPTS} 2>/dev/null")
   local cname_total=0
   if [ "$full" -eq 1 ]; then
     for d in "${DOMAINS_CNAME[@]}"; do
-      PARR_CMDS+=("dig @$(dig_target "$addr") ${d} CNAME +short +time=3 +tries=1 2>/dev/null")
+      PARR_CMDS+=("dig @$(dig_target "$addr") ${d} CNAME +short ${DIG_OPTS} 2>/dev/null")
     done
-    PARR_CMDS+=("dig @$(dig_target "$addr") baidu.com SOA +short +time=3 +tries=1 2>/dev/null")
+    PARR_CMDS+=("dig @$(dig_target "$addr") baidu.com SOA +short ${DIG_OPTS} 2>/dev/null")
     cname_total=${#DOMAINS_CNAME[@]}
   fi
   par_run
@@ -484,7 +521,7 @@ run_common_tests() {
   local stab_success=0; local stab_total=$stab_rounds; local stab_times=()
   echo -n "     进度: "
   for i in $(seq 1 $stab_rounds); do
-    local qtime=$(dig @$(dig_target "$addr") www.baidu.com A +time=3 +tries=1 2>/dev/null | sed -n 's/.*Query time: \([0-9]*\).*/\1/p' | head -1)
+    local qtime=$(dig @$(dig_target "$addr") www.baidu.com A ${DIG_OPTS} 2>/dev/null | sed -n 's/.*Query time: \([0-9]*\).*/\1/p' | head -1)
     if [ -n "$qtime" ]; then
       stab_success=$((stab_success + 1)); stab_times+=("$qtime")
     fi
@@ -510,7 +547,7 @@ run_common_tests() {
   # ===== 6. 异常/边界测试 =====
   echo ""
   echo "  ━━━ [6] 异常/边界测试 ━━━"
-  local nx_result=$(dig @$(dig_target "$addr") this-domain-does-not-exist-12345.com A +time=3 +tries=1 2>/dev/null | sed -n 's/.*status: \([A-Za-z]*\).*/\1/p' | head -1)
+  local nx_result=$(dig @$(dig_target "$addr") this-domain-does-not-exist-12345.com A ${DIG_OPTS} 2>/dev/null | sed -n 's/.*status: \([A-Za-z]*\).*/\1/p' | head -1)
   if [ "$nx_result" = "NXDOMAIN" ]; then
     echo "     ✅ NXDOMAIN 正确返回"; total_all=$((total_all+1)); success_all=$((success_all+1))
   else
@@ -520,7 +557,7 @@ run_common_tests() {
   # ===== 7. 实际连通性测试 =====
   echo ""
   echo "  ━━━ [7] 实际连通性测试 ━━━"
-  local test_ip=$(dig @$(dig_target "$addr") www.baidu.com A +short +time=3 +tries=1 2>/dev/null | tail -1)
+  local test_ip=$(dig @$(dig_target "$addr") www.baidu.com A +short ${DIG_OPTS} 2>/dev/null | tail -1)
   if [ -n "$test_ip" ] && [[ "$test_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     local ping_avg=$(ping ${PING_OPTS} ${test_ip} 2>&1 | sed -n 's/.*min\/avg.*= \([0-9.]*\)\/\([0-9.]*\)\/.*/\2/p' | head -1)
     if [ -n "$ping_avg" ]; then
@@ -536,7 +573,7 @@ run_common_tests() {
   # ===== 7b. IPv6实际连通性测试（ping6，无IPv6环境自动跳过不计分） =====
   echo ""
   echo "  ━━━ [7b] IPv6实际连通性测试（ping6） ━━━"
-  local v6_ip=$(dig @$(dig_target "$addr") www.baidu.com AAAA +short +time=3 +tries=1 2>/dev/null | grep -E ":" | head -1)
+  local v6_ip=$(dig @$(dig_target "$addr") www.baidu.com AAAA +short ${DIG_OPTS} 2>/dev/null | grep -E ":" | head -1)
   if [ -z "$v6_ip" ]; then
     echo "     ⚠️  DNS无法解析IPv6地址（该DNS可能无IPv6记录）"
   else
@@ -564,7 +601,7 @@ run_common_tests() {
   local check_domains=(www.baidu.com www.qq.com www.bilibili.com)
   PARR_CMDS=()
   for d in "${check_domains[@]}"; do
-    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A +short +time=3 +tries=1 2>/dev/null")
+    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A +short ${DIG_OPTS} 2>/dev/null")
   done
   par_run
   check_total=${#check_domains[@]}
@@ -581,7 +618,7 @@ run_common_tests() {
   local carrier_success=0; local carrier_total=0
   PARR_CMDS=()
   for d in "${DOMAINS_CARRIER[@]}"; do
-    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A +short +time=3 +tries=1 2>/dev/null")
+    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A +short ${DIG_OPTS} 2>/dev/null")
   done
   par_run
   carrier_total=${#DOMAINS_CARRIER[@]}
@@ -607,7 +644,7 @@ run_common_tests() {
   PARR_CMDS=()
   for d in "${DOMAINS_DNSSEC[@]}"; do
     for t in DNSKEY DS RRSIG; do
-      PARR_CMDS+=("dig @$(dig_target "$addr") ${d} ${t} +short +time=3 +tries=1 2>/dev/null")
+      PARR_CMDS+=("dig @$(dig_target "$addr") ${d} ${t} +short ${DIG_OPTS} 2>/dev/null")
     done
   done
   par_run
@@ -631,8 +668,8 @@ run_common_tests() {
   echo ""
   echo "  ━━━ [11] EDNS Client Subnet (ECS)测试 ━━━"
   PARR_CMDS=(
-    "dig @$(dig_target "$addr") www.baidu.com A +subnet=${ECS_SUBNET} +short +time=3 +tries=1 2>/dev/null"
-    "dig @$(dig_target "$addr") www.baidu.com A +short +time=3 +tries=1 2>/dev/null"
+    "dig @$(dig_target "$addr") www.baidu.com A +subnet=${ECS_SUBNET} +short ${DIG_OPTS} 2>/dev/null"
+    "dig @$(dig_target "$addr") www.baidu.com A +short ${DIG_OPTS} 2>/dev/null"
   )
   par_run
   local ecs_result=$(cat "${PARR_TMPDIR}/0.out")
@@ -652,7 +689,7 @@ run_common_tests() {
   echo "  ━━━ [12] 反向DNS解析(PTR)测试（并行） ━━━"
   PARR_CMDS=()
   for ip in "${TEST_IPS[@]}"; do
-    PARR_CMDS+=("dig @$(dig_target "$addr") -x ${ip} +short +time=3 +tries=1 2>/dev/null")
+    PARR_CMDS+=("dig @$(dig_target "$addr") -x ${ip} +short ${DIG_OPTS} 2>/dev/null")
   done
   par_run
   local ptr_success=0; local ptr_total=${#TEST_IPS[@]}
@@ -674,7 +711,7 @@ run_common_tests() {
   echo "  ━━━ [13] TTL值分析 ━━━"
   PARR_CMDS=()
   for d in "${DOMAINS_TTL[@]}"; do
-    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A +time=3 +tries=1 2>/dev/null")
+    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A ${DIG_OPTS} 2>/dev/null")
   done
   par_run
   local ttl_values=()
@@ -706,8 +743,8 @@ run_common_tests() {
   local hijack_domains=(www.baidu.com www.qq.com www.bilibili.com)
   PARR_CMDS=()
   for d in "${hijack_domains[@]}"; do
-    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A +short +time=3 +tries=1 2>/dev/null")
-    PARR_CMDS+=("dig @$(dig_target "$ref_dns") ${d} A +short +time=3 +tries=1 2>/dev/null")
+    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A +short ${DIG_OPTS} 2>/dev/null")
+    PARR_CMDS+=("dig @$(dig_target "$ref_dns") ${d} A +short ${DIG_OPTS} 2>/dev/null")
   done
   par_run
   local hijack_safe=0; local hijack_total=${#hijack_domains[@]}; local hijack_unknown=0
@@ -740,7 +777,7 @@ run_common_tests() {
   # ===== 15. 递归/迭代查询类型测试 =====
   echo ""
   echo "  ━━━ [15] 递归/迭代查询类型测试 ━━━"
-  local flags=$(dig @$(dig_target "$addr") www.baidu.com A +time=3 +tries=1 2>/dev/null | grep "flags:")
+  local flags=$(dig @$(dig_target "$addr") www.baidu.com A ${DIG_OPTS} 2>/dev/null | grep "flags:")
   if [[ "$flags" == *"ra"* ]]; then
     echo "     ✅ 支持递归查询 (ra标志置位)"; total_all=$((total_all+1)); success_all=$((success_all+1))
   else
@@ -751,6 +788,7 @@ run_common_tests() {
   # ===== 综合评分（lite 仅基础项口径，full 含延迟/对比一致） =====
   echo ""
   echo "  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+  # 综合评分 = 通过率×100（整数除法）；注意 lite/full 项数不同，跨模式分数不可横向比较
   local overall=$((total_all ? success_all * 100 / total_all : 0))
   printf "  ┃ 📊 综合评分: %d%% (%d/%d 项通过)\n" "$overall" "$success_all" "$total_all"
   if [ "$full" -eq 1 ]; then

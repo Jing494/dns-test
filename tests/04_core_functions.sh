@@ -56,6 +56,22 @@ else
   ok "含非法hex的IPv6被拒绝"
 fi
 
+# 4b. IPv6 畸形结构拒绝（双冒号次数/段数/边缘单冒号/段超长）
+if valid_dns_addr ':::1' || valid_dns_addr '1:2:3' || valid_dns_addr '1::2::3' \
+  || valid_dns_addr '1:2:3:4:5:6:7:8:9' || valid_dns_addr '12345::1' \
+  || valid_dns_addr ':1:2:3:4:5:6:7:8' || valid_dns_addr '1:2:3:4:5:6:7:8:'; then
+  notok "IPv6畸形结构被拒绝"
+else
+  ok "IPv6畸形结构被拒绝"
+fi
+
+# 4c. 合法 IPv6 仍通过（全展开/压缩/真实默认DNS）
+if valid_dns_addr '1:2:3:4:5:6:7:8' && valid_dns_addr '240e:52:4800::8888' && valid_dns_addr '::1'; then
+  ok "合法IPv6仍通过"
+else
+  notok "合法IPv6仍通过"
+fi
+
 echo ""
 echo "═══ is_valid_response 单测 ═══"
 

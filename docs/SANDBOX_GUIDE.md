@@ -118,7 +118,7 @@ dns-test/
 ├── verify.sh / smoke_test.sh       # 自检工具（一键验证 / 冒烟测试）
 ├── install.sh / release.sh         # 安装 / 打包发布
 ├── lib/                            # 公共库（core.sh / compat.sh / plugins.sh / DNSUtil.pm）
-├── tests/                          # 单元测试（perl 18 + bash 9 + 4 + 13 + 8 用例）
+├── tests/                          # 单元测试（perl 18 + bash 9 + 4 + 15 + 9 用例）
 ├── docs/                           # 技术文档
 ├── tools/                          # 专项测试（vowifi/ / network/）
 ├── examples/                       # 通用示例脚本（4 个 Perl）

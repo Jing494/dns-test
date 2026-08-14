@@ -117,8 +117,8 @@ dns-test/
 │   ├── 01_dnsutil.t              # DNSUtil 18 用例（perl）
 │   ├── 02_plugins.sh             # 插件系统 9 用例（bash）
 │   ├── 03_dig_target.sh          # dig_target 4 用例（IPv6加方括号）
-│   ├── 04_core_functions.sh      # core 纯函数 13 用例（地址校验/响应判断/CDN）
-│   └── 05_run_common_tests.sh    # lite 计分口径 8 用例（稳定性降轮/CONFIG_DOMAINS安全解析，mock dig/ping 离线）
+│   ├── 04_core_functions.sh      # core 纯函数 15 用例（地址校验/响应判断/CDN）
+│   └── 05_run_common_tests.sh    # lite 计分口径 9 用例（稳定性降轮/CONFIG_DOMAINS安全解析/dig @server回归，mock dig/ping 离线）
 ├── tools/                        # 专项测试工具
 │   ├── manifest.sh               # 插件注册表
 │   ├── vowifi/                   # VoWiFi 专项（ePDG/路由器）
@@ -321,6 +321,7 @@ tools/network/doh_dot_check.sh ─► lib/compat.sh（相对定位 ../../lib/）
 | `DNS_SERVER` / `DNS_LIST` | examples 默认 DNS | 云南电信 |
 | `COMPARE_MAX_CONCURRENCY` | compare 并行数 | 3 |
 | `SAVE_LOG` | 保存日志到 results/ | 关闭 |
+| `DNS_PAUSE` | full/lite 多 DNS 测试间隔秒数（请求间隔，设 0 可关掉提速） | 3 |
 | `PARR_MAX` | par_run 并行并发上限（正整数，调小可降低负载） | 8 |
 | `TRENDS_DIR` / `COMPARE_RESULTS_DIR` | 趋势产物/数据源目录 | `trends/` / `results/` |
 | `PLUGIN_MANIFEST` | 插件注册表路径覆盖 | `tools/manifest.sh` |
@@ -376,8 +377,8 @@ dns-test.sh 选"专项测试"
 | [tests/01_dnsutil.t](file:///workspace/tests/01_dnsutil.t) | DNSUtil 18 用例（dns_sockaddr/inet_pton_ipv6/build_dns_query/parse_dns_response/check_ips/PTR 系列 + 畸形包防崩） | `perl -Ilib tests/01_dnsutil.t` |
 | [tests/02_plugins.sh](file:///workspace/tests/02_plugins.sh) | 插件系统 9 用例（注册表加载/字段拆分/输出格式/无效编号拦截/未知执行器拦截/脚本缺失检测） | `bash tests/02_plugins.sh` |
 | [tests/03_dig_target.sh](file:///workspace/tests/03_dig_target.sh) | dig_target 4 用例（IPv4 原样/IPv6 加方括号/特殊 IPv6/空输入） | `bash tests/03_dig_target.sh` |
-| [tests/04_core_functions.sh](file:///workspace/tests/04_core_functions.sh) | core 纯函数 13 用例（valid_dns_addr 合法/非法+超范围、is_valid_response 错误/纯 OPT、is_cdn_domain） | `bash tests/04_core_functions.sh` |
-| [tests/05_run_common_tests.sh](file:///workspace/tests/05_run_common_tests.sh) | lite 计分口径 8 用例（稳定性降轮 20→10、AAAA 空响应计分、综合评分 45/53、CONFIG_DOMAINS 注入不执行/非法 token 忽略；mock dig/ping 离线） | `bash tests/05_run_common_tests.sh` |
+| [tests/04_core_functions.sh](file:///workspace/tests/04_core_functions.sh) | core 纯函数 15 用例（valid_dns_addr 合法/非法+超范围/IPv6 畸形结构、is_valid_response 错误/纯 OPT、is_cdn_domain） | `bash tests/04_core_functions.sh` |
+| [tests/05_run_common_tests.sh](file:///workspace/tests/05_run_common_tests.sh) | lite 计分口径 9 用例（稳定性降轮 20→10、AAAA 空响应计分、综合评分 45/53、CONFIG_DOMAINS 注入不执行/非法 token 忽略、dig @server 前缀回归；mock dig/ping 离线） | `bash tests/05_run_common_tests.sh` |
 
 `02/03/04/05_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
 
@@ -393,7 +394,7 @@ dns-test.sh 选"专项测试"
 
 1. 语法检查（.sh + .pl）
 2. shellcheck（可选依赖，`--strict` 强制）
-3. 单元测试（18+9+4+13+8 用例）
+3. 单元测试（18+9+4+15+9 用例）
 4. 冒烟测试（25 项）
 5. compare 快测（2 DNS）
 6. trends 聚合（无数据/超时跳过）

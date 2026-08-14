@@ -42,6 +42,9 @@ while [ $i -lt ${#ARGS[@]} ]; do
     --detail) DETAIL=1 ;;
     --limit)  i=$((i+1)); LIMIT="${ARGS[$i]:-}"; [ -z "$LIMIT" ] && { echo "❌ --limit 缺少值"; exit 1; } ;;
     --since)  i=$((i+1)); SINCE="${ARGS[$i]:-}"; [ -z "$SINCE" ] && { echo "❌ --since 缺少值"; exit 1; } ;;
+    --version)
+      echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
+      exit 0 ;;
     --help|-h)
       echo "用法: bash trends.sh [DNS地址...] [--html] [--csv] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD]"
       echo "  例: bash trends.sh --html --csv"

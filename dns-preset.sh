@@ -30,6 +30,11 @@ case "$1" in
     echo "    bash dns-preset.sh all lite            # 全部预设（可能较慢）"
     exit 0
     ;;
+  --version)
+    source "${SCRIPT_DIR}/lib/version.sh"
+    echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
+    exit 0
+    ;;
 esac
 
 PRESET="${1:-yunnan}"

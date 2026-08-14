@@ -25,6 +25,11 @@ case "$1" in
     echo "  安装可选依赖: bash install.sh --all"
     exit 0
     ;;
+  --version)
+    source "$(cd "$(dirname "$0")" && pwd)/lib/version.sh"
+    echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
+    exit 0
+    ;;
   "") ;;
   *)
     echo "⚠️ 未知参数: $1（可用 bash verify.sh --help 查看用法）"
@@ -75,9 +80,9 @@ else
   tick "shellcheck(未装跳过)" 0
 fi
 
-echo "--- 3. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 13 + 计分口径 8）"
+echo "--- 3. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 15 + 计分口径 9）"
 if perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 && bash tests/02_plugins.sh >/dev/null 2>&1 && bash tests/03_dig_target.sh >/dev/null 2>&1 && bash tests/04_core_functions.sh >/dev/null 2>&1 && bash tests/05_run_common_tests.sh >/dev/null 2>&1; then
-  tick "单测(18+9+4+13+8用例)" 0
+  tick "单测(18+9+4+15+9用例)" 0
 else
   tick "单测" 1
 fi

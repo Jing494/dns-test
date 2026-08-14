@@ -28,6 +28,11 @@ case "$MODE" in
     echo "    可选 shellcheck: sudo apt-get install -y shellcheck / brew install shellcheck"
     exit 0
     ;;
+  --version)
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/version.sh"
+    echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
+    exit 0
+    ;;
   "") ;;
   --smoke|--all) ;;
   *)
@@ -37,6 +42,9 @@ case "$MODE" in
 esac
 MODE_ALL=0
 [ "$MODE" = "--all" ] && MODE_ALL=1
+# root/容器无需 sudo；非 root 用 sudo 前缀（避免 root 环境因无 sudo 命令而安装失败）
+SUDO=""
+[ "$(id -u)" -ne 0 ] && SUDO="sudo"
 echo "════ 依赖检测 ════"
 
 # 先检测包管理器，决定 dig / shellcheck 的包名
@@ -101,7 +109,7 @@ else
   case "$PM" in
     apt)
       echo "════ 安装（apt-get） ════"
-      if sudo apt-get update && sudo apt-get install -y "${NEED[@]}" "${NEED_SC[@]}"; then
+      if $SUDO apt-get update && $SUDO apt-get install -y "${NEED[@]}" "${NEED_SC[@]}"; then
         :
       else
         echo "❌ 安装失败（可能需 sudo 权限或网络问题）"
@@ -110,7 +118,7 @@ else
       ;;
     dnf)
       echo "════ 安装（dnf） ════"
-      if sudo dnf install -y "${NEED[@]}" "${NEED_SC[@]}"; then
+      if $SUDO dnf install -y "${NEED[@]}" "${NEED_SC[@]}"; then
         :
       else
         echo "❌ 安装失败"
@@ -119,7 +127,7 @@ else
       ;;
     yum)
       echo "════ 安装（yum） ════"
-      if sudo yum install -y "${NEED[@]}" "${NEED_SC[@]}"; then
+      if $SUDO yum install -y "${NEED[@]}" "${NEED_SC[@]}"; then
         :
       else
         echo "❌ 安装失败"
@@ -138,9 +146,9 @@ else
     apk|pacman|zypper)
       # 无自动分支的包管理器：必需项给出对应命令，可选项单独提示
       case "$PM" in
-        apk)    CMD="apk add ${NEED[*]}" ;;
-        pacman) CMD="sudo pacman -S ${NEED[*]}" ;;
-        zypper) CMD="sudo zypper install -y ${NEED[*]}" ;;
+        apk)    CMD="$SUDO apk add ${NEED[*]}" ;;
+        pacman) CMD="$SUDO pacman -S ${NEED[*]}" ;;
+        zypper) CMD="$SUDO zypper install -y ${NEED[*]}" ;;
       esac
       echo "  ⚠️ $PM 暂未内置自动安装分支，请手动执行:"
       echo "    $CMD"
@@ -189,9 +197,9 @@ else
     if [ "$ANS" = "y" ] || [ "$ANS" = "Y" ]; then
       echo "════ 安装 shellcheck（可选依赖） ════"
       case "$PM" in
-        apt) if sudo apt-get update >/dev/null 2>&1 && sudo apt-get install -y "$PKG_SC" >/dev/null 2>&1; then echo "  ✅ 安装成功"; else echo "  ❌ 安装失败（可能需 sudo 权限或网络问题）"; fi ;;
-        dnf) if sudo dnf install -y "$PKG_SC" >/dev/null 2>&1; then echo "  ✅ 安装成功"; else echo "  ❌ 安装失败"; fi ;;
-        yum) if sudo yum install -y "$PKG_SC" >/dev/null 2>&1; then echo "  ✅ 安装成功"; else echo "  ❌ 安装失败"; fi ;;
+        apt) if $SUDO apt-get update >/dev/null 2>&1 && $SUDO apt-get install -y "$PKG_SC" >/dev/null 2>&1; then echo "  ✅ 安装成功"; else echo "  ❌ 安装失败（可能需 sudo 权限或网络问题）"; fi ;;
+        dnf) if $SUDO dnf install -y "$PKG_SC" >/dev/null 2>&1; then echo "  ✅ 安装成功"; else echo "  ❌ 安装失败"; fi ;;
+        yum) if $SUDO yum install -y "$PKG_SC" >/dev/null 2>&1; then echo "  ✅ 安装成功"; else echo "  ❌ 安装失败"; fi ;;
         brew) if brew install "$PKG_SC" >/dev/null 2>&1; then echo "  ✅ 安装成功"; else echo "  ❌ 安装失败"; fi ;;
         apk|pacman|zypper) echo "  ⚠️ $PM 暂无自动分支，请手动: ${PKG_SC}（Debian 系 sudo apt-get install -y shellcheck / macOS brew install shellcheck）" ;;
       esac
