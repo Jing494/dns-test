@@ -1,7 +1,7 @@
 # 沙箱环境使用指南
 
 > **适用对象**: AI助手 / 开发者  
-> **最后更新**: 2026-08-09  
+> **最后更新**: 2026-08-14  
 > 📍 目录可自由放置（脚本相对定位），本文示例路径 `/workspace/dns-test` 为当前环境默认，路径不同请替换。  
 
 ---
@@ -108,55 +108,22 @@ sub dns_sockaddr {
 
 ## 五、工具集结构（dns-test/）
 
+> 完整目录树（含每文件一句话说明）见 [CODE_WIKI.md](./CODE_WIKI.md#三目录结构)（权威单一来源）。以下为概览：
+
 ```
 dns-test/
-├── README.md                   # 总说明文档
-├── README.en.md                # English overview（精简英文简介）
-├── dns-test.sh                 # 统一入口（交互引导，非交互自动降级防超时）
-├── dns-preset.sh               # DNS预设快捷测试（云南电信/阿里/腾讯）
-├── compare.sh                  # 多DNS对比（并行+延迟中位数+HTML报告+JSON结果）
-├── trends.sh                   # DNS趋势洞察（聚合compare历史：趋势/CSV/SVG折线图/cron采集）
-├── verify.sh                   # 一键全面验证（语法+shellcheck+单测+冒烟+compare+trends+专项，--strict 可强制 shellcheck）
-├── install.sh                  # 一键安装依赖（缺失才装，--all 连可选依赖 shellcheck 一起装）
-├── release.sh                  # 打包发布脚本
-├── smoke_test.sh               # 自动化冒烟测试（25项）
-├── full.sh / lite.sh           # 基础测试入口（完整版/精简版）
-├── lib/                        # 公共库
-│   ├── core.sh                 # 核心库（变量/函数/测试逻辑）
-│   ├── compat.sh               # 平台兼容层（timeout兼容函数，macOS可用）
-│   ├── plugins.sh              # 插件加载器（plugin_list/plugin_run）
-│   └── DNSUtil.pm              # DNS纯函数模块（sockaddr/报文构建/响应解析，可单测）
-├── tests/                      # 单元测试
-│   ├── 01_dnsutil.t            # DNSUtil 18用例（perl -Ilib tests/01_dnsutil.t）
-│   ├── 02_plugins.sh           # 插件系统 9用例（bash tests/02_plugins.sh）
-│   ├── 03_dig_target.sh        # dig_target 4用例（bash tests/03_dig_target.sh）
-│   └── 04_core_functions.sh    # core 纯函数 13用例（bash tests/04_core_functions.sh）
-├── docs/
-│   ├── TEST_METHOD.md          # 测试方法论/评分标准/实测结果
-│   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
-│   ├── CODE_WIKI.md            # 开发者代码 Wiki（架构/模块/函数/CI）
-│   ├── SANDBOX_GUIDE.md        # 本文档
-│   ├── CHANGELOG.md            # 完整变更记录（每轮）
-│   └── FAQ.md                  # 常见问题
-├── examples/
-│   ├── 01_dns_query.pl         # 基础DNS查询（v4/v6）
-│   ├── 02_multi_dns_compare.pl # 多DNS对比
-│   ├── 03_dns64_check.pl       # DNS64检测
-│   └── 04_reverse_dns.pl       # 反向解析（含IPv6）
-├── tools/
-│   ├── manifest.sh             # 插件注册表（专项插件清单）
-│   ├── vowifi/
-│   │   ├── 01_resolve_vowifi.pl    # VoWiFi全域名解析（v4/v6）
-│   │   ├── 02_vowifi_verify.pl     # VoWiFi多DNS交叉验证
-│   │   ├── 03_test_router_dns.pl   # 路由器DNS转发测试（对比省级DNS）
-│   │   └── carrier_epdg.pl         # 运营商ePDG部署检测
-│   └── network/
-│       ├── 01_port_test.pl         # 端口连通性测试（真机可用）
-│       └── doh_dot_check.sh        # DoH/DoT 支持检测
-├── CONTRIBUTING.md             # 贡献指南
-├── .github/workflows/          # CI（ubuntu + macOS 冒烟矩阵）
-├── results/                    # 测试结果存储目录（可选）
-└── LICENSE                     # MIT 开源许可证
+├── dns-test.sh / dns-preset.sh     # 用户入口（交互引导 / 预设快捷测试）
+├── full.sh / lite.sh               # 基础测试（完整版 16 项 / 精简版 10 项）
+├── compare.sh / trends.sh          # 多DNS对比 / 历史趋势洞察
+├── verify.sh / smoke_test.sh       # 自检工具（一键验证 / 冒烟测试）
+├── install.sh / release.sh         # 安装 / 打包发布
+├── lib/                            # 公共库（core.sh / compat.sh / plugins.sh / DNSUtil.pm）
+├── tests/                          # 单元测试（perl 18 + bash 13 + 4 + 13 用例）
+├── docs/                           # 技术文档
+├── tools/                          # 专项测试（vowifi/ / network/）
+├── examples/                       # 通用示例脚本（4 个 Perl）
+├── .github/workflows/              # CI（ubuntu + macOS 双平台矩阵）
+└── results/ / trends/              # 测试结果 / 趋势产物（可选，不入库）
 ```
 
 ---

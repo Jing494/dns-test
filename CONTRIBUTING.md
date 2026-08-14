@@ -61,6 +61,6 @@ dns-test/
 ## 文档同步
 
 改了功能，记得同步：
-- 新脚本 → README 目录结构 + AI_GUIDE 命令映射
+- 新脚本 → [CODE_WIKI.md](./docs/CODE_WIKI.md) 目录结构（权威单一来源，README/SANDBOX 已精简指向此处）+ AI_GUIDE 命令映射
 - 新环境变量 → TEST_METHOD 环境变量表
 - 新测试项 → TEST_METHOD 测试维度表

@@ -1,10 +1,11 @@
 # 🤖 AI 助手操作手册（DNS/网络测试工具集）
 
 > **适用对象**: AI 助手（本工具集最重要的使用方）  
-> **最后更新**: 2026-08-09  
+> **最后更新**: 2026-08-14  
 > **工具位置**: dns-test/
 
-> 📍 **目录可自由放置**：脚本全部相对定位（`BASH_SOURCE`），仓库拉到任意目录都能运行。**执行命令前先确认实际路径**（如 `find / -name "dns-test.sh" 2>/dev/null`），本文示例路径 `/workspace/dns-test` 为当前环境默认，目录不同请先替换或 `cd` 进入仓库再执行。
+> 📍 **目录可自由放置**：脚本全部相对定位（`BASH_SOURCE`），仓库拉到任意目录都能运行。**执行命令前先确认实际路径**（如 `find / -name "dns-test.sh" 2>/dev/null`），本文示例路径 `/workspace/dns-test` 为当前环境默认，目录不同请先替换或 `cd` 进入仓库再执行。  
+> 📁 **找文件/目录**：完整目录结构（含每文件一句话说明）见 [docs/CODE_WIKI.md](./CODE_WIKI.md#三目录结构)（权威单一来源），README/SANDBOX 已精简并指向此处；实际路径仍以 `find` / `ls` 确认。
 
 ---
 
@@ -307,7 +308,7 @@ bash lite.sh 192.0.2.1 0; echo $? # 2=全部不可达（192.0.2.1为TEST-NET保�
 ### 环境差异导致的"假失败"清单
 | 现象 | 真实原因（不是脚本问题） |
 |------|------------------------|
-| Windows 下脚本无法运行 | 需 WSL/Git Bash（脚本依赖 bash 特性与 GNU 工具，不支持原生 cmd/PowerShell）；详见 README FAQ |
+| Windows 下脚本无法运行 | 需 WSL/Git Bash（脚本依赖 bash 特性与 GNU 工具，不支持原生 cmd/PowerShell）；详见 [FAQ.md](./FAQ.md)"支持哪些操作系统" |
 | 端口测试 UDP "发送失败/无响应" | 沙箱 UDP 出站（非 53）受限 → 真机才能测端口 |
 | IPv6 DNS 全部"不可达跳过" | 当前网络无 IPv6 → 预检自动跳过，正常 |
 | baidu.com 预检失败但其他 DNS 正常 | 海外网络 baidu.com 解析慢 → 预检已改双域名（alidns.com 兜底） |

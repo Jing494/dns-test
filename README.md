@@ -14,7 +14,7 @@
 
 > 🏷️ **版本号规则（双轨制）**：`vYYYY.MM.N` 日期式（N=当月发布序号）↔ 语义 `vX.Y`（X=主版本，重大重构才升；Y=次版本，功能更新）。补丁级修复仅递增日期式 N。
 
-> 🔧 **版本历程**：**v1.7.1 = v2026.08.11**（补丁：core 纯函数单测 13 用例 + IPv4 地址范围校验防超范围误判）；v1.7.0 = v2026.08.10（补丁：审阅建议优化——run_full/lite 去重合并 run_common_tests、解析走 +short 输出与评分解耦、清理 perl 残留死代码、版本号单一来源 lib/version.sh）；v1.7.0 = v2026.08.9（中等更新：临时目录统一走 TMPDIR_LIST 防中断泄漏/par_run 并发可调 PARR_MAX/mktemp 加前缀）；v1.6.2 = v2026.08.8（审阅建议优化：IPv6方括号/一致性按实计/trap收敛/compare IPv6）；v1.6.1 = v2026.08.7（插件系统bash单测9用例）；v1.6 = v2026.08.6（专项菜单插件化+CI双平台矩阵）；v1.5.3 = v2026.08.5（可选依赖引导）；v1.5 = v2026.08.2（功能大更新）；初始 v1.0 = v2026.08。
+> 🔧 **最新版本**：**v1.7.1 = v2026.08.11**（补丁：core 纯函数单测 13 用例 + IPv4 地址范围校验防超范围误判）。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
@@ -68,54 +68,23 @@ bash dns-test.sh       # 交互引导测试（或 bash lite.sh 223.5.5.5 0 快�
 ---
 
 ## 📂 目录结构
+
+> 完整目录树（含每文件一句话说明）见 [docs/CODE_WIKI.md](./docs/CODE_WIKI.md#三目录结构)。以下为概览：
+
 ```
 dns-test/
-├── README.md                   # 总说明文档（你当前看的这个）
-├── README.en.md                # English overview（精简英文简介）
-├── dns-test.sh                 # 统一入口脚本（推荐使用）
-├── dns-preset.sh               # DNS预设快捷测试（云南电信/阿里/腾讯一键测）
-├── compare.sh                  # 多DNS对比模式（并行+延迟中位数+HTML报告+JSON结果）
-├── trends.sh                   # DNS趋势洞察（聚合compare历史JSON：趋势总览/CSV/HTML折线图/定时采集）
-├── verify.sh                   # 一键全面验证（语法+shellcheck+单测+冒烟+compare+trends+专项；--strict 强制 shellcheck）
-├── smoke_test.sh               # 自动化冒烟测试（一键验证核心功能）
-├── install.sh                  # 一键安装（依赖检查+快捷方式）
-├── release.sh                  # 打包发布脚本（生成 tar.gz + 上传指引）
-├── full.sh/lite.sh             # DNS基础测试入口
-├── lib/                        # 公共库
-│   ├── core.sh                 # 核心库（变量/函数/测试逻辑）
-│   ├── compat.sh               # 平台兼容层（timeout兼容函数，macOS可用）
-│   ├── plugins.sh              # 插件加载器（plugin_list/plugin_run，专项菜单动态驱动）
-│   └── DNSUtil.pm              # DNS纯函数模块（sockaddr/报文构建/响应解析，可单测）
-├── tests/                      # 单元测试
-│   ├── 01_dnsutil.t            # DNSUtil 18用例（perl -Ilib tests/01_dnsutil.t）
-│   └── 02_plugins.sh           # 插件系统 9用例（bash tests/02_plugins.sh）
-├── docs/                       # 详细技术文档
-│   ├── AI_GUIDE.md             # AI助手操作手册（先问DNS/版本/专项，交互工具双模式）
-│   ├── TEST_METHOD.md          # DNS测试方法论/评分标准
-│   ├── CODE_WIKI.md            # 开发者代码 Wiki（架构/模块/函数/CI）
-│   ├── SANDBOX_GUIDE.md        # 沙箱环境使用指南
-│   ├── CHANGELOG.md            # 完整变更记录（每轮）
-│   └── FAQ.md                  # 常见问题
-├── examples/                   # 通用示例脚本
-│   ├── README.md               # 示例说明
-│   ├── 01_dns_query.pl         # 基础DNS查询
-│   ├── 02_multi_dns_compare.pl # 多DNS对比测试
-│   ├── 03_dns64_check.pl       # DNS64支持检测
-│   └── 04_reverse_dns.pl       # 反向DNS解析
-├── tools/                      # 专项测试工具
-│   ├── manifest.sh             # 插件注册表（专项插件清单，新增专项=加一行）
-│   ├── vowifi/                 # VoWiFi专项测试
-│   │   ├── 01_resolve_vowifi.pl    # VoWiFi全域名解析
-│   │   ├── 02_vowifi_verify.pl     # VoWiFi多DNS交叉验证
-│   │   ├── 03_test_router_dns.pl   # 路由器DNS转发测试
-│   │   └── carrier_epdg.pl         # 运营商ePDG部署检测（电信/移动/联通/广电）
-│   └── network/                # 通用网络测试
-│       ├── 01_port_test.pl         # 端口连通性测试
-│       └── doh_dot_check.sh        # DoH/DoT 支持检测
-├── .github/workflows/          # CI（ubuntu + macOS 双平台冒烟矩阵）
-├── CONTRIBUTING.md             # 贡献指南
-├── results/                    # 测试结果存储目录（可选，不入库）
-└── LICENSE                     # MIT 开源许可证
+├── dns-test.sh / dns-preset.sh     # 用户入口（交互引导 / 预设快捷测试）
+├── full.sh / lite.sh               # 基础测试（完整版 16 项 / 精简版 10 项）
+├── compare.sh / trends.sh          # 多DNS对比 / 历史趋势洞察
+├── verify.sh / smoke_test.sh       # 自检工具（一键验证 / 冒烟测试）
+├── install.sh / release.sh         # 安装 / 打包发布
+├── lib/                            # 公共库（core.sh / compat.sh / plugins.sh / DNSUtil.pm）
+├── tests/                          # 单元测试（perl 18 + bash 13 + 4 + 13 用例）
+├── docs/                           # 技术文档（AI_GUIDE / TEST_METHOD / CODE_WIKI / FAQ / CHANGELOG / SANDBOX_GUIDE）
+├── tools/                          # 专项测试（vowifi/ / network/）
+├── examples/                       # 通用示例脚本（4 个 Perl）
+├── .github/workflows/              # CI（ubuntu + macOS 双平台矩阵）
+└── results/ / trends/              # 测试结果 / 趋势产物（可选，不入库）
 ```
 
 ---
@@ -286,12 +255,7 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 ## 📋 已知限制（诚实说明）
 
-- **DoH 检测**：无 curl 环境降级为端口级探测（非真实 DoH 验证）；有 curl 才实测
-- **DoT 检测**：需要 bind 9.18+ 的 dig（`+tls` 支持），旧版 dig 无法实测
-- **Windows**：不支持原生运行，推荐 **WSL**（一条命令开装：`wsl --install` → 装依赖 → 跑 smoke，完整步骤见 [FAQ](./docs/FAQ.md)"Windows 用户"）；Git Bash 仅部分功能可用
-- **IPv6 相关**（[7b] 连通性 / v6 DNS 测试）：依赖本机 IPv6 网络，无 IPv6 时自动跳过（环境标注会说明）
-- **运营商 ePDG 检测**：公共 DNS 查不到运营商内部记录属正常（需用省级 DNS）；仅反映解析/部署，实际可用性需自测
-- **网络波动**：加速器/代理环境会导致延迟偏高、国际域名解析不稳——测试结果以真实网络为准
+已知限制（DoH/DoT 检测降级、Windows、IPv6、运营商 ePDG、网络波动等）见 **[docs/FAQ.md](./docs/FAQ.md#已知限制诚实说明)**。
 
 ---
 

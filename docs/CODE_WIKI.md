@@ -94,6 +94,8 @@
 
 ## 三、目录结构
 
+> 📍 **权威单一来源**：README / SANDBOX 的目录结构已精简并指向本节；**新增/移动脚本或文件时只需更新本节**，README/SANDBOX 无需改动（避免三份拷贝漂移）。
+
 ```
 dns-test/
 ├── README.md / README.en.md      # 中/英文说明
