@@ -145,7 +145,7 @@ dns-test/
 | [dns-test.sh](file:///workspace/dns-test.sh) | 统一交互入口，引导选 DNS 组/测试类型/专项 | 交互双模式（有/无终端）；非交互自动降级 lite+单 DNS |
 | [dns-preset.sh](file:///workspace/dns-preset.sh) | 预设快捷测试（yunnan/ali/tencent/all） | 支持 `PRESET_DNS_CSV` 自定义；索引参数避免超时 |
 | [full.sh](file:///workspace/full.sh) | 完整版基础测试（16 项，77~78 评分点） | `SAVE_LOG=1` 存日志；`trap` 清理临时目录 |
-| [lite.sh](file:///workspace/lite.sh) | 精简版基础测试（10 项，63~64 评分点） | 同上，输出更短 |
+| [lite.sh](file:///workspace/lite.sh) | 精简版基础测试（10 项，53~54 评分点） | 同上，输出更短 |
 | [compare.sh](file:///workspace/compare.sh) | 多 DNS 横向对比 | 延迟中位数 + 批量并发 + JSON/HTML 报告 |
 | [trends.sh](file:///workspace/trends.sh) | 聚合 compare 历史 JSON 出趋势 | 线性回归 + SVG 折线图 + CSV + `--cron` 定时采集 |
 | [verify.sh](file:///workspace/verify.sh) | 一键全面自检 | 7 步：语法/shellcheck/单测/冒烟/compare/trends/专项 |

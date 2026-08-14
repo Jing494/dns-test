@@ -108,10 +108,10 @@ timeout 20 perl examples/02_multi_dns_compare.pl 223.5.5.5 119.29.29.29 2>&1 | g
 echo "--- 19. trends 趋势聚合"
 TMPR=$(mktemp -d)
 cat > "$TMPR/compare-20260810-090000.json" <<'EOF'
-{"tool":"x","version":"v2026.08","timestamp":"2026-08-10 09:00:00 +0800","mode":"lite(63项)","cost_s":1,"dns":[{"addr":"223.5.5.5","score":"96","stab":"100","delay_ms":60,"reachable":true}]}
+{"tool":"x","version":"v2026.08","timestamp":"2026-08-10 09:00:00 +0800","mode":"lite(53项)","cost_s":1,"dns":[{"addr":"223.5.5.5","score":"96","stab":"100","delay_ms":60,"reachable":true}]}
 EOF
 cat > "$TMPR/compare-20260811-090000.json" <<'EOF'
-{"tool":"x","version":"v2026.08","timestamp":"2026-08-11 09:00:00 +0800","mode":"lite(63项)","cost_s":1,"dns":[{"addr":"223.5.5.5","score":"98","stab":"100","delay_ms":50,"reachable":true}]}
+{"tool":"x","version":"v2026.08","timestamp":"2026-08-11 09:00:00 +0800","mode":"lite(53项)","cost_s":1,"dns":[{"addr":"223.5.5.5","score":"98","stab":"100","delay_ms":50,"reachable":true}]}
 EOF
 COMPARE_RESULTS_DIR="$TMPR" TRENDS_DIR="$TMPR/out" timeout 10 bash trends.sh 223.5.5.5 2>&1 | grep -q "趋势" && check "trends聚合" 0 || check "trends聚合" 1
 

@@ -147,7 +147,7 @@ if [ -t 0 ]; then
             fi
             plugin_run "$professional_test" "${DNS_LIST[@]}"
           elif [ "$professional_test" = "$CMP_N" ]; then
-            echo "开始多DNS对比（compare.sh，lite精简版63项/DNS，并行）..."
+            echo "开始多DNS对比（compare.sh，lite精简版53项/DNS，并行）..."
             if [ ${#DNS_LIST[@]} -ge 2 ]; then
               echo "  使用当前DNS列表: ${DNS_LIST[*]}"
               bash compare.sh "${DNS_LIST[@]}"
