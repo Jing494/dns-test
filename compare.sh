@@ -19,7 +19,7 @@ source lib/core.sh
 # 异常退出时统一清理：全部临时目录走 TMPDIR_LIST（含 par_run 自动注册的 PARR_TMPDIR），trap 延迟求值
 trap 'rm -rf "${TMPDIR_LIST[@]}"' EXIT INT TERM
 
-VERSION="v2026.08.9"
+VERSION="${PROJECT_VERSION}"
 GEN_HTML=0
 SAVE_JSON=1
 MODE="lite"    # lite(默认) / full
