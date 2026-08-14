@@ -18,6 +18,10 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-14（第八十三轮）：**审阅收尾两项小修（在 v1.7.1 = v2026.08.11 基础上，不升版本）**
+  - ① **trap 空参数报错**：`full.sh`/`lite.sh`/`compare.sh` 异常清理 trap 改为"非空才 rm"——`PARR_TMPDIR=""` 且 `TMPDIR_LIST=()` 时（如非法地址提前 `exit 1`），macOS 的 rm 会对空串参数打印 `rm: cannot remove ''`，已用 `[ -n ... ] && rm -rf` 条件判断消除
+  - ② **doh_dot_check IPv4 范围校验**：`tools/network/doh_dot_check.sh` 原正则 `[0-9]{1,3}` 不校验 0-255，会接受 `999.999.999.999`；已改为与 `core.sh valid_dns_addr` 同规格的每段 0-255 校验（拒绝超范围地址）
+  - ③ 回归：语法 + 单测(18+9+4+15+9) 全绿，shellcheck 0 告警，实测非法地址被拒/合法地址正常
 - 2026-08-14（第八十二轮）：**审阅收尾两项小改（在 v1.7.1 = v2026.08.11 基础上，不升版本）**
   - ① **缩进统一**：`tools/network/doh_dot_check.sh` DoT 块缩进 2→4 格，与 DoH 块对齐（纯颜值，shellcheck 本就通过）
   - ② **dig @ 目标统一抽变量**：`lib/core.sh` `run_common_tests` 函数级新增 `local t=$(dig_target "$addr")` 只算一次，替换全部 21 处 `dig @$(dig_target "$addr")` 为 `"@$t"`（含 PARR_CMDS 数组字面量、稳定性/NXDOMAIN/连通性/IPv6/flags 等直接调用），A 记录循环内重复的 `local t=` 一并删除；结果对比基准 `ref_dns` 单独抽 `local ref_t`；消除 SC2046 隐患点、减少重复计算

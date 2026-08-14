@@ -33,7 +33,8 @@ esac
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/lib/core.sh"
 # 异常退出时统一清理：并行临时目录 + 各测试函数注册的临时目录（TMPDIR_LIST 由 core.sh 维护）
-trap 'rm -rf "$PARR_TMPDIR" "${TMPDIR_LIST[@]}"' EXIT INT TERM
+# ${VAR:+...} 空值时展开为空串参数仍会让 macOS 的 rm 报错，改用条件判断（审阅#1）
+trap '[ -n "${PARR_TMPDIR:-}" ] && rm -rf "$PARR_TMPDIR"; [ "${#TMPDIR_LIST[@]}" -gt 0 ] && rm -rf "${TMPDIR_LIST[@]}"' EXIT INT TERM
 
 # 自动保存日志（SAVE_LOG=1 时写入 results/，Linux tee到终端+文件 / macOS写文件）
 if [ -n "$SAVE_LOG" ]; then
