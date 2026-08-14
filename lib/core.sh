@@ -20,6 +20,9 @@ command -v perl >/dev/null 2>&1 || { echo "❌ 未找到 perl 命令，请先安
 # 平台兼容层（timeout 兼容函数等，macOS 无 timeout 命令）
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
 
+# 版本号单一来源（PROJECT_VERSION 日期式 / PROJECT_RELEASE 语义式）
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/version.sh"
+
 # 默认DNS组（云南电信，可用环境变量 DEFAULT_DNS_CSV 覆盖，逗号分隔地址；名称可用 DEFAULT_DNS_NAME_CSV 覆盖）
 if [ -n "$DEFAULT_DNS_CSV" ]; then
   IFS=',' read -ra DEFAULT_DNS_ADDR <<< "$DEFAULT_DNS_CSV"
@@ -271,12 +274,18 @@ print_header() {
   echo "测试时间: $(date '+%Y-%m-%d %H:%M:%S')"
 }
 
-# 执行单个DNS的测试（完整版逻辑，供full.sh调用）
-run_full_test() {
+# 执行单个DNS的测试（full/lite 共用逻辑，mode 控制差异点，消除 run_full_test/run_lite_test 重复代码）
+# mode=full: 完整版（A记录延迟计算、CNAME/SOA记录、稳定性min/max/avg指标、DNSSEC/ECS/PTR/TTL/结果对比/递归）
+# mode=lite: 精简版（仅基础项：A/AAAA/3GPP/MX·NS·TXT/稳定性/异常/连通性/IPv6/一致性/运营商）
+# 供 full.sh/lite.sh 调用；run_full_test/run_lite_test 为薄包装（见文末）
+run_common_tests() {
   local addr="$1"
   local name="$2"
-  
-  # 可达性预检：不可达直接跳过，避免90+次查询白等
+  local mode="${3:-full}"
+  local full=0
+  [ "$mode" = "full" ] && full=1
+
+  # 可达性预检：不可达直接跳过，避免大量查询白等
   if ! dns_health_check "$addr"; then
     echo ""
     echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
@@ -291,7 +300,7 @@ run_full_test() {
   echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
   local total_all=0; local success_all=0
 
-  # ===== 1. A记录批量测试（并行8并发，单次dig取IP+延迟） =====
+  # ===== 1. A记录批量测试（并行8并发；full计算平均延迟，lite不计算） =====
   echo ""
   echo "  ━━━ [1] A记录批量测试 (${#DOMAINS_MAIN[@]} 国内 + ${#DOMAINS_GLOBAL[@]} 国际) ━━━"
   local a_success=0; local a_total=0; local a_time_sum=0
@@ -308,14 +317,22 @@ run_full_test() {
   a_total=${#a_domains[@]}
   for ((i=0; i<a_i; i++)); do
     local out=$(cat "${a_tmpdir}/${i}.out")
-    local result=$(echo "$out" | sed -n '/ANSWER SECTION/,/^$/p' | grep -v "ANSWER SECTION" | awk '{print $NF}')
-    local qtime=$(echo "$out" | sed -n 's/.*Query time: \([0-9]*\).*/\1/p' | head -1)
-    a_time_sum=$((a_time_sum + ${qtime:-0}))
+    # 解析：只取 ANSWER SECTION 的 A 记录 IP（输出与评分解耦——评分只看是否有效响应）
+    local result=$(echo "$out" | sed -n '/ANSWER SECTION/,/^$/p' | awk '$3=="IN" && $4=="A"{print $NF}' | head -1)
     is_valid_response "$result" && a_success=$((a_success + 1))
+    # 延迟仅 full 计算（需完整输出中的 Query time，+short 会抑制计时，故此处不用 +short）
+    if [ "$full" -eq 1 ]; then
+      local qtime=$(echo "$out" | sed -n 's/.*Query time: \([0-9]*\).*/\1/p' | head -1)
+      a_time_sum=$((a_time_sum + ${qtime:-0}))
+    fi
   done
   local a_rate=$((a_total ? a_success * 100 / a_total : 0))
-  local a_avg=$((a_total ? a_time_sum / a_total : 0))
-  printf "  📊 A记录: %d/%d (%d%%) | 平均延迟: %dms\n" "$a_success" "$a_total" "$a_rate" "$a_avg"
+  if [ "$full" -eq 1 ]; then
+    local a_avg=$((a_total ? a_time_sum / a_total : 0))
+    printf "  📊 A记录: %d/%d (%d%%) | 平均延迟: %dms\n" "$a_success" "$a_total" "$a_rate" "$a_avg"
+  else
+    printf "  📊 A记录: %d/%d (%d%%)\n" "$a_success" "$a_total" "$a_rate"
+  fi
   total_all=$((total_all + a_total)); success_all=$((success_all + a_success))
 
   # ===== 2. AAAA记录测试 =====
@@ -360,17 +377,21 @@ run_full_test() {
   done
   echo "     📝 注: VoWiFi为信息项，不影响综合评分"
 
-  # ===== 4. 其他记录类型测试（并行） =====
+  # ===== 4. 其他记录类型测试（并行；lite仅MX/NS/TXT，full加CNAME/SOA） =====
   echo ""
   echo "  ━━━ [4] 其他记录类型测试（并行） ━━━"
   PARR_CMDS=()
   PARR_CMDS+=("dig @$(dig_target "$addr") qq.com MX +short +time=3 +tries=1 2>/dev/null")
   PARR_CMDS+=("dig @$(dig_target "$addr") baidu.com NS +short +time=3 +tries=1 2>/dev/null")
   PARR_CMDS+=("dig @$(dig_target "$addr") google.com TXT +short +time=3 +tries=1 2>/dev/null")
-  for d in "${DOMAINS_CNAME[@]}"; do
-    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} CNAME +short +time=3 +tries=1 2>/dev/null")
-  done
-  PARR_CMDS+=("dig @$(dig_target "$addr") baidu.com SOA +short +time=3 +tries=1 2>/dev/null")
+  local cname_total=0
+  if [ "$full" -eq 1 ]; then
+    for d in "${DOMAINS_CNAME[@]}"; do
+      PARR_CMDS+=("dig @$(dig_target "$addr") ${d} CNAME +short +time=3 +tries=1 2>/dev/null")
+    done
+    PARR_CMDS+=("dig @$(dig_target "$addr") baidu.com SOA +short +time=3 +tries=1 2>/dev/null")
+    cname_total=${#DOMAINS_CNAME[@]}
+  fi
   par_run
   # 索引: 0=MX 1=NS 2=TXT 3..(3+CN-1)=CNAME (3+CN)=SOA
   local mx_result=$(cat "${PARR_TMPDIR}/0.out")
@@ -396,26 +417,28 @@ run_full_test() {
     echo "     ❌ TXT (google.com): 失败"; total_all=$((total_all+1));
   fi
 
-  local cname_found=0; local cname_total=${#DOMAINS_CNAME[@]}
-  for ((i=0; i<cname_total; i++)); do
-    local cname_result=$(cat "${PARR_TMPDIR}/$((i+3)).out")
-    is_valid_response "$cname_result" && cname_found=$((cname_found + 1))
-  done
-  if [ $cname_found -gt 0 ]; then
-    printf "     ✅ CNAME: %d/%d 个域名存在\n" "$cname_found" "$cname_total"
-    total_all=$((total_all+1)); success_all=$((success_all+1))
-  else
-    echo "     ❌ CNAME: 未找到"; total_all=$((total_all+1));
+  if [ "$full" -eq 1 ]; then
+    local cname_found=0
+    for ((i=0; i<cname_total; i++)); do
+      local cname_result=$(cat "${PARR_TMPDIR}/$((i+3)).out")
+      is_valid_response "$cname_result" && cname_found=$((cname_found + 1))
+    done
+    if [ $cname_found -gt 0 ]; then
+      printf "     ✅ CNAME: %d/%d 个域名存在\n" "$cname_found" "$cname_total"
+      total_all=$((total_all+1)); success_all=$((success_all+1))
+    else
+      echo "     ❌ CNAME: 未找到"; total_all=$((total_all+1));
+    fi
+
+    local soa_result=$(cat "${PARR_TMPDIR}/$((cname_total+3)).out")
+    if is_valid_response "$soa_result"; then
+      echo "     ✅ SOA (baidu.com): ✓"; total_all=$((total_all+1)); success_all=$((success_all+1))
+    else
+      echo "     ❌ SOA (baidu.com): 失败"; total_all=$((total_all+1));
+    fi
   fi
 
-  local soa_result=$(cat "${PARR_TMPDIR}/$((cname_total+3)).out")
-  if is_valid_response "$soa_result"; then
-    echo "     ✅ SOA (baidu.com): ✓"; total_all=$((total_all+1)); success_all=$((success_all+1))
-  else
-    echo "     ❌ SOA (baidu.com): 失败"; total_all=$((total_all+1));
-  fi
-
-  # ===== 5. 稳定性压力测试 =====
+  # ===== 5. 稳定性压力测试（min/max/avg 与原始数据仅 full 输出，lite 只看成功率） =====
   echo ""
   echo "  ━━━ [5] 稳定性压力测试 (${STAB_ROUNDS} 次连续查询) ━━━"
   local stab_success=0; local stab_total=$STAB_ROUNDS; local stab_times=()
@@ -428,19 +451,19 @@ run_full_test() {
     [ $((i % 5)) -eq 0 ] && printf "."
   done
   echo ""
-  if [ ${#stab_times[@]} -gt 0 ]; then
+  local stab_rate=$((stab_total ? stab_success * 100 / stab_total : 0))
+  printf "  📊 稳定性: %d/%d (%d%%)\n" "$stab_success" "$stab_total" "$stab_rate"
+  local avg_t=0
+  if [ "$full" -eq 1 ] && [ ${#stab_times[@]} -gt 0 ]; then
     local min_t=${stab_times[0]}; local max_t=${stab_times[0]}; local sum=0
     for t in "${stab_times[@]}"; do
       [ "$t" -lt "$min_t" ] && min_t=$t; [ "$t" -gt "$max_t" ] && max_t=$t; sum=$((sum + t))
     done
-    local avg_t=$((sum / ${#stab_times[@]}))
-    local stab_rate=$((stab_total ? stab_success * 100 / stab_total : 0))
-    printf "  📊 稳定性: %d/%d (%d%%)\n" "$stab_success" "$stab_total" "$stab_rate"
+    avg_t=$((sum / ${#stab_times[@]}))
     printf "  ⏱️  延迟: 最小%dms | 最大%dms | 平均%dms\n" "$min_t" "$max_t" "$avg_t"
     echo "  📈 数据: ${stab_times[*]}"
-  else
+  elif [ "$full" -eq 1 ]; then
     echo "  ❌ 稳定性测试: 全部失败"
-    local avg_t=0; local stab_rate=0
   fi
   total_all=$((total_all + stab_total)); success_all=$((success_all + stab_success))
 
@@ -535,6 +558,9 @@ run_full_test() {
   printf "  📊 运营商域名: %d/%d (%d%%)\n" "$carrier_success" "$carrier_total" "$carrier_rate"
   total_all=$((total_all + carrier_total)); success_all=$((success_all + carrier_success))
 
+  # ===== 10~15. 高级项（DNSSEC/ECS/PTR/TTL/结果对比/递归）仅 full 模式执行 =====
+  # （lite 模式到 [9] 即进入综合评分，缩短耗时；此 if 块内的代码保持原缩进）
+  if [ "$full" -eq 1 ]; then
   # ===== 10. DNSSEC安全扩展测试（并行） =====
   echo ""
   echo "  ━━━ [10] DNSSEC安全扩展测试（并行） ━━━"
@@ -679,243 +705,33 @@ run_full_test() {
   else
     echo "     ⚠️ 不支持递归查询"; total_all=$((total_all+1));
   fi
+  fi  # 结束高级项（仅 full 模式）
 
-  # ===== 综合评分 =====
+  # ===== 综合评分（lite 仅基础项口径，full 含延迟/对比一致） =====
   echo ""
   echo "  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
   local overall=$((total_all ? success_all * 100 / total_all : 0))
   printf "  ┃ 📊 综合评分: %d%% (%d/%d 项通过)\n" "$overall" "$success_all" "$total_all"
-  printf "  ┃ ⏱️  平均延迟: %dms | 稳定性: %d%%\n" "$avg_t" "$stab_rate"
-  printf "  ┃ 🔑 关键指标: A记录%d%% 稳定性%d%% 对比一致%d/%d\n" "$a_rate" "$stab_rate" "$hijack_safe" "$hijack_judged"
+  if [ "$full" -eq 1 ]; then
+    printf "  ┃ ⏱️  平均延迟: %dms | 稳定性: %d%%\n" "$avg_t" "$stab_rate"
+    printf "  ┃ 🔑 关键指标: A记录%d%% 稳定性%d%% 对比一致%d/%d\n" "$a_rate" "$stab_rate" "$hijack_safe" "$hijack_judged"
+  else
+    printf "  ┃ ⏱️  稳定性: %d%%\n" "$stab_rate"
+    printf "  ┃ 🔑 关键指标: A记录%d%% 稳定性%d%%\n" "$a_rate" "$stab_rate"
+  fi
   echo "  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
 }
 
-# 执行精简版测试（供lite.sh调用）
+# ============================================================================
+# 薄包装：run_full_test / run_lite_test 复用 run_common_tests（mode 控制差异点）
+# 消除原 run_full_test（约300行）与 run_lite_test（约230行）的重复代码
+# ============================================================================
+# 完整版测试（供 full.sh 调用；含延迟计算、CNAME/SOA、稳定性min/max/avg、高级项）
+run_full_test() {
+  run_common_tests "$1" "$2" "full"
+}
+
+# 精简版测试（供 lite.sh 调用；仅基础项，缩短耗时）
 run_lite_test() {
-  local addr="$1"
-  local name="$2"
-  
-  # 可达性预检：不可达直接跳过，避免59+次查询白等
-  if ! dns_health_check "$addr"; then
-    echo ""
-    echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
-    printf "┃  📡 %s [%s]\n" "$name" "$addr"
-    printf "┃  ⚠️  DNS不可达（预检失败），已跳过该DNS\n"
-    echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
-    return 1
-  fi
-  echo ""
-  echo "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
-  printf "┃  📡 %s [%s]\n" "$name" "$addr"
-  echo "┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
-  local total_all=0; local success_all=0
-
-  # 1. A记录（并行8并发，单次dig）
-  echo ""
-  echo "  ━━━ [1] A记录批量测试 ━━━"
-  local a_success=0; local a_total=0
-  local a_tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/dns-test.XXXXXX")
-  TMPDIR_LIST+=("$a_tmpdir")
-  local a_i=0
-  local a_domains=("${DOMAINS_MAIN[@]}" "${DOMAINS_GLOBAL[@]}")
-  for d in "${a_domains[@]}"; do
-    (dig @$(dig_target "$addr") ${d} A +time=3 +tries=1 2>/dev/null > "${a_tmpdir}/${a_i}.out") &
-    a_i=$((a_i + 1))
-    [ $((a_i % 8)) -eq 0 ] && wait
-  done
-  wait
-  a_total=${#a_domains[@]}
-  for ((i=0; i<a_i; i++)); do
-    local out=$(cat "${a_tmpdir}/${i}.out")
-    local result=$(echo "$out" | sed -n '/ANSWER SECTION/,/^$/p' | grep -v "ANSWER SECTION" | awk '{print $NF}')
-    is_valid_response "$result" && a_success=$((a_success + 1))
-  done
-  local a_rate=$((a_total ? a_success * 100 / a_total : 0))
-  printf "  📊 A记录: %d/%d (%d%%)\n" "$a_success" "$a_total" "$a_rate"
-  total_all=$((total_all + a_total)); success_all=$((success_all + a_success))
-
-  # 2. AAAA记录
-  echo ""
-  echo "  ━━━ [2] AAAA记录批量测试（并行） ━━━"
-  local aaaa_success=0; local aaaa_total=0
-  local aaaa_domains=("${DOMAINS_MAIN[@]:0:8}")
-  PARR_CMDS=()
-  for d in "${aaaa_domains[@]}"; do
-    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} AAAA +short +time=3 +tries=1 2>/dev/null")
-  done
-  par_run
-  aaaa_total=${#aaaa_domains[@]}
-  for ((i=0; i<PARR_COUNT; i++)); do
-    local result=$(cat "${PARR_TMPDIR}/${i}.out")
-    is_valid_response "$result" && aaaa_success=$((aaaa_success + 1))
-  done
-  local aaaa_rate=$((aaaa_total ? aaaa_success * 100 / aaaa_total : 0))
-  printf "  📊 AAAA记录: %d/%d (%d%%)\n" "$aaaa_success" "$aaaa_total" "$aaaa_rate"
-  total_all=$((total_all + aaaa_total)); success_all=$((success_all + aaaa_success))
-
-  # 3. 3GPP/VoWiFi（参考信息项，不计入综合评分）
-  echo ""
-  echo "  ━━━ [3] 3GPP/VoWiFi域名测试（信息项） ━━━"
-  PARR_CMDS=()
-  for d in "${DOMAINS_3GPP[@]}"; do
-    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A +short +time=3 +tries=1 2>/dev/null")
-  done
-  par_run
-  for ((i=0; i<${#DOMAINS_3GPP[@]}; i++)); do
-    local result=$(cat "${PARR_TMPDIR}/${i}.out")
-    local d="${DOMAINS_3GPP[$i]}"
-    if [ -n "$result" ]; then
-      if ! echo "$result" | grep -vq "127\.0\.0\.1"; then
-        printf "     ⚠️  %s → 127.0.0.1（运营商未部署ePDG，正常）\n" "$d"
-      else
-        printf "     ✅ %s → %s\n" "$d" "$(echo "$result" | tr '\n' ' ')"
-      fi
-    else
-      printf "     ⚠️  %s → 无记录（公共DNS查不到，正常）\n" "$d"
-    fi
-  done
-  echo "     📝 注: VoWiFi为信息项，不影响综合评分"
-
-  # 4. 其他记录类型（并行）
-  echo ""
-  echo "  ━━━ [4] 其他记录类型测试（并行） ━━━"
-  PARR_CMDS=(
-    "dig @$(dig_target "$addr") qq.com MX +short +time=3 +tries=1 2>/dev/null"
-    "dig @$(dig_target "$addr") baidu.com NS +short +time=3 +tries=1 2>/dev/null"
-    "dig @$(dig_target "$addr") google.com TXT +short +time=3 +tries=1 2>/dev/null"
-  )
-  par_run
-  local mx_result=$(cat "${PARR_TMPDIR}/0.out")
-  if is_valid_response "$mx_result"; then
-    echo "     ✅ MX (qq.com): 通过"; total_all=$((total_all+1)); success_all=$((success_all+1))
-  else
-    echo "     ❌ MX (qq.com): 失败"; total_all=$((total_all+1));
-  fi
-  local ns_result=$(cat "${PARR_TMPDIR}/1.out")
-  if is_valid_response "$ns_result"; then
-    echo "     ✅ NS (baidu.com): 通过"; total_all=$((total_all+1)); success_all=$((success_all+1))
-  else
-    echo "     ❌ NS (baidu.com): 失败"; total_all=$((total_all+1));
-  fi
-  local txt_result=$(cat "${PARR_TMPDIR}/2.out")
-  if is_valid_response "$txt_result"; then
-    echo "     ✅ TXT (google.com): 通过"; total_all=$((total_all+1)); success_all=$((success_all+1))
-  else
-    echo "     ❌ TXT (google.com): 失败"; total_all=$((total_all+1));
-  fi
-
-  # 5. 稳定性
-  echo ""
-  echo "  ━━━ [5] 稳定性压力测试 ━━━"
-  local stab_success=0; local stab_total=$STAB_ROUNDS
-  echo -n "     进度: "
-  for i in $(seq 1 $STAB_ROUNDS); do
-    local qtime=$(dig @$(dig_target "$addr") www.baidu.com A +time=3 +tries=1 2>/dev/null | sed -n 's/.*Query time: \([0-9]*\).*/\1/p' | head -1)
-    [ -n "$qtime" ] && stab_success=$((stab_success + 1))
-    [ $((i % 5)) -eq 0 ] && printf "."
-  done
-  echo ""
-  local stab_rate=$((stab_total ? stab_success * 100 / stab_total : 0))
-  printf "  📊 稳定性: %d/%d (%d%%)\n" "$stab_success" "$stab_total" "$stab_rate"
-  total_all=$((total_all + stab_total)); success_all=$((success_all + stab_success))
-
-  # 6. 异常测试
-  echo ""
-  echo "  ━━━ [6] 异常/边界测试 ━━━"
-  local nx_result=$(dig @$(dig_target "$addr") this-domain-does-not-exist-12345.com A +time=3 +tries=1 2>/dev/null | sed -n 's/.*status: \([A-Za-z]*\).*/\1/p' | head -1)
-  if [ "$nx_result" = "NXDOMAIN" ]; then
-    echo "     ✅ NXDOMAIN 正确返回"; total_all=$((total_all+1)); success_all=$((success_all+1))
-  else
-    printf "     ⚠️ 不存在域名: %s\n" "$nx_result"; total_all=$((total_all+1));
-  fi
-
-  # 7. 连通性
-  echo ""
-  echo "  ━━━ [7] 实际连通性测试 ━━━"
-  local test_ip=$(dig @$(dig_target "$addr") www.baidu.com A +short +time=3 +tries=1 2>/dev/null | tail -1)
-  if [ -n "$test_ip" ] && [[ "$test_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    local ping_avg=$(ping ${PING_OPTS} ${test_ip} 2>&1 | sed -n 's/.*min\/avg.*= \([0-9.]*\)\/\([0-9.]*\)\/.*/\2/p' | head -1)
-    if [ -n "$ping_avg" ]; then
-      printf "     ✅ Ping %s: 平均 %sms\n" "$test_ip" "$ping_avg"
-      total_all=$((total_all+1)); success_all=$((success_all+1))
-    else
-      printf "     ⚠️ Ping %s: 不通\n" "$test_ip"; total_all=$((total_all+1));
-    fi
-  else
-    echo "     ⚠️ 无法获取有效IP"; total_all=$((total_all+1));
-  fi
-
-  # 7b. IPv6实际连通性测试（ping6，无IPv6环境自动跳过不计分）
-  echo ""
-  echo "  ━━━ [7b] IPv6实际连通性测试（ping6） ━━━"
-  local v6_ip=$(dig @$(dig_target "$addr") www.baidu.com AAAA +short +time=3 +tries=1 2>/dev/null | grep -E ":" | head -1)
-  if [ -z "$v6_ip" ]; then
-    echo "     ⚠️  DNS无法解析IPv6地址（该DNS可能无IPv6记录）"
-  else
-    # ping6 命令平台适配（Linux: ping6，macOS: ping -6）
-    local ping6_cmd="ping6"
-    command -v ping6 >/dev/null 2>&1 || ping6_cmd="ping -6"
-    if [ "$(uname)" = "Darwin" ]; then
-      ping6_cmd="${ping6_cmd} -c 2 -W 2000"
-    else
-      ping6_cmd="${ping6_cmd} -c 2 -W 2"
-    fi
-    local v6_rtt=$(${ping6_cmd} ${v6_ip} 2>&1 | sed -n 's/.*min\/avg.*= \([0-9.]*\)\/\([0-9.]*\)\/.*/\2/p' | head -1)
-    if [ -n "$v6_rtt" ]; then
-      printf "     ✅ IPv6 %s: 平均 %sms\n" "$v6_ip" "$v6_rtt"
-      total_all=$((total_all+1)); success_all=$((success_all+1))
-    else
-      echo "     ⚠️  IPv6 ${v6_ip}: 不通或本机无IPv6网络（环境限制，不计分）"
-    fi
-  fi
-
-  # 8. 一致性（并行）
-  echo ""
-  echo "  ━━━ [8] IPv4/IPv6解析一致性 ━━━"
-  local consistent=0; local check_total=0
-  local check_domains=(www.baidu.com www.qq.com www.bilibili.com)
-  PARR_CMDS=()
-  for d in "${check_domains[@]}"; do
-    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A +short +time=3 +tries=1 2>/dev/null")
-  done
-  par_run
-  check_total=${#check_domains[@]}
-  for ((i=0; i<check_total; i++)); do
-    local has_a=$(cat "${PARR_TMPDIR}/${i}.out" | grep -v OPT | head -1)
-    [ -n "$has_a" ] && consistent=$((consistent + 1))
-  done
-  printf "     📊 A记录覆盖率: %d/%d\n" "$consistent" "$check_total"
-  total_all=$((total_all+1)); [ $consistent -gt 0 ] && success_all=$((success_all + 1))
-
-  # 9. 运营商域名
-  echo ""
-  echo "  ━━━ [9] 运营商域名解析测试（并行） ━━━"
-  local carrier_success=0; local carrier_total=0
-  PARR_CMDS=()
-  for d in "${DOMAINS_CARRIER[@]}"; do
-    PARR_CMDS+=("dig @$(dig_target "$addr") ${d} A +short +time=3 +tries=1 2>/dev/null")
-  done
-  par_run
-  carrier_total=${#DOMAINS_CARRIER[@]}
-  for ((i=0; i<PARR_COUNT; i++)); do
-    local result=$(cat "${PARR_TMPDIR}/${i}.out")
-    if is_valid_response "$result"; then
-      carrier_success=$((carrier_success + 1))
-      printf "     ✅ %s → %s\n" "${DOMAINS_CARRIER[$i]}" "$(echo "$result" | tail -1)"
-    else
-      printf "     ❌ %s → 失败\n" "${DOMAINS_CARRIER[$i]}"
-    fi
-  done
-  local carrier_rate=$((carrier_total ? carrier_success * 100 / carrier_total : 0))
-  printf "  📊 运营商域名: %d/%d (%d%%)\n" "$carrier_success" "$carrier_total" "$carrier_rate"
-  total_all=$((total_all + carrier_total)); success_all=$((success_all + carrier_success))
-
-  # 综合评分
-  echo ""
-  echo "  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
-  local overall=$((total_all ? success_all * 100 / total_all : 0))
-  printf "  ┃ 📊 综合评分: %d%% (%d/%d 项通过)\n" "$overall" "$success_all" "$total_all"
-  printf "  ┃ ⏱️  稳定性: %d%%\n" "$stab_rate"
-  printf "  ┃ 🔑 关键指标: A记录%d%% 稳定性%d%%\n" "$a_rate" "$stab_rate"
-  echo "  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+  run_common_tests "$1" "$2" "lite"
 }

@@ -40,15 +40,6 @@ if (@ARGV) {
 # 测试域名（只有IPv4的域名）
 my @DOMAINS = ("v4.ipv6test.app", "www.baidu.com", "www.qq.com");
 
-# IPv6地址转换 
-
-# 自动识别IPv4/IPv6地址，返回 (sockaddr, family, error)
-
-
-# 构建DNS查询
-
-# 解析DNS响应
-
 # 检查是否是DNS64合成地址
 sub is_dns64_synthesized {
     my ($ipv6) = @_;

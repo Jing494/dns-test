@@ -78,7 +78,7 @@ for _a in "${DNS_ADDR[@]}"; do
 done
 
 # 打印头部
-print_header "DNS 地毯式综合测试 (完整版 v2026.08.9)"
+print_header "DNS 地毯式综合测试 (完整版 ${PROJECT_VERSION})"
 START_TIME=$(date +%s)
 print_env_info
 echo "待测DNS数量: ${#DNS_ADDR[@]} 个"

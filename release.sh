@@ -1,13 +1,15 @@
 #!/bin/bash
 # ============================================================================
 # 打包发布脚本（防止手动打包遗漏新文件）
-# 用法: bash release.sh [版本号]    默认 v2026.08.9
+# 用法: bash release.sh [版本号]    默认取 lib/version.sh 的 PROJECT_VERSION
 # 自动: 排除 .git / results内容 / 其他tar.gz，保留 results 空目录
 # 提示: 上传 Release 的命令会打印出来（需 GitHub 令牌）
 # ============================================================================
-VERSION="${1:-v2026.08.9}"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
 cd "$SCRIPT_DIR" || exit 1
+# 版本号单一来源
+source "$SCRIPT_DIR/lib/version.sh"
+VERSION="${1:-$PROJECT_VERSION}"
 
 OUT="dns-test-${VERSION}.tar.gz"
 rm -f "$OUT"

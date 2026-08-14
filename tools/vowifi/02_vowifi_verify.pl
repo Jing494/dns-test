@@ -109,9 +109,3 @@ print "=" x 80 . "\n";
 print "测试完成\n";
 print "=" x 80 . "\n";
 
- 
-
-# 自动识别IPv4/IPv6地址，返回 (sockaddr, family, error)
-
-
-
