@@ -1,7 +1,7 @@
 # DNS/网络测试工具集 — Code Wiki
 
 > 本文档是项目的结构化代码 Wiki，涵盖整体架构、模块职责、关键类与函数、依赖关系及运行方式。
-> 对应仓库：`dns-test`（MIT，当前版本 `v1.7.0 / v2026.08.9`）
+> 对应仓库：`dns-test`（MIT，当前版本 `v1.7.0 / v2026.08.10`）
 > 适用对象：开发者 / 二次维护者 / AI 助手
 
 > 🤖 **给 AI 的指引**：本工具集最重要的使用方是 AI 助手。需要**理解或修改本仓库代码**时，请先读本文档（代码结构与实现），再配合 [docs/AI_GUIDE.md](docs/AI_GUIDE.md)（操作流程）使用——两者分工互补：**AI_GUIDE 教你"怎么操作测试"**（初始化/流程/排障），**本文档教你"代码长什么样、想改哪里看哪里"**（架构/模块/函数/依赖）。修改代码后务必运行 `bash smoke_test.sh` + `bash verify.sh` 做回归验证，并同步更新 [docs/CHANGELOG.md](docs/CHANGELOG.md) 记录变更轮次。
@@ -43,7 +43,7 @@
 
 - `vYYYY.MM.N`：日期式，N=当月发布序号（补丁级修复仅递增 N）
 - `vX.Y`：语义版本（X=主版本，重大重构才升；Y=次版本，功能更新）
-- 当前：`v1.7.0 = v2026.08.9`
+- 当前：`v1.7.0 = v2026.08.10`
 
 ---
 
@@ -85,7 +85,7 @@
 
 ### 2.3 数据流
 
-- **基础测试**：入口脚本 → `core.sh` 的 `run_lite_test`/`run_full_test` → 并行 `dig` → 解析 → 汇总评分
+- **基础测试**：入口脚本 → `core.sh` 的 `run_common_tests`（mode=full/lite 控制差异） → 并行 `dig` → 解析 → 汇总评分
 - **对比测试**：`compare.sh` → 延迟探测 + 批量调用 `lite.sh`/`full.sh` → 文本表格 + JSON + HTML
 - **趋势洞察**：`trends.sh` → 扫描 `results/compare-*.json` → 线性回归 → CSV + SVG 折线图
 - **专项测试**：`dns-test.sh` → `plugins.sh` → `manifest.sh` → 执行 `tools/` 下 perl/bash 脚本
@@ -152,7 +152,7 @@ dns-test/
 
 | 文件 | 职责 |
 |------|------|
-| [lib/core.sh](file:///workspace/lib/core.sh) | 公共变量（DNS 组/域名列表/超时参数）+ 辅助函数 + `run_full_test`/`run_lite_test` 测试逻辑 + `par_run` 并行引擎 + 综合评分 |
+| [lib/core.sh](file:///workspace/lib/core.sh) | 公共变量（DNS 组/域名列表/超时参数）+ 辅助函数 + `run_common_tests` 统一测试逻辑（mode 区分 full/lite）+ `par_run` 并行引擎 + 综合评分 |
 | [lib/compat.sh](file:///workspace/lib/compat.sh) | 平台兼容层：macOS 无 `timeout` 命令时提供后台运行+到期 kill 的兼容实现 |
 | [lib/plugins.sh](file:///workspace/lib/plugins.sh) | 插件加载器：`plugin_list` 打印菜单、`plugin_run` 按编号执行，参数策略三态 |
 | [lib/DNSUtil.pm](file:///workspace/lib/DNSUtil.pm) | DNS 纯函数库：sockaddr 构建/IPv6 转换/报文构建与解析/PTR/反向名，无网络 IO 可单测 |
@@ -241,8 +241,9 @@ use DNSUtil;
 | `is_valid_response` | 判断 dig 响应是否有效（过滤通信错误/无服务器/OPT 杂项） |
 | `is_cdn_domain` | 判断域名是否为 CDN（结果对比时排除负载均衡差异） |
 | `print_header` / `print_separator` | 输出格式化头部/分隔线 |
-| `run_full_test` | 完整版测试逻辑（16 项：A/AAAA/3GPP/记录类型/稳定性/异常/连通性/IPv6/一致性/运营商/DNSSEC/ECS/PTR/TTL/结果对比/递归） |
-| `run_lite_test` | 精简版测试逻辑（10 项，输出更短） |
+| `run_common_tests` | 统一测试逻辑，`mode` 参数（full/lite）控制差异点：A 记录延迟计算（仅 full）、记录类型数量（lite 仅 MX/NS/TXT，full 加 CNAME/SOA）、稳定性指标（full 输出 min/max/avg，lite 仅成功率）、综合评分高级项（DNSSEC/ECS/PTR/TTL/结果对比/递归） |
+| `run_full_test` | 薄包装：`run_common_tests <addr> <name> full`（完整版 16 项） |
+| `run_lite_test` | 薄包装：`run_common_tests <addr> <name> lite`（精简版 10 项，输出更短） |
 
 ### 5.3 lib/plugins.sh（插件加载器）
 
