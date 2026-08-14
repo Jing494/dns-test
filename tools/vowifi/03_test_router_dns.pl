@@ -143,7 +143,3 @@ sub query_a {
     return $result;
 }
 
-# 自动识别IPv4/IPv6地址，返回 (sockaddr, family, error)
-
-
-

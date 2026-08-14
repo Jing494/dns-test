@@ -21,15 +21,6 @@ if (@ARGV && $ARGV[0] =~ /^(-h|--help)$/) {
 my $DNS_SERVER = $ARGV[0] || $ENV{DNS_SERVER} || "222.172.200.68";  # 默认云南电信DNS，支持传参/环境变量DNS_SERVER（v4/v6均可）
 my @DOMAINS = ("www.baidu.com", "www.qq.com", "www.taobao.com");
 
-# IPv6地址转换函数 
-
-# 自动识别IPv4/IPv6地址，返回 (sockaddr, family, error)
-
-
-# 构建DNS查询包
-
-# 解析DNS响应
-
 # 主程序
 print "=" x 60 . "\n";
 print "示例1: 基础DNS查询\n";

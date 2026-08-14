@@ -41,15 +41,6 @@ if (@ARGV) {
 # 要测试的域名
 my @DOMAINS = ("www.baidu.com", "www.qq.com", "epdg.epc.mnc011.mcc460.pub.3gppnetwork.org");
 
-# IPv6地址转换 
-
-# 自动识别IPv4/IPv6地址，返回 (sockaddr, family, error)
-
-
-# 构建DNS查询
-
-# 解析DNS响应
-
 # 主程序
 print "=" x 70 . "\n";
 print "示例2: 多DNS服务器对比测试\n";

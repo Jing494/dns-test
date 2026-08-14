@@ -30,19 +30,6 @@ my @IPS = (
 # 配置: DNS服务器
 my $DNS_SERVER = $ARGV[0] || $ENV{DNS_SERVER} || "222.172.200.68";  # 默认云南电信DNS，支持传参/环境变量DNS_SERVER（v4/v6均可）
 
-# IPv6地址转换 
-
-# 自动识别IPv4/IPv6地址，返回 (sockaddr, family, error)
-
-
-# 构建PTR查询
-
-# 简化版PTR响应解析（仅提取第一个域名）
-
-# 构造反向解析域名（v4→in-addr.arpa，v6→ip6.arpa）
-
-# 展开IPv6为32个hex字符
-
 # 主程序
 print "=" x 70 . "\n";
 print "示例4: 反向DNS解析 (PTR记录)\n";
