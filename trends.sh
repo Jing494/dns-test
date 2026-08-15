@@ -286,6 +286,25 @@ trend_stats() {
 }
 
 # ============================================================================
+# SVG 图表公共框架（模板化）：card+svg 开头 / Y轴 / 收尾
+# svg_chart（单DNS）与 svg_multi_chart（多DNS同图）共用；轴/极值标签统一此处，点线绘制各自保留
+# 参数: chart_begin "标题" "meta副标题(可空)" w h pad_l pad_t plot_w plot_h ymin ymax
+# ============================================================================
+chart_begin() {
+  local title="$1" meta="$2" w="$3" h="$4" pad_l="$5" pad_t="$6" plot_w="$7" plot_h="$8" ymin="$9" ymax="${10}"
+  echo "<div class='card'><h2>$title</h2>"
+  [ -n "$meta" ] && echo "<div class='meta'>$meta</div>"
+  echo "<div class='sc'><svg viewBox='0 0 $w $h' style='min-width:${w}px;max-width:100%'>"
+  echo "<line class='ax' x1='$pad_l' y1='$pad_t' x2='$pad_l' y2='$((pad_t + plot_h))'/>"
+  echo "<line class='ax' x1='$pad_l' y1='$((pad_t + plot_h))' x2='$((pad_l + plot_w))' y2='$((pad_t + plot_h))'/>"
+  echo "<text x='4' y='$((pad_t + 4))' font-size='10' class='ax-t'>$ymax</text>"
+  echo "<text x='4' y='$((pad_t + plot_h + 4))' font-size='10' class='ax-t'>$ymin</text>"
+}
+chart_end() {
+  echo "</svg></div>"
+}
+
+# ============================================================================
 # SVG 折线图（纯bash生成，无JS依赖）
 # 用法: svg_chart "addr" "数据行" "score|delay" "趋势文字" "单位" "最新值" "均值"
 # ============================================================================
@@ -322,17 +341,12 @@ svg_chart() {
     fi
     i=$((i+1))
   done <<< "$data"
-  echo "<div class='card'><h2><span class='mono'>$addr</span> — $title</h2>"
-  echo "<div class='meta'>最新: $last_disp$unit ｜ 均值: $mean_disp$unit ｜ 趋势: $trend</div>"
-  echo "<div class='sc'><svg viewBox='0 0 $w $h' style='min-width:${w}px;max-width:100%'>"
-  echo "<line class='ax' x1='$pad_l' y1='$pad_t' x2='$pad_l' y2='$((pad_t + plot_h))'/>"
-  echo "<line class='ax' x1='$pad_l' y1='$((pad_t + plot_h))' x2='$((pad_l + plot_w))' y2='$((pad_t + plot_h))'/>"
-  echo "<text x='6' y='$((pad_t + 4))' font-size='10' class='ax-t'>$maxv</text>"
-  echo "<text x='6' y='$((pad_t + plot_h + 4))' font-size='10' class='ax-t'>$minv</text>"
+  chart_begin "<span class='mono'>$addr</span> — $title" "最新: $last_disp$unit ｜ 均值: $mean_disp$unit ｜ 趋势: $trend" \
+    "$w" "$h" "$pad_l" "$pad_t" "$plot_w" "$plot_h" "$minv" "$maxv"
   echo "<polyline points='$pts' fill='none' stroke='$color' stroke-width='2' stroke-linejoin='round'/>"
   echo "$dots"
   echo "$labels"
-  echo "</svg></div></div>"
+  echo "</div></div>"
 }
 
 # ============================================================================
@@ -365,12 +379,8 @@ svg_multi_chart() {
   [ -z "$gmin" ] && return 0
   [ "$gmin" = "$gmax" ] && gmax=$((gmin + 1))
   local legend="" ci=0
-  echo "<div class='card'><h2>📊 $title（${#RAW_ADDR[@]}个DNS × ${n_rounds}轮）</h2>"
-  echo "<div class='sc'><svg viewBox='0 0 $w $h' style='min-width:${w}px;max-width:100%'>"
-  echo "<line class='ax' x1='$pad_l' y1='$pad_t' x2='$pad_l' y2='$((pad_t + plot_h))'/>"
-  echo "<line class='ax' x1='$pad_l' y1='$((pad_t + plot_h))' x2='$((pad_l + plot_w))' y2='$((pad_t + plot_h))'/>"
-  echo "<text x='4' y='$((pad_t + 4))' font-size='10' class='ax-t'>$gmax</text>"
-  echo "<text x='4' y='$((pad_t + plot_h + 4))' font-size='10' class='ax-t'>$gmin</text>"
+  chart_begin "📊 $title（${#RAW_ADDR[@]}个DNS × ${n_rounds}轮）" "" \
+    "$w" "$h" "$pad_l" "$pad_t" "$plot_w" "$plot_h" "$gmin" "$gmax"
   # X 轴标签：首/尾 + 中点（轮次≥3才画中点，2轮时中=尾会重叠）
   local mid_r=$((n_rounds / 2))
   local xlabels="0 $((n_rounds - 1))"
@@ -403,16 +413,18 @@ svg_multi_chart() {
     legend="$legend<span class='lg-i'><span class='lg-c' style='background:$color'></span>${_lg}</span>"
     ci=$((ci+1))
   done
-  echo "</svg></div>"
+  chart_end
   echo "<div class='legend'>$legend</div>"
   echo "<div class='meta'>X轴=采集轮次（按时间等距）；某轮不可达的DNS该点缺省，折线跨缺口直连</div>"
   echo "</div>"
 }
 
 # ============================================================================
-# 主循环：每个DNS统计 + 输出（文本表/明细/时段分析/CSV/HTML行与图表）
+# 主循环：每个DNS统计 + 输出（文本表/明细/时段分析/日级分析/CSV/HTML行与图表）
 # ============================================================================
 HOUR_ANALYSIS=""   # 时段分析文本行（凑齐才输出小节）
+DAILY_ANALYSIS=""  # 日级分析文本行（数据跨≥2天才输出小节）
+HTML_INSIGHTS=""   # HTML 洞察卡内容（时段+日级，等宽对齐）
 for k in "${!RAW_ADDR[@]}"; do
   addr="${RAW_ADDR[$k]}"
   lines="${RAW_VAL[$k]}"
@@ -462,6 +474,30 @@ for k in "${!RAW_ADDR[@]}"; do
     fi
   fi
 
+  # 日级分析：按天聚合评分/延迟均值（跨天采集才有意义；该DNS数据跨≥2天才计入）
+  if [ "$n_ok" -ge 2 ]; then
+    day_stat=$(printf '%s\n' "$lines" | grep -v UNREACH | grep -v '^$' | awk -F'|' '{
+      n=split($1, dt, " "); d=substr(dt[1], 6)   # 取 MM-DD
+      sc[d]+=$2; dl[d]+=$4; cnt[d]++
+    } END {
+      for (d in cnt) printf "%s %.1f %.1f %d\n", d, sc[d]/cnt[d], dl[d]/cnt[d], cnt[d]
+    }' | sort)
+    n_days=$(printf '%s\n' "$day_stat" | grep -c .)
+    if [ "$n_days" -ge 2 ]; then
+      DAILY_ANALYSIS="${DAILY_ANALYSIS}  ${addr_show}
+"
+      while read -r dline; do
+        [ -z "$dline" ] && continue
+        dd=$(echo "$dline" | awk '{print $1}')
+        dsc=$(echo "$dline" | awk '{print $2}')
+        ddl=$(echo "$dline" | awk '{print $3}')
+        dcn=$(echo "$dline" | awk '{print $4}')
+        DAILY_ANALYSIS="${DAILY_ANALYSIS}    ${dd}  均分${dsc}  均延${ddl}ms（${dcn}样本）
+"
+      done <<< "$day_stat"
+    fi
+  fi
+
   # CSV
   if [ "$GEN_CSV" = "1" ] && [ "$n_ok" -ge 1 ]; then
     printf '%s\n' "$lines" | grep -v UNREACH | grep -v '^$' | while IFS='|' read -r ts sc st dl; do
@@ -498,11 +534,30 @@ for k in "${!RAW_ADDR[@]}"; do
   fi
 done
 
-# ---------- 时段分析小节（文本；有满足条件的DNS才输出） ----------
+# ---------- 时段/日级分析小节（文本；有满足条件的DNS才输出） ----------
 if [ -n "$HOUR_ANALYSIS" ]; then
   echo ""
   echo "  ━━━ 时段分析（按小时聚合，每小时≥3样本才统计） ━━━"
   printf '%s' "$HOUR_ANALYSIS"
+fi
+if [ -n "$DAILY_ANALYSIS" ]; then
+  echo ""
+  echo "  ━━━ 日级分析（按天聚合，数据跨≥2天才显示） ━━━"
+  printf '%s' "$DAILY_ANALYSIS"
+fi
+
+# HTML 洞察卡内容（时段+日级一并给 HTML；等宽 pre 风格，数据均为数字/地址无需转义）
+if [ "$GEN_HTML" = "1" ]; then
+  if [ -n "$HOUR_ANALYSIS" ]; then
+    HTML_INSIGHTS="⏰ 时段分析（每小时≥3样本）
+${HOUR_ANALYSIS}
+"
+  fi
+  if [ -n "$DAILY_ANALYSIS" ]; then
+    HTML_INSIGHTS="${HTML_INSIGHTS}📅 日级分析（跨≥2天）
+${DAILY_ANALYSIS}
+"
+  fi
 fi
 
 if [ "$GEN_CSV" = "1" ]; then
@@ -539,6 +594,7 @@ if [ "$GEN_HTML" = "1" ]; then
     echo "tbody tr:nth-child(even){background:rgba(127,127,127,.04)}"
     echo ".sc{overflow-x:auto}"
     echo ".ax{stroke:var(--line)}.ax-t{fill:var(--sub)}"
+    echo ".insight{white-space:pre-wrap;font-family:var(--mono);font-size:12px;line-height:1.8;color:var(--tx);overflow-x:auto}"
     echo ".legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:12px;font-family:var(--mono)}"
     echo ".lg-i{display:inline-flex;align-items:center;gap:5px;color:var(--tx)}"
     echo ".lg-c{display:inline-block;width:14px;height:4px;border-radius:2px}"
@@ -551,6 +607,10 @@ if [ "$GEN_HTML" = "1" ]; then
     echo "<div class='tbl-wrap'><table><thead><tr><th>DNS</th><th>样本</th><th>评分均值</th><th>评分趋势</th><th>延迟均值</th><th>延迟趋势</th><th>P95延迟</th></tr></thead><tbody>"
     echo "$HTML_ROWS"
     echo "</tbody></table></div></div>"
+    # 洞察卡（时段+日级分析；有内容才输出）
+    if [ -n "$HTML_INSIGHTS" ]; then
+      echo "<div class='card'><h2>🔍 洞察</h2><div class='insight'>${HTML_INSIGHTS}</div></div>"
+    fi
     # 多DNS同图对比总图（≥2个DNS且≥2轮才出；放在单DNS明细图之前，先总后分）
     echo "$(svg_multi_chart score)"
     echo "$(svg_multi_chart delay)"

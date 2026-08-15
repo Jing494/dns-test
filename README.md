@@ -3,8 +3,8 @@
 > 🌐 **English**：[README.en.md](./README.en.md) ｜ **中文**：本文档
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Release: v1.10](https://img.shields.io/badge/Release-v1.10-blue.svg)
-![Version: v2026.08.17](https://img.shields.io/badge/Version-v2026.08.17-blue.svg)
+![Release: v1.11](https://img.shields.io/badge/Release-v1.11-blue.svg)
+![Version: v2026.08.18](https://img.shields.io/badge/Version-v2026.08.18-blue.svg)
 ![Platform: Linux/macOS/WSL](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20WSL-green.svg)
 ![Bash 3.2+](https://img.shields.io/badge/Bash-3.2%2B-blue.svg)
 ![Perl 5.10+](https://img.shields.io/badge/Perl-5.10%2B-blue.svg)
@@ -14,7 +14,7 @@
 
 > 🏷️ **版本号规则（双轨制）**：`vYYYY.MM.N` 日期式（N=当月发布序号）↔ 语义 `vX.Y`（X=主版本，重大重构才升；Y=次版本，功能更新）。补丁级修复仅递增日期式 N。
 
-> 🔧 **最新版本**：**v1.10 = v2026.08.17**（趋势报告大升级：trends 提供商标签/延迟 P95 分位/多DNS同图对比总图/时段分析/`--open`；compare 新增 `--rounds M` 限定采集轮数、`--keep K` JSON 自动清理、`--json` 管道输出，并修复 `--watch+--open` 子轮丢 HTML 报告等问题）。v1.9 带来 compare `--watch` 定时采集、切换命令建议、`--md` 导出、环比 Δ、预设组对比、当前 DNS 👤 标记。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
+> 🔧 **最新版本**：**v1.11 = v2026.08.18**（compare `--watch` 断点续采（中断后重跑同命令自动续轮数）+ 采集模式 HTML 报告自动刷新；trends 日级聚合分析（按天看走势）+ HTML 洞察卡 + SVG 图表框架模板化）。v1.10 带来趋势报告大升级（提供商标签/P95/多DNS同图/时段分析/`--open`）与 `--rounds`/`--keep`/`--json`。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；**默认 DNS 列表为公开可测试的运营商公网 DNS**，示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
@@ -101,7 +101,7 @@ cd dns-test
 
 # 方式2: Releases 下载（免 git，直接拿成品包）
 #   前往 https://github.com/Jing494/dns-test/releases
-#   下载 dns-test-v2026.08.17.tar.gz 后解压即可
+#   下载 dns-test-v2026.08.18.tar.gz 后解压即可
 
 # 方式3: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
 ```
@@ -186,11 +186,13 @@ bash compare.sh 223.5.5.5 119.29.29.29 --json               # JSON 同时输出�
 bash compare.sh 223.5.5.5 119.29.29.29 --watch 30           # 每30分钟采集一轮(Ctrl-C停止,趋势数据源)
 bash compare.sh 223.5.5.5 --watch 30 --rounds 12            # 采集12轮后自动停止（有边界基准）
 bash compare.sh 223.5.5.5 --watch 30 --keep 200             # JSON只保留最近200份（自动清老）
+#   --watch 断点续采: Ctrl-C 中断后重跑同命令自动续轮数（换参数/DNS则从头开始）
+#   采集模式HTML报告带自动刷新（挂屏监控到点自动更新）
 #   环境变量: COMPARE_MAX_CONCURRENCY=3  lite并行数（设1串行最稳）
 #   输出: results/compare-<时间戳>.json 结构化结果（历史趋势积累用）
 
 # DNS趋势洞察（基于compare历史JSON聚合，需先积累至少2次compare数据）
-bash trends.sh                              # 全部DNS趋势总览（文本，含P95延迟+时段分析）
+bash trends.sh                              # 全部DNS趋势总览（文本，含P95延迟+时段/日级分析）
 bash trends.sh --html --csv                 # 生成 trends/report.html（多DNS同图总图+SVG折线图）+ trends.csv
 bash trends.sh --html --open                # 生成HTML并自动在浏览器打开（隐含--html）
 bash trends.sh --detail --limit 5           # 每个DNS列最近5条明细
@@ -276,10 +278,10 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 按优先级排序：
 
-- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截）+ `tests/03_dig_target.sh` 4 用例（IPv6 加方括号）+ `tests/04_core_functions.sh` 18 用例（地址校验/响应判断/CDN 判定/入口参数解析）+ `tests/05_run_common_tests.sh` 12 用例（lite 计分口径/稳定性降轮/CONFIG_DOMAINS 安全解析/dig @server 前缀回归/full 模式 @server 遮蔽回归/ECS_SUBNET 注入拦截/par_run 元字符禁令）+ `tests/06_compare_e2e.sh` 46 用例（compare 端到端离线回归：--watch 参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/--rounds/--keep 校验与清理/--json stdout/--watch+--open 子轮HTML回归/trends --prune/标签/P95/同图总图/时段分析/计数修复，mock dig/ping + 用户 results 目录备份恢复），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh` / `bash tests/03_dig_target.sh` / `bash tests/04_core_functions.sh` / `bash tests/05_run_common_tests.sh` / `bash tests/06_compare_e2e.sh`
+- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截）+ `tests/03_dig_target.sh` 4 用例（IPv6 加方括号）+ `tests/04_core_functions.sh` 18 用例（地址校验/响应判断/CDN 判定/入口参数解析）+ `tests/05_run_common_tests.sh` 12 用例（lite 计分口径/稳定性降轮/CONFIG_DOMAINS 安全解析/dig @server 前缀回归/full 模式 @server 遮蔽回归/ECS_SUBNET 注入拦截/par_run 元字符禁令）+ `tests/06_compare_e2e.sh` 59 用例（compare 端到端离线回归：--watch 参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/--rounds/--keep 校验与清理/--json stdout/--watch+--open 子轮HTML回归/断点续采（同签名续采+签名不匹配重开+跑满清除）/采集模式HTML自动刷新/trends --prune/标签/P95/同图总图/时段分析/日级分析/模板化图回归/计数修复，mock dig/ping + 用户 results 目录备份恢复），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh` / `bash tests/03_dig_target.sh` / `bash tests/04_core_functions.sh` / `bash tests/05_run_common_tests.sh` / `bash tests/06_compare_e2e.sh`
   - bats 评估结论（2026-08-13）：**不引入**——现有 perl 单测 + smoke/verify 集成已够，bash 纯函数用零依赖轻量断言（tests/02_plugins.sh）补充，避免增加依赖
 - **par_run 通用化（✅ 已完成）**：PARR_MAX 环境变量可调并发数（默认 8），临时目录自动注册 TMPDIR_LIST 统一清理
-- **trends svg_chart 模板化**：HTML/SVG 内联字符串改 heredoc/独立模板文件（当前功能正常，纯可读性优化）
+- **trends svg_chart 模板化（✅ 已完成）**：SVG 图表公共框架 `chart_begin`/`chart_end` 下沉（card/Y轴/极值标签统一），svg_chart 与 svg_multi_chart 复用同一框架，点线绘制各自保留
 - **JSON 序列化增强**：compare 结果结构复杂化时引入 jq（当前 JSON 自产自销且格式固定，echo 拼接足够，避免增加依赖）
 
 ---

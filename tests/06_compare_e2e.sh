@@ -200,6 +200,36 @@ grep -q "P95延迟" trends/report.html && ok "HTML 表含P95列" || notok "HTML 
 bash trends.sh --since 2026/08/01 2>&1 | grep -q "YYYY-MM-DD" && ok "--since 非法格式报错" || notok "--since 未校验格式"
 bash trends.sh --open 2>&1 | grep -q "已在浏览器打开\|手动打开" && ok "--open 输出打开/降级提示" || notok "--open 无提示"
 
+echo "═══ trends.sh: 日级分析 + 模板化图回归（chart_begin/chart_end 公共框架） ═══"
+# 夹具跨 08-11/12/13 三天 → 日级分析应出；单图/总图经模板化后仍完整
+TD=$(bash trends.sh 2>&1)
+echo "$TD" | grep -q "日级分析（按天聚合，数据跨≥2天才显示）" && ok "文本日级分析小节" || notok "文本缺日级分析"
+echo "$TD" | grep -q "08-12  均分" && ok "日级行(08-12均分)" || notok "日级行缺失"
+echo "$TD" | grep -q "08-13  均分" && ok "日级行(08-13均分)" || notok "日级行缺失(末日)"
+NP=$(grep -c "<polyline" trends/report.html)
+[ "$NP" = "8" ] && ok "模板化后折线数=8(2总图×2DNS+4单图)" || notok "折线数=${NP}(应8)"
+grep -q "综合评分趋势" trends/report.html && ok "单DNS图标题正常(模板化回归)" || notok "单DNS图标题丢失"
+grep -q "class='insight'" trends/report.html && ok "HTML 洞察卡存在" || notok "HTML 缺洞察卡"
+grep -q "日级分析（跨≥2天）" trends/report.html && ok "HTML 洞察卡含日级" || notok "HTML 洞察卡缺日级"
+
+echo "═══ compare.sh e2e: --watch 断点续采 + 采集模式 HTML 自动刷新 ═══"
+mkdir -p results
+# 造同签名状态（watch=1|rounds=3|dns=223.5.5.5，已完成2轮）→ 应从第3轮继续，跑满后状态清除
+printf 'watch=1|rounds=3|dns=223.5.5.5\n2\n' > results/.compare-watch-state
+RS=$(bash compare.sh 223.5.5.5 --watch 1 --rounds 3 --html 2>&1)
+echo "$RS" | grep -q "断点续采: 上次同参数采集已完成 2 轮，从第 3 轮继续" && ok "断点续采提示" || notok "断点续采提示缺失"
+echo "$RS" | grep -q "第 3 轮采集" && ok "续采从第3轮开始" || notok "续采轮号错误"
+[ ! -f results/.compare-watch-state ] && ok "跑满--rounds后状态清除" || notok "状态未清除"
+grep -q "http-equiv='refresh' content='60'" results/report.html && ok "采集模式HTML自动刷新(watch 1→60s)" || notok "HTML缺自动刷新"
+# 签名不匹配（DNS不同）→ 从第1轮重新开始
+printf 'watch=1|rounds=3|dns=119.29.29.29\n2\n' > results/.compare-watch-state
+RS2=$(bash compare.sh 223.5.5.5 --watch 1 --rounds 1 2>&1)
+echo "$RS2" | grep -q "第 1 轮采集" && ok "签名不匹配从头开始" || notok "签名不匹配仍续采"
+rm -f results/.compare-watch-state
+# 非采集模式 HTML 不带自动刷新（回归：COMPARE_REFRESH_SEC 未设时不注入 meta）
+bash compare.sh 223.5.5.5 --html >/dev/null 2>&1
+grep -q "http-equiv='refresh'" results/report.html && notok "非采集模式误注入refresh" || ok "非采集模式无refresh"
+
 echo ""
 echo "═══ 结果: $PASS 通过 / $FAIL 失败 ═══"
 [ "$FAIL" = "0" ]

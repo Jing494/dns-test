@@ -14,6 +14,8 @@
 #       bash compare.sh 223.5.5.5 119.29.29.29 --watch 30 --html  # 每30分钟采集一轮（Ctrl-C停止）
 #       bash compare.sh 223.5.5.5 --watch 30 --rounds 12  # 采集12轮后自动停止（有边界基准）
 #       bash compare.sh 223.5.5.5 --watch 30 --keep 200  # JSON只保留最近200份（自动清老）
+#   --watch 断点续采: Ctrl-C 中断后重跑同命令自动从上次轮数继续（状态存 results/.compare-watch-state；
+#                     跑满 --rounds 或改参数/换DNS 则从头开始）；采集模式的 HTML 报告带 meta refresh 自动刷新
 # 环境变量:
 #   COMPARE_MAX_CONCURRENCY  lite测试并行数上限（默认3；设1为串行，结果最稳）
 # 输出:
@@ -97,6 +99,7 @@ for a in "${CLEAN_ARGS[@]}"; do
       echo "      bash compare.sh 223.5.5.5 119.29.29.29 --watch 30 # 每30分钟采集一轮(Ctrl-C停止,供trends)"
       echo "      bash compare.sh 223.5.5.5 --watch 30 --rounds 12  # 采集12轮后自动停止"
       echo "      bash compare.sh 223.5.5.5 --watch 30 --keep 200   # JSON只保留最近200份（自动清老）"
+      echo "      # --watch 断点续采: Ctrl-C 后重跑同命令自动续轮数; 采集模式HTML带自动刷新"
       echo "环境变量: COMPARE_MAX_CONCURRENCY=3  (并行数,1=串行最稳)"
       exit 0 ;;
     *) DNS_ARGS+=("$a") ;;
@@ -201,9 +204,25 @@ if [ -n "$WATCH_N" ]; then
     done
     CLEAN_ARGS=("${CA4[@]}")
   fi
-  WROUND=0
-  WDONE=0   # 已完整跑完的轮数（Ctrl-C 打断在子轮中时，该轮不计入"完成"）
-  trap 'echo ""; echo "🛑 已停止采集（共完成 ${WDONE} 轮，可用 bash trends.sh --html 查看趋势）"; exit 0' INT TERM
+  # 断点续采：状态文件存 签名+已完成轮数；Ctrl-C 中断后重跑同命令自动续采（跑满 --rounds 任务完成即清除）
+  # 签名 = 间隔+轮数上限+DNS列表（任一变化视为新任务，从头开始）
+  mkdir -p results
+  WSTATE="results/.compare-watch-state"
+  WSIG="watch=${WATCH_N}|rounds=${ROUNDS_N}|dns=${DNS_ARGS[*]}"
+  WSTART=0
+  if [ -f "$WSTATE" ]; then
+    _wsig=$(sed -n '1p' "$WSTATE")
+    _wdone=$(sed -n '2p' "$WSTATE")
+    if [ "$_wsig" = "$WSIG" ] && [[ "$_wdone" =~ ^[0-9]+$ ]]; then
+      WSTART=$_wdone
+      echo "🔁 断点续采: 上次同参数采集已完成 ${WSTART} 轮，从第 $((WSTART + 1)) 轮继续"
+    fi
+  fi
+  WROUND=$WSTART
+  WDONE=$WSTART   # 已完整跑完的轮数（Ctrl-C 打断在子轮中时，该轮不计入"完成"）
+  trap 'echo ""; echo "🛑 已停止采集（共完成 ${WDONE} 轮${ROUNDS_N:+/共 ${ROUNDS_N} 轮}；重跑同命令将从第 $((WDONE + 1)) 轮继续，可用 bash trends.sh --html 查看趋势）"; exit 0' INT TERM
+  # 子轮经环境变量感知采集间隔：HTML 报告加 meta refresh，挂屏页面到点自动刷新
+  export COMPARE_REFRESH_SEC=$((WATCH_N * 60))
   echo "⏱️  定时采集: 每 ${WATCH_N} 分钟一轮${ROUNDS_N:+（共 ${ROUNDS_N} 轮）}${KEEP_N:+，保留最近 ${KEEP_N} 份JSON}（Ctrl-C 停止）  对比DNS: ${DNS_ARGS[*]}"
   while :; do
     WROUND=$((WROUND+1))
@@ -212,6 +231,8 @@ if [ -n "$WATCH_N" ]; then
     # 子轮重放（含 --html/--md 等原参数）；子轮自身 exit 2（全不可达）不终止采集
     bash "$0" "${CLEAN_ARGS[@]}" || true
     WDONE=$WROUND
+    # 每轮落进度（断点续采依据；JSON glob 不含隐藏文件，不会混入 --keep 清理范围）
+    printf '%s\n%s\n' "$WSIG" "$WDONE" > "$WSTATE"
     # --keep K：JSON 超出保留份数时清最老的（glob 字典序=时间序，与 trends --prune 同口径）
     if [ -n "$KEEP_N" ]; then
       KFILES=()
@@ -227,8 +248,9 @@ if [ -n "$WATCH_N" ]; then
         echo "  ♻️  --keep: 已清理 ${KDEL} 份旧JSON（保留最近 ${KEEP_N} 份）"
       fi
     fi
-    # 轮数到限：跑满即收工，不再进入等待
+    # 轮数到限：跑满即收工（任务完成，清除断点状态——下次重跑同命令从头开始），不再进入等待
     if [ -n "$ROUNDS_N" ] && [ "$WROUND" -ge "$ROUNDS_N" ]; then
+      rm -f "$WSTATE"
       echo ""
       echo "✅ 已完成指定 ${ROUNDS_N} 轮采集（可用 bash trends.sh --html 查看趋势）"
       exit 0
@@ -555,6 +577,10 @@ if [ "$GEN_HTML" = "1" ]; then
     echo "<meta charset='utf-8'>"
     echo "<meta name='viewport' content='width=device-width,initial-scale=1'>"
     echo "<meta name='color-scheme' content='light dark'>"
+    # 采集模式（--watch）下子轮经 COMPARE_REFRESH_SEC 感知间隔：挂屏的报告页到点自动刷新
+    if [ -n "${COMPARE_REFRESH_SEC:-}" ] && [[ "$COMPARE_REFRESH_SEC" =~ ^[1-9][0-9]*$ ]]; then
+      echo "<meta http-equiv='refresh' content='${COMPARE_REFRESH_SEC}'>"
+    fi
     echo "<title>DNS对比报告</title>"
     echo "<style>"
     echo ":root{--bg:#f5f7fa;--card:#fff;--tx:#333;--sub:#888;--th-bg:#fafbfc;--th-tx:#666;--line:#eee;--track:#e5e7eb;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--gtx:#16a34a;--atx:#d97706;--rtx:#dc2626;--rec-bg:#f0fdf4;--rec-bd:#bbf7d0;--rec-tx:#166534;--best:#f0fdf4;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace}"
