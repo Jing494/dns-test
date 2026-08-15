@@ -331,8 +331,8 @@ LAST_TS=""     # 最新一条采集时间戳（数据新鲜度计算用）
 for f in $FILES; do
   ts=$(grep -oE '"timestamp": ?"[^"]+"' "$f" | head -1 | sed 's/"timestamp": *"//;s/"$//')
   [ -z "$ts" ] && continue
-  if [ -n "$SINCE" ] && [[ "$ts" < "$SINCE" ]]; then continue; fi
-  # --until 含当日整天：按日期前缀比较（ts 前缀="2026-08-13"，until 为纯日期）
+  # --since/--until 均按 YYYY-MM-DD 日期前缀比较（含两端日期；纯 ASCII 前缀不受 locale 排序影响）
+  if [ -n "$SINCE" ] && [[ "${ts:0:10}" < "$SINCE" ]]; then continue; fi
   if [ -n "$UNTIL" ] && [[ "${ts:0:10}" > "$UNTIL" ]]; then continue; fi
   ROUNDS_TS+=("$ts")
   LAST_TS="$ts"
@@ -726,9 +726,10 @@ for k in "${!RAW_ADDR[@]}"; do
   fi
 
   # 突变检测：延迟较上一轮突增（Δ>+100ms 且 >2×前值）视为异常轮（网络抖动/加速器抽风定位）
+  # 前值 0ms 不计：倍数无意义且 awk 会除零出 inf（本机缓存 DNS 可真实打出 0ms）
   if [ "$n_ok" -ge 2 ]; then
     mut_hits=$(printf '%s\n' "$lines" | grep -v UNREACH | grep -v '^$' | awk -F'|' '
-      NR>1 && ($4-prev_d>100 && $4>2*prev_d) {
+      NR>1 && prev_d>0 && ($4-prev_d>100 && $4>2*prev_d) {
         printf "    %-16s %sms→%sms（+%dms，为上轮%.1f倍）\n", substr($1,1,16), prev_d, $4, $4-prev_d, $4/prev_d
       }
       { prev_d=$4 }')

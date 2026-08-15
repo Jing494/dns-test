@@ -330,6 +330,25 @@ echo "$WVS" | grep -q "势均力敌" && ok "--vs 占优判定保守(2/3不触发
 tr2 --vs 2>&1 | grep -q "缺少值" && ok "--vs 缺值报错" || notok "--vs 缺值未报错"
 tr2 --vs 223.5.5.5 2>&1 | grep -q "两个不同DNS" && ok "--vs 单值报错" || notok "--vs 单值未报错"
 tr2 --vs 8.8.8.8,1.1.1.1 2>&1 | grep -q "不在数据集中" && ok "--vs 数据集外报错" || notok "--vs 越界未报错"
+
+echo "═══ trends.sh: 突变检测边界(前值0ms) + --since 当日边界 ═══"
+# 前值 0ms（本机缓存 DNS 可真实打出）→ 不计突增也不出 inf 倍数；--since 前缀比较含当日
+TRD3=/tmp/t06-trends3; rm -rf "$TRD3" /tmp/t06-trends-out3; mkdir -p "$TRD3"
+cat > "$TRD3/compare-${D5F}-100000.json" <<EOF5
+{"tool":"x","timestamp":"$D5 10:00:00 +0800","mode":"lite","dns":[
+ {"addr":"223.5.5.5","score":"70","stab":"100","delay_ms":0,"reachable":true}]}
+EOF5
+cat > "$TRD3/compare-${D5F}-110000.json" <<EOF5
+{"tool":"x","timestamp":"$D5 11:00:00 +0800","mode":"lite","dns":[
+ {"addr":"223.5.5.5","score":"70","stab":"100","delay_ms":300,"reachable":true}]}
+EOF5
+tr3() { COMPARE_RESULTS_DIR="$TRD3" TRENDS_DIR=/tmp/t06-trends-out3 bash trends.sh "$@"; }
+WV0=$(tr3 2>&1)
+echo "$WV0" | grep -q "inf" && notok "前值0ms产生inf倍数" || ok "前值0ms不出inf倍数"
+echo "$WV0" | grep -qF "0ms→300ms" && notok "前值0ms误计突增" || ok "前值0ms不计突增(倍数无意义)"
+SB=$(tr3 --since "$D5" 2>&1)
+echo "$SB" | grep -q "2次采集" && ok "--since 当日边界含当日" || notok "--since 当日边界漏当日"
+rm -rf "$TRD3" /tmp/t06-trends-out3
 # --md 报告（表行 + 三小节 + 尾注）
 MDO=$(tr2 --md --vs 223.5.5.5,119.29.29.29 2>&1)
 echo "$MDO" | grep -q "Markdown趋势报告已生成" && ok "--md 生成提示" || notok "--md 无提示"

@@ -123,7 +123,7 @@ dns-test/
 │   ├── 03_dig_target.sh          # dig_target 4 用例（IPv6加方括号）
 │   ├── 04_core_functions.sh      # core 纯函数 18 用例（地址校验/响应判断/CDN/入口参数解析）
 │   ├── 05_run_common_tests.sh    # lite 计分口径/full 回归 12 用例（稳定性降轮/CONFIG_DOMAINS安全解析/dig @server回归/for t遮蔽回归/ECS_SUBNET注入拦截/par_run元字符禁令，mock dig/ping 离线）
-│   ├── 06_compare_e2e.sh         # compare 端到端 121 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune/--until/--alert/--vs/周对比/突变检测/--md/--json/--week/--webhook/--archive 归档/--export 报障包/HTML归档小节/compare↔trends互链，mock dig/ping 离线 + 用户 results 备份恢复）
+│   ├── 06_compare_e2e.sh         # compare 端到端 124 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune/--until/--alert/--vs/周对比/突变检测(前值0ms边界)/--since当日边界/--md/--json/--week/--webhook/--archive 归档/--export 报障包/HTML归档小节/compare↔trends互链，mock dig/ping 离线 + 用户 results 备份恢复）
 │   ├── 07_doctor.sh              # doctor 自检+补全+install+新参数校验 49 用例（doctor正常/参数/--cron模板/PATH剥离FAIL路径 + bash补全语法/注册/模拟TAB(--fix/--archive-keep/值位不补) + zsh头与内容(--fix/--archive-keep) + install --completions幂等(假HOME)）
 │   └── 08_trends_lib.sh          # trends_lib 纯函数 23 用例（分位数空/单值/奇偶样本/P95取位/clamp + score/delay全10态趋势判定 + trends.sh端到端等价冒烟）
 ├── tools/                        # 专项测试工具

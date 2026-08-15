@@ -14,7 +14,7 @@
 
 > 🏷️ **版本号规则（双轨制）**：`vYYYY.MM.N` 日期式（N=当月发布序号）↔ 语义 `vX.Y`（X=主版本，重大重构才升；Y=次版本，功能更新）。补丁级修复仅递增日期式 N。
 
-> 🔧 **最新版本**：**v1.16 = v2026.08.25**（补丁轮：shell 补全词表补齐——doctor `--fix`、trends `--archive-keep` 进 bash/zsh 补全，`--archive-keep` 值位不再误补 flag；`release.sh` 打包自检升级为门禁——混入日志/报告或缺 results 目录直接拦截不上传）。v2026.08.24 修复 macOS bash 3.2 多字节展开损坏与 `--open` 降级提示。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
+> 🔧 **最新版本**：**v1.16A = v2026.08.26**（加固轮：trends 突变检测前值 0ms 不再除零出 `inf` 倍数——本机缓存 DNS 打出 0ms 的真实场景；`--since/--until` 改日期前缀比较，不受 locale 排序影响；边界均有回归用例）。v2026.08.25 补全词表补齐（doctor `--fix` / trends `--archive-keep`）+ release.sh 打包门禁。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；**默认 DNS 列表为公开可测试的运营商公网 DNS**，示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
