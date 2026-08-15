@@ -63,7 +63,7 @@ jobs:
           echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 18 + 计分口径 12 + compare e2e 121 + doctor/completions/trends参数 45 + trends_lib纯函数 23）"
           # 失败时打印输出尾部（断言名直接进日志，不再盲猜）
           UTLOG=$(mktemp)
-          ut() { bash "tests/$1" >"$UTLOG" 2>&1 || { echo "❌ $1 失败，输出尾部:"; tail -25 "$UTLOG"; exit 1; }; }
+          ut() { bash "tests/$1" >"$UTLOG" 2>&1 || { echo "❌ $1 失败断言:"; grep -n "❌" "$UTLOG"; tail -3 "$UTLOG"; exit 1; }; }
           perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 || { echo "❌ perl单测失败"; exit 1; }
           ut 02_plugins.sh
           ut 03_dig_target.sh
