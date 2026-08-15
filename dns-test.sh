@@ -80,10 +80,11 @@ select_dns_group() {
   echo ""
   case $dns_group in
     0) return 0 ;;
+    1) DNS_LIST=(); DNS_DISPLAY="默认运营商DNS 4个" ;;
     2) DNS_LIST=("${ALI_DNS_ADDR[@]}"); DNS_DISPLAY="阿里云公共DNS（4个）" ;;
     3) DNS_LIST=("${TENCENT_DNS_ADDR[@]}"); DNS_DISPLAY="腾讯DNSPod（3个）" ;;
     4) DNS_LIST=("${DEFAULT_DNS_ADDR[@]}" "${ALI_DNS_ADDR[@]}" "${TENCENT_DNS_ADDR[@]}"); DNS_DISPLAY="全部（11个DNS）" ;;
-    *) DNS_LIST=(); DNS_DISPLAY="默认运营商DNS 4个" ;;
+    *) echo "无效选项，返回主菜单..."; return 0 ;;
   esac
   echo "已切换 DNS 组: $DNS_DISPLAY"
 }
@@ -125,6 +126,7 @@ run_basic() {
         echo ""
         case $dns_select in
           0) return 0 ;;
+          1) : ;;  # 全部测试
           2)
             echo "可测试的DNS列表："
             for idx in "${!DNS_LIST[@]}"; do
@@ -136,10 +138,9 @@ run_basic() {
               return 0
             fi
             echo ""
-            # 转换为从0开始的索引
-            dns_idx=$((dns_idx-1))
-            if [ $dns_idx -ge 0 ] && [ $dns_idx -lt ${#DNS_LIST[@]} ]; then
-              DNS_LIST=("${DNS_LIST[$dns_idx]}")
+            # 非数字/越界均回退第1个；先校验纯数字再做算术，避免非数字输入产生报错噪音
+            if [[ "$dns_idx" =~ ^[1-9][0-9]*$ ]] && [ "$dns_idx" -le "${#DNS_LIST[@]}" ]; then
+              DNS_LIST=("${DNS_LIST[$((dns_idx-1))]}")
               DNS_DISPLAY="指定DNS: ${DNS_LIST[0]}"
             else
               echo "无效编号，默认测试第一个DNS"
@@ -147,7 +148,7 @@ run_basic() {
               DNS_DISPLAY="指定DNS: ${DNS_LIST[0]}"
             fi
             ;;
-          *) : ;;  # 1 或其它 → 全部
+          *) echo "无效选项，返回主菜单..."; return 0 ;;
         esac
       fi
 
@@ -190,12 +191,13 @@ run_prof() {
     *)
       if [ "$professional_test" -le "$n_plugin" ]; then
         # 专项插件：DNS 数量保护（专项脚本收多 DNS 会慢/超时，最多4个）
+        # 仅本次调用截断，不改动会话内 DNS_LIST/DNS_DISPLAY（避免副作用带到后续测试）
         if [ ${#DNS_LIST[@]} -gt 4 ]; then
           echo "⚠️  ${#DNS_LIST[@]}个DNS跑专项会慢，本次只取前4个"
-          DNS_LIST=("${DNS_LIST[@]:0:4}")
-          DNS_DISPLAY="${DNS_LIST[0]} 等${#DNS_LIST[@]}个（已截断）"
+          plugin_run "$professional_test" "${DNS_LIST[@]:0:4}"
+        else
+          plugin_run "$professional_test" "${DNS_LIST[@]}"
         fi
-        plugin_run "$professional_test" "${DNS_LIST[@]}"
       elif [ "$professional_test" = "$cmp_n" ]; then
         echo "开始多DNS对比（compare.sh，lite精简版53项/DNS，并行）..."
         if [ ${#DNS_LIST[@]} -ge 2 ]; then
@@ -242,7 +244,11 @@ while true; do
   echo ""
   echo "──────── 主菜单 ────────"
   echo "  当前DNS: $DNS_DISPLAY"
-  [ ${#DNS_LIST[@]} -ge 1 ] && echo "  数量: ${#DNS_LIST[@]} 个"
+  if [ ${#DNS_LIST[@]} -ge 1 ]; then
+    echo "  数量: ${#DNS_LIST[@]} 个"
+  else
+    echo "  数量: ${#DEFAULT_DNS_ADDR[@]} 个（默认组）"
+  fi
   echo "1. 基础测试（精简版/完整版）"
   echo "2. 专项测试（VoWiFi/端口/反向解析等）"
   if [ "$DNS_FROM_ARG" = "0" ]; then

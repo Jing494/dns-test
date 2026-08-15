@@ -28,6 +28,12 @@
   - ① **shellcheck 回归修复**：第八十六轮把交互 `read` 抽成 `prompt()` 后，`dns_group/version/dns_select/professional_test/main_choice` 由函数内 `read -t -p` 动态赋值，shellcheck 无法追踪而报 5 处 SC2154——导致 CI strict 步骤（`shellcheck ... || exit 1`）在 main/develop/tool_list-test 三分支全红（run #140~142）；已在文件头加 `# shellcheck disable=SC2154` 说明，恢复全库 0 告警
   - ② **主入口补 --help**：`dns-test.sh` 原仅支持 `--version`，`--help` 在非交互模式会误落进 `lite.sh --help`、交互模式被当自定义 DNS；已补齐 `-h/--help/help` 帮助输出，与其余入口脚本一致
   - ③ 回归：bash -n 全绿、shellcheck 全库 0 告警、单测(18+9+4+18+9) 全绿、伪终端 主菜单循环/DNS切换/返回主菜单/退出 全部符合预期
+- 2026-08-15（第八十六轮-补充2）：**审阅收尾四小修（dns-test.sh，不升版本）**
+  - ① **指定DNS编号输入校验**：原 `dns_idx=$((dns_idx-1))` 对非数字输入（如 `2a`）会向 stderr 打 `integer expression expected`；改为先 `^[1-9][0-9]*$` 校验再做算术，非法/越界统一回退第 1 个，消除报错噪音
+  - ② **多DNS选择非法输入**：原 `*)` 静默把非 0/1/2 输入当"全部测试"；改为非法选项提示"无效选项"并返回主菜单（与全局行为一致）
+  - ③ **专项插件截断副作用**：原跑专项前 `DNS_LIST=("${DNS_LIST[@]:0:4}")` 会永久改掉会话内 DNS 列表并带到后续测试；改为仅本次调用传前 4 个，不动 DNS_LIST/DNS_DISPLAY
+  - ④ **主菜单数量显示**：选"1.默认组"后 DNS_LIST 为空导致"数量"行消失；空列表时改为显示"数量: N 个（默认组）"（N 取 DEFAULT_DNS_ADDR 长度，兼容自定义默认组）
+  - ⑤ 回归：bash -n 全绿、shellcheck 0 告警；伪终端 切组/默认组数量显示/切组非法9返回/多DNS非法9返回/dns_idx非数字2a无噪音回退 全部符合预期
 - 2026-08-14（第八十五轮）：**去品牌化——审阅#4 通用化改造（在 v1.7.1 = v2026.08.11 基础上，不升版本）**
   - ① **代码去品牌化**：`lib/core.sh` 默认 DNS 组名称从"云南电信*"改为"默认*"（如"云南电信IPv6-DNS-1"→"默认IPv6-DNS-1"），注释中"云南电信"→"示例为运营商DNS"；`dns-test.sh` 交互菜单"云南电信"→"默认运营商DNS（可配置）"；`dns-preset.sh` 预设键名 `yunnan` → `default`（保留 yunnan/yn 为兼容别名）
   - ② **文档去品牌化**：README/AI_GUIDE/CODE_WIKI/FAQ/TEST_METHOD/SANDBOX_GUIDE/examples README 中等操作说明/文案/环境变量默认值描述全部替换为"默认运营商DNS"、"示例为运营商DNS"（保留 CHANGELOG 历史轮次与 TEST_METHOD 实测记录中的"云南电信"作为历史事实）
