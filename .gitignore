@@ -4,3 +4,5 @@
 *.tmp
 *.tar.gz
 trends/
+.trae-html-share-packages/
+.preview/

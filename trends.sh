@@ -2,7 +2,7 @@
 # ============================================================================
 # DNS 趋势洞察：聚合 compare.sh 的历史 JSON 结果，输出趋势总览/CSV/HTML报告
 # 兼容性: bash 3.2+（无关联数组依赖，macOS 默认 bash 可直接运行）
-# 用法: bash trends.sh [DNS地址...] [--html] [--csv] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD]
+# 用法: bash trends.sh [DNS地址...] [--html] [--csv] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD] [--prune N]
 #   例: bash trends.sh                              # 全部DNS趋势总览（文本）
 #       bash trends.sh 223.5.5.5                    # 只看223.5.5.5
 #       bash trends.sh --html --csv                 # 生成 trends/report.html + trends.csv
@@ -28,6 +28,7 @@ CRON_MODE=0
 DETAIL=0
 LIMIT=""
 SINCE=""
+PRUNE_N=""
 FILTER=()
 
 # ---------- 参数解析（while+shift风格，兼容--limit N成对取值） ----------
@@ -42,13 +43,15 @@ while [ $i -lt ${#ARGS[@]} ]; do
     --detail) DETAIL=1 ;;
     --limit)  i=$((i+1)); LIMIT="${ARGS[$i]:-}"; [ -z "$LIMIT" ] && { echo "❌ --limit 缺少值"; exit 1; } ;;
     --since)  i=$((i+1)); SINCE="${ARGS[$i]:-}"; [ -z "$SINCE" ] && { echo "❌ --since 缺少值"; exit 1; } ;;
+    --prune)  i=$((i+1)); PRUNE_N="${ARGS[$i]:-}"; [ -z "$PRUNE_N" ] && { echo "❌ --prune 缺少值"; exit 1; } ;;
     --version)
       echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
       exit 0 ;;
     --help|-h)
-      echo "用法: bash trends.sh [DNS地址...] [--html] [--csv] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD]"
+      echo "用法: bash trends.sh [DNS地址...] [--html] [--csv] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD] [--prune N]"
       echo "  例: bash trends.sh --html --csv"
       echo "      bash trends.sh --cron 223.5.5.5 119.29.29.29   # 先采集再聚合(crontab用)"
+      echo "      bash trends.sh --prune 200 --html              # 只保留最近200份JSON再聚合(--watch配套)"
       echo "环境变量: TRENDS_DIR(默认trends/)  COMPARE_RESULTS_DIR(默认results/)"
       exit 0 ;;
     --*)
@@ -71,6 +74,33 @@ if [ "$CRON_MODE" = "1" ]; then
   echo "⏳ 采集: compare.sh ${FILTER[*]}"
   bash compare.sh "${FILTER[@]}" >> "$OUT_DIR/cron.log" 2>&1
   echo "   采集完成，开始聚合..."
+fi
+
+# ---------- --prune N：只保留最近 N 份 compare JSON（--watch/定时长期采集的磁盘配套清理） ----------
+# glob 字典序=时间序（时间戳文件名），删最老的 TOTAL-N 份；先清理再聚合，报告口径与留存一致
+if [ -n "$PRUNE_N" ]; then
+  if ! [[ "$PRUNE_N" =~ ^[1-9][0-9]*$ ]]; then
+    echo "❌ --prune 参数必须为正整数（保留份数），收到: $PRUNE_N"; exit 1
+  fi
+  PFILES=()
+  for _f in "$SRC_DIR"/compare-*.json; do
+    [ -e "$_f" ] && PFILES+=("$_f")
+  done
+  PTOTAL=${#PFILES[@]}
+  if [ "$PTOTAL" -le "$PRUNE_N" ]; then
+    echo "  ♻️  --prune: 共 ${PTOTAL} 份 ≤ 保留 ${PRUNE_N} 份，无需清理"
+  else
+    DELN=$((PTOTAL - PRUNE_N))
+    echo "  ♻️  --prune: 共 ${PTOTAL} 份，保留最近 ${PRUNE_N} 份，删除 ${DELN} 份:"
+    k=0
+    for _f in "${PFILES[@]}"; do
+      k=$((k+1))
+      if [ "$k" -le "$DELN" ]; then
+        echo "     🗑️  $(basename "$_f")"
+        rm -f "$_f"
+      fi
+    done
+  fi
 fi
 
 # ---------- 数据扫描 ----------

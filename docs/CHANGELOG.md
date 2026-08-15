@@ -6,7 +6,8 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
-| v2026.08.15 | v1.8（当前） |
+| v2026.08.16 | v1.9（当前） |
+| v2026.08.15 | v1.8 |
 | v2026.08.11 | v1.7.1 |
 | v2026.08.10 | v1.7.0 |
 | v2026.08.9  | v1.7.0 |
@@ -19,6 +20,17 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-16（第八十九轮）：**compare 七大增强 + e2e 测试转正（compare.sh / trends.sh / tests/06，发布 v1.9 = v2026.08.16）**
+  - ① **定时采集 `--watch N`**：每 N 分钟重放一轮自身（子轮含 `--html/--md/--full` 等原参数，`--no-save` 自动剔除并提示），落 JSON 打通 trends.sh 数据源；`sleep` 后台化 + `wait`，Ctrl-C 立即中断等待并优雅退出（打印完成轮数与趋势查看指引）；正整数校验与 STAB_ROUNDS 同风格
+  - ② **切换命令建议**：按当前系统给可直接复制的切换命令（macOS networksetup / WSL resolv.conf+wsl.conf / NetworkManager nmcli / systemd-resolved resolvectl / 通用 resolv.conf 兜底），终端/HTML/MD 三出口同款，HTML 内 `< >` 转义防标签解析
+  - ③ **`--md` Markdown 报告**：results/report.md，GitHub/PR/Issue 友好（8 列环比表 + 奖牌 + 切换命令代码块）
+  - ④ **环比上次**：读上一份 compare-*.json（glob 排除本轮），逐 DNS 算 Δ评分/Δ延迟，终端 + HTML Δ列（升绿/降红/0 中性）+ MD 表格三出口；DNS 地址仅含 hex/点/冒号，安全内嵌 ERE
+  - ⑤ **预设组名直接对比**：`bash compare.sh ali tencent`——default/ali/tencent/all 展开为 core.sh 预设地址（可与 IP 混用，展开后统一走 valid_dns_addr 校验 + 线性去重）；未知词仍报"非法DNS地址"
+  - ⑥ **当前系统 DNS 检测**：macOS `scutil --dns` → `resolvectl dns` → `/etc/resolv.conf` 三级兜底（只读，失败静默跳过）；头部列当前 DNS、对比表命中行加 👤当前 徽章（HTML）/👤（MD）、推荐=当前时提示"当前正在使用，无需切换"
+  - ⑦ **trends `--prune N`**：只保留最近 N 份 compare JSON、删最老的（glob 字典序=时间序），先清理再聚合口径一致——`--watch` 长期采集的磁盘配套清理
+  - ⑧ **修复三处**：`--watch` 缺值时被静默吞掉跑成单轮（wnext 残留检测显式报错）；空参数 usage 未列 `--md/--watch/预设`；lite 失败行 "稳定性-%"/"评分不可达%" 百分号破相显示（仅数值时拼接）
+  - ⑨ **测试转正**：新增 `tests/06_compare_e2e.sh` 19 用例（mock dig/ping 离线端到端：--watch 参数校验 ×3、当前DNS👤标记三出口 ×6、环比Δ ×2、预设展开 ×3、--prune ×5；用户 results/ 自动备份恢复防误删历史数据），接入 verify + CI；总用例 61→80
+  - ⑩ 回归：bash -n/shellcheck（-S warning 口径）0 告警；tests 01~06 全绿（80 用例）；真实浏览器四页视觉回归 PASS（compare/trends × 亮/暗，奖牌/徽章/Δ列/👤标记/SVG 轴色无溢出错位）；版本 v1.9 = v2026.08.16，README/CODE_WIKI/AI_GUIDE/CI 同步
 - 2026-08-15（第八十七轮）：**full 模式 @server 错乱修复 + 注入面收尾（lib/core.sh 等，不升版本）**
   - ① **P0 循环变量遮蔽（审阅#11）**：`run_common_tests` 函数级 `local t=$(dig_target ...)` 是全部 `dig @server` 的目标，但 full 专有的三处 `for t` 循环（稳定性延迟值/DNSSEC 记录类型 DNSKEY-DS-RRSIG/TTL 值）会把它永久遮蔽——实测 full 模式第 6~15 项（NXDOMAIN/连通性/IPv6/一致性/运营商/DNSSEC/ECS/PTR/TTL/劫持对比/递归）出现 `@10`（延迟值）、`@DNSKEY/@DS/@RRSIG`（记录类型）、`@300`（TTL）等错误目标，结果整体不可信；循环变量改名 `st`/`rt`/`tv` 修复（lite 路径不进这些分支故未受影响）
   - ② **P1 ECS_SUBNET 注入拦截（审阅#12）**：环境变量 `ECS_SUBNET` 未校验即拼进 `par_run` 的 `eval` 命令串，`ECS_SUBNET="1.2.3.4/24; <命令>"` 可穿透"dig 开头"白名单执行任意命令（实测复现）；加载时按 CIDR 格式（`^[0-9a-fA-F:.]+/[0-9]{1,3}$`）校验，非法回退默认 `240e:52:4800::/48`（与 STAB_ROUNDS 校验同风格）
