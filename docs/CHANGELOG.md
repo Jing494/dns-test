@@ -27,6 +27,9 @@
   - ⑤ **两处小修**：`tools/vowifi/carrier_epdg.pl` DNS 选项先 `^\d+$` 再数值比较（消除非数字输入的 "isn't numeric" 警告噪音）；`install.sh` 无包管理器场景 `PKG_DIG/PKG_SC` 预置通用名（NEED 数组不再出现空包名导致"必需缺失: "显示为空）
   - ⑥ **回归防护**：`tests/05_run_common_tests.sh` 新增第 10~12 用例——full 模式 mock dig 断言 `@server` 恒为被测地址/[14]劫持对比基准（白名单 `@8.8.8.8`/`@[2400:3200::1]`/`@223.5.5.5`）、ECS_SUBNET 非法值回退默认且注入不执行、par_run 元字符命令整体拒执行；负向验证：用修复前 core.sh 跑三条新用例全部变红，修复后全绿；用例数 9→12，verify/CI/README/CODE_WIKI/AI_GUIDE 文案同步
   - ⑦ 回归：bash -n 全绿、perl -c 全绿、shellcheck 全库 0 告警、单测(18+9+4+18+12) 全绿、伪终端主菜单循环如常
+- 2026-08-15（第八十八轮-补充）：**不可达 DNS 不授奖牌 + v1.8 视觉回归验证（compare.sh，不升版本）**
+  - ① 边界修正：全部 DNS 不可达时排名表仍会给故障服务器发 🥇🥈（视觉误导）；不可达行降级为纯序号，正常场景奖牌逻辑不变
+  - ② 视觉回归：真实浏览器（HTTP 服务 + 截图）四页验证（compare/trends × 亮/暗）——无横向溢出（scrollWidth 1265<1280）、奖牌/徽章/最佳行高亮正常、暗色对比度可读、SVG 折线暗色下可见；HTML 标签平衡校验通过、无裸实体；trends 趋势徽章语义（评分升→变好/延迟降→变好）正确；全部不可达路径 exit 2 + bad-rec 提示正常
 - 2026-08-15（第八十八轮）：**HTML 报告视觉升级：排名奖牌 + 暗色模式 + 徽章化（compare.sh / trends.sh，发布 v1.8 = v2026.08.15）**
   - ① **compare.sh 排名表**：汇总表从"输入顺序平铺"升级为按 评分降序+延迟升序 排名（不可达沉底），前三名 🥇🥈🥉 奖牌、综合推荐行整行高亮（`tr.best`）；排序用"可达|评分%03d|延迟%05d|下标"平行文本 sort，兼容 bash 3.2
   - ② **暗色模式**：compare/trends 两报告统一切 CSS 变量双主题（`prefers-color-scheme` 自动跟随系统 + `<meta name='color-scheme'>`），暗色下卡片/表格/徽章/推荐条/趋势图轴色全套适配；trends SVG 轴线与刻度文字改 class（`.ax/.ax-t`）由 CSS 接管

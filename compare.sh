@@ -325,6 +325,8 @@ if [ "$GEN_HTML" = "1" ]; then
       case "$rank" in
         1) mk="🥇";; 2) mk="🥈";; 3) mk="🥉";; *) mk="$rank";;
       esac
+      # 不可达的 DNS 不授奖牌（全部故障时给金牌属视觉误导），降级为纯序号
+      [ "${SCORE_VAL[$oi]}" = "不可达" ] && mk="$rank"
       rowcls=""; [ "$oi" = "$BEST_IDX" ] && rowcls=" class='best'"
       echo "<tr${rowcls}><td class='rank'>$mk</td><td class='addr'>${DNS_ARGS[$oi]}</td><td><span class='bdg $bcls'>$sv</span></td><td><span class='bdg $dcls'>$dvs</span></td><td><span class='bdg $tcls'>$tvs</span></td><td>$st</td></tr>"
     done <<EOF
