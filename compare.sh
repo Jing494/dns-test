@@ -224,6 +224,11 @@ if [ -n "$WATCH_N" ]; then
   # 子轮经环境变量感知采集间隔：HTML 报告加 meta refresh，挂屏页面到点自动刷新
   export COMPARE_REFRESH_SEC=$((WATCH_N * 60))
   echo "⏱️  定时采集: 每 ${WATCH_N} 分钟一轮${ROUNDS_N:+（共 ${ROUNDS_N} 轮）}${KEEP_N:+，保留最近 ${KEEP_N} 份JSON}（Ctrl-C 停止）  对比DNS: ${DNS_ARGS[*]}"
+  # 有 --rounds 时给预计完成时间（按剩余轮数×间隔估算，不含单轮测试耗时；断点续采后剩余轮数相应减少）
+  if [ -n "$ROUNDS_N" ]; then
+    ETA_T=$(date_plus_minutes $(( (ROUNDS_N - WSTART) * WATCH_N )))
+    [ -n "$ETA_T" ] && echo "  📅 预计完成 ≈ ${ETA_T}（剩 $((ROUNDS_N - WSTART)) 轮 × ${WATCH_N} 分钟，不含单轮测试耗时）"
+  fi
   while :; do
     WROUND=$((WROUND+1))
     echo ""

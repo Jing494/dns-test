@@ -339,11 +339,14 @@ bash lite.sh 192.0.2.1 0; echo $? # 2=全部不可达（192.0.2.1为TEST-NET保�
 
 ### 常用命令
 ```bash
-bash trends.sh                    # 全部DNS趋势总览（文本，含均值/趋势箭头）
+bash trends.sh                    # 全部DNS趋势总览（文本，含均值/趋势箭头/时段/日级/周对比/突变检测）
 bash trends.sh --html --csv       # 生成 trends/report.html（SVG折线图）+ trends.csv
+bash trends.sh --md               # 生成 trends/report.md（GitHub/PR友好，含周对比/突变/头对头小节）
 bash trends.sh 223.5.5.5          # 只看指定DNS
 bash trends.sh --detail --limit 5 # 每个DNS列最近5条明细
-bash trends.sh --since 2026-08-01 # 只看该日期后数据
+bash trends.sh --vs 223.5.5.5,119.29.29.29  # 两DNS头对头：同轮对决胜负计数
+bash trends.sh --since 2026-08-01 --until 2026-08-07  # 时间窗口（含两端日期）
+bash trends.sh --alert 70         # 值守告警：评分均值<70或全不可达 → exit 3（cron用）
 bash trends.sh --prune 200        # 只保留最近200份JSON再聚合（长期采集控磁盘）
 bash trends.sh --cron 223.5.5.5 119.29.29.29  # 先采集(跑compare)再聚合，配crontab自动积累
 ```

@@ -188,7 +188,8 @@ EOF3
 done
 TT=$(bash trends.sh --html 2>&1)
 echo "$TT" | grep -q "6次采集" && ok "采集计数正确(6份=6次)" || notok "采集计数错误"
-echo "$TT" | grep -q "2026-08-13 20:00$" && ok "期间终点正常显示" || notok "期间终点为空"
+echo "$TT" | grep -q "~ 2026-08-13 20:00" && ok "期间终点正常显示" || notok "期间终点为空"
+echo "$TT" | grep -q "最新采集:" && ok "数据新鲜度显示(最新采集: N天前)" || notok "缺数据新鲜度"
 echo "$TT" | grep -q "223.5.5.5·阿里DNS-v4-1" && ok "文本表带提供商标签" || notok "文本表缺标签"
 echo "$TT" | grep -q "P95延迟" && ok "文本表含P95列" || notok "文本表缺P95列"
 echo "$TT" | grep -q "最差 20:00 均延90.0ms" && ok "时段分析标出最差时段" || notok "时段分析缺最差时段"
@@ -229,6 +230,97 @@ rm -f results/.compare-watch-state
 # 非采集模式 HTML 不带自动刷新（回归：COMPARE_REFRESH_SEC 未设时不注入 meta）
 bash compare.sh 223.5.5.5 --html >/dev/null 2>&1
 grep -q "http-equiv='refresh'" results/report.html && notok "非采集模式误注入refresh" || ok "非采集模式无refresh"
+
+echo "═══ compare.sh e2e: --watch --rounds 预计完成时间 ETA ═══"
+printf 'watch=1|rounds=3|dns=223.5.5.5\n2\n' > results/.compare-watch-state
+ET=$(bash compare.sh 223.5.5.5 --watch 1 --rounds 3 2>&1)
+echo "$ET" | grep -q "预计完成 ≈" && ok "ETA 输出预计完成时间" || notok "ETA 缺失"
+echo "$ET" | grep -q "剩 1 轮 × 1 分钟" && ok "ETA 断点续采后剩余轮数正确" || notok "ETA 剩余轮数错误"
+rm -f results/.compare-watch-state
+
+echo "═══ trends.sh: --until 窗口 + --alert 值守 + 混采警告 + 数据新鲜度 ═══"
+# 用独立数据目录（前面 --watch/断点续采等 mock 采集轮已向默认 results/ 写入今天的 JSON，
+# 会污染窗口/均值断言；这里重建确定性夹具 08-11/12/13 各2份共6份）
+TRD=/tmp/t06-trends; rm -rf "$TRD" /tmp/t06-trends-out; mkdir -p "$TRD"
+for i in 1 2 3; do
+  cat > "$TRD/compare-2026081${i}-200000.json" <<EOF4
+{"tool":"dns-test/compare.sh","version":"t","timestamp":"2026-08-1${i} 20:0${i}:00 +0800","mode":"lite",
+ "dns":[{"addr":"223.5.5.5","score":"8${i}","stab":"100","delay_ms":$((80+i*5)),"reachable":true},
+        {"addr":"119.29.29.29","score":"7${i}","stab":"95","delay_ms":$((90+i*5)),"reachable":true}]}
+EOF4
+  cat > "$TRD/compare-2026081${i}-080000.json" <<EOF4
+{"tool":"dns-test/compare.sh","version":"t","timestamp":"2026-08-1${i} 08:0${i}:00 +0800","mode":"lite",
+ "dns":[{"addr":"223.5.5.5","score":"9${i}","stab":"100","delay_ms":$((10+i)),"reachable":true},
+        {"addr":"119.29.29.29","score":"8${i}","stab":"95","delay_ms":$((15+i)),"reachable":true}]}
+EOF4
+done
+tr() { COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-trends-out bash trends.sh "$@"; }
+# --until 08-12（含当日）→ 4次采集；期间改为入选数据口径（非全量文件名范围）
+UT=$(tr --until 2026-08-12 2>&1)
+echo "$UT" | grep -q "4次采集" && ok "--until 窗口过滤(含当日)" || notok "--until 过滤计数错误"
+echo "$UT" | grep -q "期间: 2026-08-11 08:01 ~ 2026-08-12 20:02" && ok "期间改为入选数据口径" || notok "期间口径未随过滤更新"
+tr --until 2026/08/12 2>&1 | grep -q "YYYY-MM-DD" && ok "--until 非法格式报错" || notok "--until 未校验格式"
+tr --since 2026-08-13 --until 2026-08-11 2>&1 | grep -q "倒挂" && ok "窗口倒挂报错" || notok "倒挂未报错"
+# --alert 值守：夹具 223 均值87.0 / 119 均值77.0（80阈值→119命中 exit 3；50阈值→全过 exit 0）
+tr --alert 80 >/tmp/t06a.out 2>&1; ARC=$?
+[ "$ARC" = "3" ] && ok "--alert 80 命中退出码3" || notok "--alert 80 退出码=$ARC(应3)"
+grep -q "评分均值 77.0% 低于阈值 80%" /tmp/t06a.out && ok "告警列出低阈值DNS" || notok "告警未列出DNS"
+tr --alert 50 >/dev/null 2>&1; ARC2=$?
+[ "$ARC2" = "0" ] && ok "--alert 50 全过退出码0" || notok "--alert 50 退出码=$ARC2(应0)"
+tr --alert 0 2>&1 | grep -q "1-100" && ok "--alert 0 报错" || notok "--alert 0 未报错"
+# lite/full 混采警告（改一份为 full → 警告；sed -i.bak 兼容 BSD/GNU）
+sed -i.bak 's/"mode":"lite"/"mode":"full"/' "$TRD/compare-20260812-200000.json" && rm -f "$TRD/compare-20260812-200000.json.bak"
+tr 2>&1 | grep -q "lite 与 full 两种采集模式混合" && ok "混采口径警告" || notok "混采未警告"
+sed -i.bak 's/"mode":"full"/"mode":"lite"/' "$TRD/compare-20260812-200000.json" && rm -f "$TRD/compare-20260812-200000.json.bak"
+# 数据新鲜度（夹具最新为 2026-08-13 → 应显示"最新采集: N.N天前"）
+tr 2>&1 | grep -qE "最新采集: [0-9]+\.[0-9]天前" && ok "数据新鲜度显示" || notok "新鲜度缺失"
+rm -rf "$TRD" /tmp/t06-trends-out
+
+echo "═══ trends.sh: 周对比 + 突变检测 + --vs 头对头 + --md 报告 ═══"
+# 夹具用相对今天的动态日期（date_days_ago）保证周对比两窗恒有数据：前窗=10天前1轮，近窗=5天前2轮
+source lib/compat.sh
+D10=$(date_days_ago 10); D5=$(date_days_ago 5)
+D10F=${D10//-/}; D5F=${D5//-/}   # 原生替换：tr 已被本文件前段的 tr() 辅助函数覆盖
+TRD=/tmp/t06-trends2; rm -rf "$TRD" /tmp/t06-trends-out2; mkdir -p "$TRD"
+# 前窗: 223=90分/20ms（该轮胜）；近窗r1: 223=72/22；近窗r2: 223=68/260（延迟突变，负）
+cat > "$TRD/compare-${D10F}-080000.json" <<EOF5
+{"tool":"x","timestamp":"$D10 08:00:00 +0800","mode":"lite","dns":[
+ {"addr":"223.5.5.5","score":"90","stab":"100","delay_ms":20,"reachable":true},
+ {"addr":"119.29.29.29","score":"80","stab":"95","delay_ms":30,"reachable":true}]}
+EOF5
+cat > "$TRD/compare-${D5F}-080000.json" <<EOF5
+{"tool":"x","timestamp":"$D5 08:00:00 +0800","mode":"lite","dns":[
+ {"addr":"223.5.5.5","score":"72","stab":"100","delay_ms":22,"reachable":true},
+ {"addr":"119.29.29.29","score":"80","stab":"95","delay_ms":31,"reachable":true}]}
+EOF5
+cat > "$TRD/compare-${D5F}-090000.json" <<EOF5
+{"tool":"x","timestamp":"$D5 09:00:00 +0800","mode":"lite","dns":[
+ {"addr":"223.5.5.5","score":"68","stab":"90","delay_ms":260,"reachable":true},
+ {"addr":"119.29.29.29","score":"80","stab":"95","delay_ms":29,"reachable":true}]}
+EOF5
+tr2() { COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-trends-out2 bash trends.sh "$@"; }
+WV=$(tr2 2>&1)
+echo "$WV" | grep -qF "评分 90.0%→70.0%（-20.0 ↓）" && ok "周对比Δ评分正确(90→70)" || notok "周对比Δ评分错误"
+echo "$WV" | grep -qF "延迟 20.0ms→141.0ms（+121.0ms ↓）" && ok "周对比Δ延迟正确(20→141)" || notok "周对比Δ延迟错误"
+echo "$WV" | grep -qF "22ms→260ms（+238ms" && ok "突变检测命中(22→260)" || notok "突变检测未命中"
+echo "$WV" | grep -q "1次突增" && ok "突变计数=1" || notok "突变计数错误"
+WVS=$(tr2 --vs 223.5.5.5,119.29.29.29 2>&1)
+echo "$WVS" | grep -q "223.5.5.5·阿里DNS-v4-1 胜1 ｜ 119.29.29.29·腾讯DNSPod-v4 胜2 ｜ 平0" && ok "--vs 头对头胜负计数(1/2/0)" || notok "--vs 胜负计数错误"
+echo "$WVS" | grep -q "同轮对决 3 局" && ok "--vs 对局数=3" || notok "--vs 对局数错误"
+echo "$WVS" | grep -q "势均力敌" && ok "--vs 占优判定保守(2/3不触发)" || notok "--vs 判定异常"
+# --vs 错误路径
+tr2 --vs 2>&1 | grep -q "缺少值" && ok "--vs 缺值报错" || notok "--vs 缺值未报错"
+tr2 --vs 223.5.5.5 2>&1 | grep -q "两个不同DNS" && ok "--vs 单值报错" || notok "--vs 单值未报错"
+tr2 --vs 8.8.8.8,1.1.1.1 2>&1 | grep -q "不在数据集中" && ok "--vs 数据集外报错" || notok "--vs 越界未报错"
+# --md 报告（表行 + 三小节 + 尾注）
+MDO=$(tr2 --md --vs 223.5.5.5,119.29.29.29 2>&1)
+echo "$MDO" | grep -q "Markdown趋势报告已生成" && ok "--md 生成提示" || notok "--md 无提示"
+grep -q "| \`223.5.5.5·阿里DNS-v4-1\` | 3 | 76.7%" /tmp/t06-trends-out2/report.md && ok "--md 总览表行正确" || notok "--md 表行错误"
+grep -q "## 周对比" /tmp/t06-trends-out2/report.md && ok "--md 含周对比小节" || notok "--md 缺周对比"
+grep -q "## 突变检测" /tmp/t06-trends-out2/report.md && ok "--md 含突变小节" || notok "--md 缺突变"
+grep -q "## 头对头" /tmp/t06-trends-out2/report.md && ok "--md 含头对头小节" || notok "--md 缺头对头"
+grep -q "bash compare.sh DNS1 DNS2 --watch 30" /tmp/t06-trends-out2/report.md && ok "--md 尾注含采集指引" || notok "--md 缺尾注"
+rm -rf "$TRD" /tmp/t06-trends-out2
 
 echo ""
 echo "═══ 结果: $PASS 通过 / $FAIL 失败 ═══"

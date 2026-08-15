@@ -2,13 +2,17 @@
 # ============================================================================
 # DNS 趋势洞察：聚合 compare.sh 的历史 JSON 结果，输出趋势总览/CSV/HTML报告
 # 兼容性: bash 3.2+（无关联数组依赖，macOS 默认 bash 可直接运行）
-# 用法: bash trends.sh [DNS地址...] [--html] [--open] [--csv] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD] [--prune N]
-#   例: bash trends.sh                              # 全部DNS趋势总览（文本，含P95/时段分析）
+# 用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--prune N] [--alert N]
+#   例: bash trends.sh                              # 全部DNS趋势总览（文本，含P95/时段/日级/周对比/突变检测）
 #       bash trends.sh 223.5.5.5                    # 只看223.5.5.5
 #       bash trends.sh --html --csv                 # 生成 trends/report.html + trends.csv
 #       bash trends.sh --html --open                # 生成HTML并自动在浏览器打开（隐含--html）
+#       bash trends.sh --md                         # 生成 trends/report.md（GitHub/PR友好）
+#       bash trends.sh --vs 223.5.5.5,119.29.29.29  # 两DNS头对头：同轮对决胜负计数
 #       bash trends.sh --cron 223.5.5.5 119.29.29.29  # 先采集(跑compare)再聚合（crontab用）
 #       bash trends.sh --detail --limit 5           # 每个DNS列最近5条明细
+#       bash trends.sh --since 2026-08-01 --until 2026-08-07  # 只看该周的窗口数据
+#       bash trends.sh --alert 70                   # 值守告警：评分均值<70或全不可达 → 提示+exit 3（cron用）
 # 环境变量:
 #   TRENDS_DIR              趋势产物目录（默认 trends/）
 #   COMPARE_RESULTS_DIR     compare JSON 数据源目录（默认 results/）
@@ -16,7 +20,7 @@
 #   评分: ↑=变好 ↓=变差；延迟: ↑=变好 ↓=变差（箭头=好坏方向，非数值方向）
 #   延迟统计: 均值 + P50/P95 分位（长尾场景均值失真，P95 更真实）
 #   时段分析: 按小时聚合延迟，标出最优/最差时段（每小时≥3样本才统计）
-# 退出码: 0=完成  1=参数/错误  2=无可用数据
+#   退出码: 0=完成  1=参数/错误  2=无可用数据  3=--alert 告警命中（cron 值守判断用）
 # ============================================================================
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
 cd "$SCRIPT_DIR" || exit 1
@@ -27,12 +31,16 @@ SRC_DIR="${COMPARE_RESULTS_DIR:-results}"   # compare JSON 数据源
 OUT_DIR="${TRENDS_DIR:-trends}"             # 趋势产物目录
 GEN_HTML=0
 GEN_CSV=0
+GEN_MD=0
 GEN_OPEN=0
 CRON_MODE=0
 DETAIL=0
 LIMIT=""
 SINCE=""
+UNTIL=""
+ALERT_N=""
 PRUNE_N=""
+VS_ARG=""
 FILTER=()
 
 # ---------- 参数解析（while+shift风格，兼容--limit N成对取值） ----------
@@ -44,21 +52,30 @@ while [ $i -lt ${#ARGS[@]} ]; do
     --html)   GEN_HTML=1 ;;
     --open)   GEN_HTML=1; GEN_OPEN=1 ;;   # --open 隐含 --html（打开的前提是生成）
     --csv)    GEN_CSV=1 ;;
+    --md)     GEN_MD=1 ;;
+    --vs)     i=$((i+1)); VS_ARG="${ARGS[$i]:-}"; [ -z "$VS_ARG" ] && { echo "❌ --vs 缺少值（例: --vs 223.5.5.5,119.29.29.29）"; exit 1; } ;;
     --cron)   CRON_MODE=1 ;;
     --detail) DETAIL=1 ;;
     --limit)  i=$((i+1)); LIMIT="${ARGS[$i]:-}"; [ -z "$LIMIT" ] && { echo "❌ --limit 缺少值"; exit 1; } ;;
     --since)  i=$((i+1)); SINCE="${ARGS[$i]:-}"; [ -z "$SINCE" ] && { echo "❌ --since 缺少值"; exit 1; } ;;
+    --until)  i=$((i+1)); UNTIL="${ARGS[$i]:-}"; [ -z "$UNTIL" ] && { echo "❌ --until 缺少值"; exit 1; } ;;
+    --alert)  i=$((i+1)); ALERT_N="${ARGS[$i]:-}"; [ -z "$ALERT_N" ] && { echo "❌ --alert 缺少阈值（1-100，例: --alert 70）"; exit 1; } ;;
     --prune)  i=$((i+1)); PRUNE_N="${ARGS[$i]:-}"; [ -z "$PRUNE_N" ] && { echo "❌ --prune 缺少值"; exit 1; } ;;
     --version)
       echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
       exit 0 ;;
     --help|-h)
-      echo "用法: bash trends.sh [DNS地址...] [--html] [--open] [--csv] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD] [--prune N]"
+      echo "用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since Y-M-D] [--until Y-M-D] [--prune N] [--alert N]"
       echo "  例: bash trends.sh --html --csv"
       echo "      bash trends.sh --html --open                    # 生成HTML并自动打开(隐含--html)"
+      echo "      bash trends.sh --md                             # 生成 trends/report.md（GitHub/PR友好）"
+      echo "      bash trends.sh --vs 223.5.5.5,119.29.29.29      # 头对头:两DNS同轮对决胜负计数"
       echo "      bash trends.sh --cron 223.5.5.5 119.29.29.29   # 先采集再聚合(crontab用)"
+      echo "      bash trends.sh --since 2026-08-01 --until 2026-08-07  # 窗口分析(含两端日期)"
+      echo "      bash trends.sh --alert 70                       # 值守:评分均值<70或全不可达 → exit 3(cron用)"
       echo "      bash trends.sh --prune 200 --html              # 只保留最近200份JSON再聚合(--watch配套)"
       echo "环境变量: TRENDS_DIR(默认trends/)  COMPARE_RESULTS_DIR(默认results/)"
+      echo "退出码: 0=完成 1=参数错 2=无数据 3=--alert告警命中"
       exit 0 ;;
     --*)
       echo "❌ 未知参数: $a"; exit 1 ;;
@@ -69,10 +86,37 @@ while [ $i -lt ${#ARGS[@]} ]; do
   i=$((i+1))
 done
 
-# --since 日期格式校验（写错格式会静默全排除/全保留，与静默吞错不同，必须显式报错）
-if [ -n "$SINCE" ] && ! [[ "$SINCE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-  echo "❌ --since 格式必须为 YYYY-MM-DD（例: --since 2026-08-01），收到: $SINCE"
+# --since/--until 日期格式校验（写错格式会静默全排除/全保留，与静默吞错不同，必须显式报错）
+for _d in "since:$SINCE" "until:$UNTIL"; do
+  _dv="${_d#*:}"; _dn="${_d%%:*}"
+  if [ -n "$_dv" ] && ! [[ "$_dv" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    echo "❌ --${_dn} 格式必须为 YYYY-MM-DD（例: 2026-08-01），收到: $_dv"
+    exit 1
+  fi
+done
+# --until 不能早于 --since（窗口倒挂必然空集，提前报错比"2=无数据"更可诊断）
+if [ -n "$SINCE" ] && [ -n "$UNTIL" ] && [[ "$UNTIL" < "$SINCE" ]]; then
+  echo "❌ --until（$UNTIL）早于 --since（$SINCE），时间窗口倒挂"
   exit 1
+fi
+# --alert 阈值校验：1-100 的评分百分制
+if [ -n "$ALERT_N" ] && ! [[ "$ALERT_N" =~ ^(100|[1-9][0-9]?)$ ]]; then
+  echo "❌ --alert 必须为 1-100 的整数（评分百分制阈值），收到: $ALERT_N"
+  exit 1
+fi
+# --vs 头对头校验：逗号分隔恰好2个合法DNS地址且互不相同（扫描后再确认数据集中存在）
+VS_A=""; VS_B=""
+if [ -n "$VS_ARG" ]; then
+  VS_A="${VS_ARG%%,*}"; VS_B="${VS_ARG##*,}"
+  if [ "$VS_A" = "$VS_B" ] || [ -z "$VS_A" ] || [ -z "$VS_B" ]; then
+    echo "❌ --vs 必须为逗号分隔的两个不同DNS（例: --vs 223.5.5.5,119.29.29.29），收到: $VS_ARG"
+    exit 1
+  fi
+  for _v in "$VS_A" "$VS_B"; do
+    if ! valid_dns_addr "$_v"; then
+      echo "❌ --vs 含非法DNS地址: $_v"; exit 1
+    fi
+  done
 fi
 
 # ---------- --cron 采集模式：先跑 compare 再聚合 ----------
@@ -167,11 +211,19 @@ round_idx() {
 }
 
 rec_total=0
+MODE_SEEN=""   # 已见采集模式（lite/full 混采则评分口径不一致，扫描后统一警告）
+LAST_TS=""     # 最新一条采集时间戳（数据新鲜度计算用）
 for f in $FILES; do
   ts=$(grep -oE '"timestamp": ?"[^"]+"' "$f" | head -1 | sed 's/"timestamp": *"//;s/"$//')
   [ -z "$ts" ] && continue
   if [ -n "$SINCE" ] && [[ "$ts" < "$SINCE" ]]; then continue; fi
+  # --until 含当日整天：按日期前缀比较（ts 前缀="2026-08-13"，until 为纯日期）
+  if [ -n "$UNTIL" ] && [[ "${ts:0:10}" > "$UNTIL" ]]; then continue; fi
   ROUNDS_TS+=("$ts")
+  LAST_TS="$ts"
+  _m=$(grep -oE '"mode": ?"[^"]+"' "$f" | head -1 | sed 's/"mode": *"//;s/"$//')
+  [ -z "$_m" ] && _m="unknown"
+  case " $MODE_SEEN " in *" $_m "*) ;; *) MODE_SEEN="$MODE_SEEN $_m";; esac
   while IFS= read -r line; do
     [ -z "$line" ] && continue
     addr=$(echo "$line" | sed -n 's/.*"addr": *"\([^"]*\)".*/\1/p')
@@ -205,16 +257,37 @@ if [ "$rec_total" -eq 0 ]; then
   exit 2
 fi
 
-# 修尾换行坑：FILES 构造时每行带 \n，尾部空行会让 wc -l 多算1、tail -1 取到空行（期间终点显示为空）
-# 统一按"非空行"口径取首/尾/计数
-fmt_ts() { sed 's/.*compare-//;s/.json//' | sed 's/\(....\)\(..\)\(..\)-\(..\)\(..\)\(..\)/\1-\2-\3 \4:\5/'; }
-T0_TS=$(printf '%s\n' "$FILES" | awk 'NF{print; exit}' | fmt_ts)
-T1_TS=$(printf '%s\n' "$FILES" | awk 'NF{f=$0} END{print f}' | fmt_ts)
-N_FILES=$(printf '%s\n' "$FILES" | grep -c .)
+# 期间/计数改用"已入选数据"口径（ROUNDS_TS 只含通过 --since/--until 过滤的文件，与表格/图表一致）
+# 原实现取自文件名时间戳且未过滤，窗口分析时会显示全量范围与总数，口径不符
+T0_TS="${ROUNDS_TS[0]:0:16}"
+T1_TS="${LAST_TS:0:16}"
+N_FILES=${#ROUNDS_TS[@]}
+
+# lite/full 混采警告：两种模式测试项数不同、评分口径不同，横向趋势会失真（只警告不阻断）
+# 注意不能用 case *" lite "*" full "* 单模式判定：两个字面量的首尾空格会要求两词间有两个空格（永不匹配）
+_ms=" $MODE_SEEN "
+if [[ "$_ms" == *" lite "* && "$_ms" == *" full "* ]]; then
+  echo "⚠️  检测到 lite 与 full 两种采集模式混合：评分口径不同（测试项数不同），横向趋势仅供粗略参考"
+  echo "   建议: 用 --since/--until 圈定同一模式的时段分别对比"
+fi
+
+# 数据新鲜度：最新采集距现在多久（跨平台 epoch 换算见 lib/compat.sh ts_to_epoch；解析失败静默跳过）
+FRESHNESS=""
+if [ -n "$LAST_TS" ]; then
+  _le=$(ts_to_epoch "${LAST_TS:0:16}")
+  if [ -n "$_le" ]; then
+    _mins=$(( ( $(date +%s) - _le ) / 60 ))
+    if   [ "$_mins" -lt 1 ];    then FRESHNESS="刚刚"
+    elif [ "$_mins" -lt 60 ];   then FRESHNESS="${_mins}分钟前"
+    elif [ "$_mins" -lt 1440 ]; then FRESHNESS="$(( _mins / 60 )).$(( (_mins % 60) * 10 / 60 ))小时前"
+    else                             FRESHNESS="$(( _mins / 1440 )).$(( (_mins % 1440) * 10 / 1440 ))天前"
+    fi
+  fi
+fi
 
 print_header "DNS趋势洞察 — ${N_FILES}次采集 | ${rec_total}条可达记录"
 echo "  数据源: $SRC_DIR/compare-*.json  |  产物: $OUT_DIR/"
-echo "  期间: ${T0_TS} ~ ${T1_TS}"
+echo "  期间: ${T0_TS} ~ ${T1_TS}${FRESHNESS:+  |  最新采集: ${FRESHNESS}}"
 echo ""
 
 printf "  %-46s %-6s %-9s %-8s %-9s %-8s %-9s\n" "DNS" "样本" "评分均值" "评分趋势" "延迟均值" "延迟趋势" "P95延迟"
@@ -227,6 +300,7 @@ fi
 
 HTML_ROWS=""      # 总览表行
 HTML_CHARTS=""    # 图表卡片
+ALERT_CAND=""     # --alert 候选（addr_show|score_mean|n_ok|n_un，逐DNS一行，末尾统一判定）
 
 # ============================================================================
 # 趋势统计函数: 输出 "score_t|delay_t|score_mean|stab_mean|delay_mean|score_last|delay_last|n_ok|n_un|p50|p95"
@@ -420,11 +494,20 @@ svg_multi_chart() {
 }
 
 # ============================================================================
-# 主循环：每个DNS统计 + 输出（文本表/明细/时段分析/日级分析/CSV/HTML行与图表）
+# 主循环：每个DNS统计 + 输出（文本表/明细/时段分析/日级分析/周对比/突变检测/CSV/HTML行与图表）
 # ============================================================================
 HOUR_ANALYSIS=""   # 时段分析文本行（凑齐才输出小节）
 DAILY_ANALYSIS=""  # 日级分析文本行（数据跨≥2天才输出小节）
-HTML_INSIGHTS=""   # HTML 洞察卡内容（时段+日级，等宽对齐）
+WEEK_ANALYSIS=""   # 周对比文本行（近7天 vs 前7天，两窗都有样本的DNS才计入）
+MUTATION_ANALYSIS="" # 突变检测文本行（延迟较上轮突增的轮次，有命中才计入）
+HTML_INSIGHTS=""   # HTML 洞察卡内容（时段+日级+周对比+突变，等宽对齐）
+MD_ROWS=""         # --md 总览表行（与 HTML_ROWS 同口径）
+# 周对比窗口：近7天（含今天）= 日期 >= W1；前7天 = W2 <= 日期 <= W2E（字符串字典序比较，零子进程开销）
+# date_days_ago 不可用（极端环境）时跳过该节，不阻断主流程
+W1=$(date_days_ago 6)
+W2=$(date_days_ago 13)
+W2E=$(date_days_ago 7)
+[ -z "$W1" ] && W2=""   # W1 失败则一并停用（W2 单独存在无意义）
 for k in "${!RAW_ADDR[@]}"; do
   addr="${RAW_ADDR[$k]}"
   lines="${RAW_VAL[$k]}"
@@ -448,6 +531,8 @@ for k in "${!RAW_ADDR[@]}"; do
   un_suffix=""
   [ "$n_un" -gt 0 ] && un_suffix=" (含${n_un}次不可达)"
   p95_show="-"; [ "$p95" != "-" ] && p95_show="${p95}ms"
+  ALERT_CAND="${ALERT_CAND}${addr_show}|${score_mean:-0}|${n_ok}|${n_un}
+"
 
   if [ "$n_ok" -ge 1 ]; then
     printf "  %-46s %-6s %-9s %-8s %-9s %-8s %-9s%s\n" "$addr_show" "$n_ok" "$score_mean%" "$score_t" "${delay_mean}ms" "$delay_t" "$p95_show" "$un_suffix"
@@ -498,6 +583,50 @@ for k in "${!RAW_ADDR[@]}"; do
     fi
   fi
 
+  # 周对比：近7天（含今天）vs 前7天 的评分/延迟均值变化（两窗都有样本才有 Δ 可言）
+  if [ -n "$W2" ] && [ "$n_ok" -ge 2 ]; then
+    wk_stat=$(printf '%s\n' "$lines" | grep -v UNREACH | grep -v '^$' | awk -F'|' -v w1="$W1" -v w2="$W2" -v w2e="$W2E" '{
+      d=substr($1,1,10)
+      if (d>=w1) { s1+=$2; dl1+=$4; n1++ }
+      else if (d>=w2 && d<=w2e) { s2+=$2; dl2+=$4; n2++ }
+    } END {
+      if (n1>0 && n2>0) printf "%.1f %.1f %.1f %.1f %d %d", s2/n2, s1/n1, dl2/n2, dl1/n1, n2, n1
+    }')
+    if [ -n "$wk_stat" ]; then
+      wk_prev_s=$(echo "$wk_stat" | awk '{print $1}')
+      wk_cur_s=$(echo "$wk_stat"  | awk '{print $2}')
+      wk_prev_d=$(echo "$wk_stat" | awk '{print $3}')
+      wk_cur_d=$(echo "$wk_stat"  | awk '{print $4}')
+      wk_prev_n=$(echo "$wk_stat" | awk '{print $5}')
+      wk_cur_n=$(echo "$wk_stat"  | awk '{print $6}')
+      wk_ds=$(awk "BEGIN{printf \"%+.1f\", $wk_cur_s - $wk_prev_s}")
+      wk_dd=$(awk "BEGIN{printf \"%+.1f\", $wk_cur_d - $wk_prev_d}")
+      # Δ符号语义: 评分升=好，延迟降=好（箭头=好坏方向）
+      wk_ds_mark="→"; awk "BEGIN{exit !($wk_ds>0.5)}"  && wk_ds_mark="↑"
+      awk "BEGIN{exit !($wk_ds<-0.5)}" && wk_ds_mark="↓"
+      wk_dd_mark="→"; awk "BEGIN{exit !($wk_dd<-1)}"   && wk_dd_mark="↑"
+      awk "BEGIN{exit !($wk_dd>1)}"    && wk_dd_mark="↓"
+      WEEK_ANALYSIS="${WEEK_ANALYSIS}  ${addr_show}
+    评分 ${wk_prev_s}%→${wk_cur_s}%（${wk_ds} ${wk_ds_mark}）｜ 延迟 ${wk_prev_d}ms→${wk_cur_d}ms（${wk_dd}ms ${wk_dd_mark}）｜ 样本 ${wk_prev_n}→${wk_cur_n}
+"
+    fi
+  fi
+
+  # 突变检测：延迟较上一轮突增（Δ>+100ms 且 >2×前值）视为异常轮（网络抖动/加速器抽风定位）
+  if [ "$n_ok" -ge 2 ]; then
+    mut_hits=$(printf '%s\n' "$lines" | grep -v UNREACH | grep -v '^$' | awk -F'|' '
+      NR>1 && ($4-prev_d>100 && $4>2*prev_d) {
+        printf "    %-16s %sms→%sms（+%dms，为上轮%.1f倍）\n", substr($1,1,16), prev_d, $4, $4-prev_d, $4/prev_d
+      }
+      { prev_d=$4 }')
+    if [ -n "$mut_hits" ]; then
+      mut_cnt=$(printf '%s\n' "$mut_hits" | grep -c .)
+      MUTATION_ANALYSIS="${MUTATION_ANALYSIS}  ${addr_show}（${mut_cnt}次突增）
+${mut_hits}
+"
+    fi
+  fi
+
   # CSV
   if [ "$GEN_CSV" = "1" ] && [ "$n_ok" -ge 1 ]; then
     printf '%s\n' "$lines" | grep -v UNREACH | grep -v '^$' | while IFS='|' read -r ts sc st dl; do
@@ -532,6 +661,17 @@ for k in "${!RAW_ADDR[@]}"; do
       HTML_CHARTS="$HTML_CHARTS$(svg_chart "$addr_show" "$ok_lines" delay "$delay_t" "ms" "$delay_last" "$delay_mean")"
     fi
   fi
+
+  # --md 总览表行（与文本表同口径；addr_show 无需转义，仅含 hex/点/冒号/中文/·）
+  if [ "$GEN_MD" = "1" ]; then
+    if [ "$n_ok" -ge 1 ]; then
+      MD_ROWS="${MD_ROWS}| \`${addr_show}\` | ${n_ok} | ${score_mean}% | ${score_t} | ${delay_mean}ms | ${delay_t} | ${p95_show} |
+"
+    else
+      MD_ROWS="${MD_ROWS}| \`${addr_show}\` | 0 | — | — | — | — | — |
+"
+    fi
+  fi
 done
 
 # ---------- 时段/日级分析小节（文本；有满足条件的DNS才输出） ----------
@@ -545,8 +685,62 @@ if [ -n "$DAILY_ANALYSIS" ]; then
   echo "  ━━━ 日级分析（按天聚合，数据跨≥2天才显示） ━━━"
   printf '%s' "$DAILY_ANALYSIS"
 fi
+if [ -n "$WEEK_ANALYSIS" ]; then
+  echo ""
+  echo "  ━━━ 周对比（近7天 vs 前7天，两窗都有样本才显示） ━━━"
+  printf '%s' "$WEEK_ANALYSIS"
+fi
+if [ -n "$MUTATION_ANALYSIS" ]; then
+  echo ""
+  echo "  ━━━ 突变检测（延迟较上轮 +100ms 且 >2× 记为突增） ━━━"
+  printf '%s' "$MUTATION_ANALYSIS"
+fi
 
-# HTML 洞察卡内容（时段+日级一并给 HTML；等宽 pre 风格，数据均为数字/地址无需转义）
+# ---------- --vs 头对头：两DNS同轮对决胜负计数（同轮都可达才成局，评分高者胜） ----------
+VS_TEXT=""
+if [ -n "$VS_A" ]; then
+  va_idx=$(raw_idx "$VS_A"); vb_idx=$(raw_idx "$VS_B")
+  if [ "$va_idx" = "-1" ] || [ "$vb_idx" = "-1" ]; then
+    _miss=""; [ "$va_idx" = "-1" ] && _miss="$VS_A"
+    [ "$vb_idx" = "-1" ] && _miss="${_miss:+$_miss }$VS_B"
+    echo "❌ --vs 的 ${_miss} 不在数据集中（先采集该DNS: bash compare.sh $VS_A $VS_B）"
+    exit 1
+  fi
+  wins_a=0; wins_b=0; draws=0; duel_n=0
+  for r in "${ROUNDS_TS[@]}"; do
+    # 该轮两方评分（RAW_VAL 行= "ts|score|stab|delay"；不可达行尾标 UNREACH 已排除）
+    sa=$(printf '%s\n' "${RAW_VAL[$va_idx]}" | grep -F "$r|" | grep -v UNREACH | head -1 | cut -d'|' -f2)
+    sb=$(printf '%s\n' "${RAW_VAL[$vb_idx]}" | grep -F "$r|" | grep -v UNREACH | head -1 | cut -d'|' -f2)
+    [ -z "$sa" ] || [ -z "$sb" ] && continue
+    duel_n=$((duel_n+1))
+    if [ "$sa" -gt "$sb" ]; then wins_a=$((wins_a+1))
+    elif [ "$sb" -gt "$sa" ]; then wins_b=$((wins_b+1))
+    else draws=$((draws+1)); fi
+  done
+  if [ "$duel_n" -gt 0 ]; then
+    # 均值对比（复用 trend_stats 的均值口径）
+    va_mean=$(trend_stats "${RAW_VAL[$va_idx]}" | cut -d'|' -f3)
+    vb_mean=$(trend_stats "${RAW_VAL[$vb_idx]}" | cut -d'|' -f3)
+    va_dmean=$(trend_stats "${RAW_VAL[$va_idx]}" | cut -d'|' -f5)
+    vb_dmean=$(trend_stats "${RAW_VAL[$vb_idx]}" | cut -d'|' -f5)
+    va_show="$VS_A"; _vl=$(dns_preset_label "$VS_A") && va_show="$VS_A·$_vl"
+    vb_show="$VS_B"; _vl=$(dns_preset_label "$VS_B") && vb_show="$VS_B·$_vl"
+    vs_verdict="势均力敌"
+    [ "$wins_a" -gt $((duel_n * 2 / 3)) ] && vs_verdict="🏆 ${va_show} 占优"
+    [ "$wins_b" -gt $((duel_n * 2 / 3)) ] && vs_verdict="🏆 ${vb_show} 占优"
+    VS_TEXT="⚔️  头对头（同轮对决 ${duel_n} 局）: ${va_show} 胜${wins_a} ｜ ${vb_show} 胜${wins_b} ｜ 平${draws} ｜ ${vs_verdict}
+    全期均值: 评分 ${va_mean}% vs ${vb_mean}% ｜ 延迟 ${va_dmean}ms vs ${vb_dmean}ms
+"
+    echo ""
+    echo "  ━━━ 头对头 --vs（同轮对决，评分高者胜） ━━━"
+    printf '%s' "$VS_TEXT"
+  else
+    echo ""
+    echo "  ⚔️  --vs: ${VS_A} 与 ${VS_B} 无同轮都可达的采集记录，无法对决（需同轮对比采集: bash compare.sh $VS_A $VS_B）"
+  fi
+fi
+
+# HTML 洞察卡内容（时段/日级/周对比/突变/头对头一并给 HTML；等宽 pre 风格，数据均为数字/地址无需转义）
 if [ "$GEN_HTML" = "1" ]; then
   if [ -n "$HOUR_ANALYSIS" ]; then
     HTML_INSIGHTS="⏰ 时段分析（每小时≥3样本）
@@ -556,6 +750,20 @@ ${HOUR_ANALYSIS}
   if [ -n "$DAILY_ANALYSIS" ]; then
     HTML_INSIGHTS="${HTML_INSIGHTS}📅 日级分析（跨≥2天）
 ${DAILY_ANALYSIS}
+"
+  fi
+  if [ -n "$WEEK_ANALYSIS" ]; then
+    HTML_INSIGHTS="${HTML_INSIGHTS}📆 周对比（近7天 vs 前7天）
+${WEEK_ANALYSIS}
+"
+  fi
+  if [ -n "$MUTATION_ANALYSIS" ]; then
+    HTML_INSIGHTS="${HTML_INSIGHTS}⚡ 突变检测（延迟较上轮 +100ms 且 >2×）
+${MUTATION_ANALYSIS}
+"
+  fi
+  if [ -n "$VS_TEXT" ]; then
+    HTML_INSIGHTS="${HTML_INSIGHTS}${VS_TEXT}
 "
   fi
 fi
@@ -603,7 +811,7 @@ if [ "$GEN_HTML" = "1" ]; then
     echo "</style></head><body>"
     echo "<div class='wrap'>"
     echo "<div class='card'><h1>📈 DNS 趋势报告</h1>"
-    echo "<div class='meta'>${N_FILES}次采集（${T0_TS} ~ ${T1_TS}）｜ dns-test ${VERSION} ｜ 数据源 ${SRC_DIR}/compare-*.json</div>"
+    echo "<div class='meta'>${N_FILES}次采集（${T0_TS} ~ ${T1_TS}）${FRESHNESS:+｜ 最新采集 ${FRESHNESS}}｜ dns-test ${VERSION} ｜ 数据源 ${SRC_DIR}/compare-*.json</div>"
     echo "<div class='tbl-wrap'><table><thead><tr><th>DNS</th><th>样本</th><th>评分均值</th><th>评分趋势</th><th>延迟均值</th><th>延迟趋势</th><th>P95延迟</th></tr></thead><tbody>"
     echo "$HTML_ROWS"
     echo "</tbody></table></div></div>"
@@ -623,6 +831,89 @@ if [ "$GEN_HTML" = "1" ]; then
   if [ "${GEN_OPEN:-0}" = "1" ]; then
     open_report_file "$HF"
   fi
+fi
+
+# ---------- Markdown 报告（--md）— GitHub/PR/Issue 友好，与 compare --md 同风格 ----------
+if [ "$GEN_MD" = "1" ]; then
+  MF="$OUT_DIR/report.md"
+  {
+    echo "# DNS 趋势报告"
+    echo ""
+    echo "> ${N_FILES}次采集（${T0_TS} ~ ${T1_TS}）${FRESHNESS:+｜ 最新采集 ${FRESHNESS}}｜ dns-test ${VERSION}｜ 数据源 \`${SRC_DIR}/compare-*.json\`"
+    echo ""
+    echo "| DNS | 样本 | 评分均值 | 评分趋势 | 延迟均值 | 延迟趋势 | P95延迟 |"
+    echo "|-----|------|---------|---------|---------|---------|--------|"
+    printf '%s' "$MD_ROWS"
+    echo ""
+    if [ -n "$WEEK_ANALYSIS" ]; then
+      echo "## 周对比（近7天 vs 前7天）"
+      echo ""
+      echo '```'
+      printf '%s' "$WEEK_ANALYSIS"
+      echo '```'
+      echo ""
+    fi
+    if [ -n "$MUTATION_ANALYSIS" ]; then
+      echo "## 突变检测（延迟较上轮 +100ms 且 >2× 记为突增）"
+      echo ""
+      echo '```'
+      printf '%s' "$MUTATION_ANALYSIS"
+      echo '```'
+      echo ""
+    fi
+    if [ -n "$VS_TEXT" ]; then
+      echo "## 头对头（同轮对决）"
+      echo ""
+      echo '```'
+      printf '%s' "$VS_TEXT"
+      echo '```'
+      echo ""
+    fi
+    if [ -n "$HOUR_ANALYSIS" ]; then
+      echo "## 时段分析（按小时聚合）"
+      echo ""
+      echo '```'
+      printf '%s' "$HOUR_ANALYSIS"
+      echo '```'
+      echo ""
+    fi
+    if [ -n "$DAILY_ANALYSIS" ]; then
+      echo "## 日级分析（按天聚合）"
+      echo ""
+      echo '```'
+      printf '%s' "$DAILY_ANALYSIS"
+      echo '```'
+      echo ""
+    fi
+    echo "---"
+    echo "<sub>由 dns-test ${VERSION} 生成；采集: \`bash compare.sh DNS1 DNS2 --watch 30\`；HTML: \`bash trends.sh --html\`</sub>"
+  } > "$MF"
+  echo ""
+  echo "  📝 Markdown趋势报告已生成: $MF"
+fi
+
+# ---------- --alert 值守告警：评分均值低于阈值 或 全程不可达 → 列出并 exit 3 ----------
+# cron 场景按退出码分发（≠0 即触发通知通道）；文本模式同样输出，人肉跑也能看到
+if [ -n "$ALERT_N" ]; then
+  ALERT_HITS=""
+  while IFS='|' read -r aname amean aok aun; do
+    [ -z "$aname" ] && continue
+    if [ "$aok" = "0" ]; then
+      ALERT_HITS="${ALERT_HITS}  🚨 ${aname}: 全部 ${aun} 次采集均不可达
+"
+    elif awk "BEGIN{exit !($amean < $ALERT_N)}"; then
+      ALERT_HITS="${ALERT_HITS}  🚨 ${aname}: 评分均值 ${amean}% 低于阈值 ${ALERT_N}%
+"
+    fi
+  done <<< "$ALERT_CAND"
+  if [ -n "$ALERT_HITS" ]; then
+    echo ""
+    echo "  ━━━ 🚨 告警（--alert ${ALERT_N}）━━━"
+    printf '%s' "$ALERT_HITS"
+    exit 3
+  fi
+  echo ""
+  echo "  ✅ --alert ${ALERT_N}: 全部 DNS 评分均值达标"
 fi
 
 exit 0
