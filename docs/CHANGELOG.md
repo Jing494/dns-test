@@ -6,7 +6,8 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
-| v2026.08.23 | v1.16（当前） |
+| v2026.08.24 | v1.16（当前，补丁） |
+| v2026.08.23 | v1.16 |
 | v2026.08.22 | v1.15 |
 | v2026.08.21 | v1.14 |
 | v2026.08.20 | v1.13 |
@@ -27,6 +28,13 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-24（第九十七轮）：**补丁轮：macOS bash 3.2 多字节展开修复 + --open 降级提示 + CI 双平台加固（trends.sh / doctor.sh / lib/core.sh / lib/plugins.sh / install.sh / tests/06 / .github/workflows/smoke.yml，发布 v2026.08.24，语义版 v1.16 不变）**
+  - **根因（CI macOS 首跑实证）**：macOS 自带 bash 3.2 在 UTF-8 locale 下，`"$var（"` 中紧跟变量的全角字符首字节（0xEF/0xC2 等）被误并入变量名 → 展开为空/错位。表现：trends 总图标题丢"综合评分对比"、`--vs` 对决行 DNS 标签坏、时间窗倒挂报错插值坏
+  - **修法**：全仓 `$var` 后紧跟非 ASCII 字符的插值一律加花括号 `${var}`（trends.sh 7 处 / lib/core.sh 1 / lib/plugins.sh 2 / doctor.sh 10 / install.sh 2）
+  - **`--open` 静默降级修复**：xdg-open/wslview 存在但打开失败（无桌面环境，如 SSH/CI）时原为静默，现补降级提示"请手动打开"（open/xdg-open/wslview 三分支全覆盖）
+  - **tests/06 归档计数**：改 `-eq` 整数比较（免疫 BSD wc 前导空格；并避开测试内 `tr()` 函数截获系统 `tr -d` 的坑）
+  - **CI（smoke.yml）加固**：单测失败打印失败断言上下文（grep ❌ 前后各 1 行，不再盲猜）；失败时上传 UTLOG artifact；双平台矩阵（ubuntu/macos）实证 bash 3.2 兼容
+  - **回归**：全量单测 8 套 250 断言双平台通过；参数解析/拦截/退出码语义零改动
 - 2026-08-23（第九十六轮）：**收官轮：--archive-keep 归档轮转 + doctor --fix 自愈 + --export 时间窗 + trends 纯函数下沉 + compare↔trends 互链 + CI/文档全量同步（trends.sh / doctor.sh / lib/trends_lib.sh / compare.sh / verify.sh / .github/workflows/smoke.yml / tests/06 / tests/08 / docs，发布 v1.16 = v2026.08.23）**
   - **`trends --archive-keep N` 归档包轮转**：`trends/archive/` 只留最近 N 个 tar.gz（删最老的总数−N 个，逐个报名）；≤N 提示无需轮转；正整数校验；与 `--prune N --archive` 长期值守配套（归档不再无限堆积，也不动数据 JSON）
   - **`trends --export --since/--until` 时间窗**：报障包按文件名内嵌日期段（`compare-YYYYMMDD-`）过滤，窗口外计数提示未打包；非标准命名的老文件不过滤保留（宁可多带不丢数据）；`--since/--until` 传参逻辑与主流程过滤零改动
