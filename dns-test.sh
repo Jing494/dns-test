@@ -132,15 +132,15 @@ run_basic() {
             for idx in "${!DNS_LIST[@]}"; do
               printf "  %d. %s\n" $((idx+1)) "${DNS_LIST[$idx]}"
             done
-            if ! prompt dns_idx "请输入要测试的DNS编号(1-${#DNS_LIST[@]}): "; then
+            if ! prompt dns_choice "请输入要测试的DNS编号(1-${#DNS_LIST[@]}): "; then
               echo ""
               echo "⏰ 等待输入超时，返回主菜单..."
               return 0
             fi
             echo ""
-            # 非数字/越界均回退第1个；先校验纯数字再做算术，避免非数字输入产生报错噪音
-            if [[ "$dns_idx" =~ ^[1-9][0-9]*$ ]] && [ "$dns_idx" -le "${#DNS_LIST[@]}" ]; then
-              DNS_LIST=("${DNS_LIST[$((dns_idx-1))]}")
+            # dns_choice 是用户输入的 1-based 编号：先校验纯数字再做 1→0 索引换算，避免非数字输入产生报错噪音；非法/越界回退第1个
+            if [[ "$dns_choice" =~ ^[1-9][0-9]*$ ]] && [ "$dns_choice" -le "${#DNS_LIST[@]}" ]; then
+              DNS_LIST=("${DNS_LIST[$((dns_choice-1))]}")
               DNS_DISPLAY="指定DNS: ${DNS_LIST[0]}"
             else
               echo "无效编号，默认测试第一个DNS"
