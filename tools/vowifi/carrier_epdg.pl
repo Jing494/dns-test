@@ -99,9 +99,10 @@ if (!defined $carrier_arg) {
     print "请输入选项(1-3): ";
     my $dsel = <STDIN>;
     chomp $dsel;
-    if ($dsel == 2) {
+    # 先判纯数字再比较（非数字输入直接走数值比较会触发 "isn't numeric" 警告噪音）
+    if ($dsel =~ /^\d+$/ && $dsel == 2) {
         $dns_arg = "router";
-    } elsif ($dsel == 3) {
+    } elsif ($dsel =~ /^\d+$/ && $dsel == 3) {
         print "请输入DNS地址: ";
         $dns_arg = <STDIN>;
         chomp $dns_arg;

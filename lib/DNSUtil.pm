@@ -34,10 +34,13 @@ sub inet_pton_ipv6 {
         my @parts = split(/::/, $addr, 2);
         my @left = $parts[0] ? split(/:/, $parts[0]) : ();
         my @right = $parts[1] ? split(/:/, $parts[1]) : ();
-        # hex 合法性校验（perl hex() 对非法字符只警告不报错，需显式拒绝）
+        # hex 合法性 + 段长校验（perl hex() 对非法字符只警告不报错；超4位段 pack("n") 会静默截断，均需显式拒绝）
         for my $p (@left, @right) {
             return undef if defined($p) && $p =~ /[^0-9a-fA-F]/;
+            return undef if defined($p) && length($p) > 4;
         }
+        # :: 两侧总段数不得超 7（超 8 段类畸形地址会使 missing 为负，静默产出 18 字节错误结果）
+        return undef if scalar(@left) + scalar(@right) > 7;
         my $missing = 8 - scalar(@left) - scalar(@right);
         my @mid = ("0") x $missing if $missing > 0;
         my @full = (@left, @mid, @right);
@@ -52,9 +55,10 @@ sub inet_pton_ipv6 {
     } else {
         my @parts = split(/:/, $addr);
         return undef if (scalar(@parts) != 8);
-        # hex 合法性校验
+        # hex 合法性 + 段长校验（与 :: 分支同规格，超4位段拒绝）
         for my $p (@parts) {
             return undef if defined($p) && $p =~ /[^0-9a-fA-F]/;
+            return undef if defined($p) && length($p) > 4;
         }
 
         my $bytes = "";

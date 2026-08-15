@@ -47,6 +47,13 @@ subtest 'inet_pton_ipv6 非法地址' => sub {
     ok(!defined inet_pton_ipv6("gg::1"), "非法hex拒绝");
     ok(!defined inet_pton_ipv6("1.2.3.4"), "IPv4地址被拒绝(纯v6函数)");
     ok(!defined inet_pton_ipv6("2001:db8:1:2:3:4:5"), "少一段(7段)拒绝");
+    # :: 分支段数超限（修复前 missing 为负会静默产出 18 字节错误结果，见审阅#13）
+    ok(!defined inet_pton_ipv6("1:2:3:4:5:6:7:8::9"), "::两侧9段拒绝");
+    ok(!defined inet_pton_ipv6("1:2:3:4:5:6:7:8::"), "全8段+::拒绝");
+    ok(!defined inet_pton_ipv6("1::2:3:4:5:6:7:8"), "::后接8段拒绝");
+    # 段超4位（修复前 pack("n") 静默截断产出错误地址）
+    ok(!defined inet_pton_ipv6("1:2:3:4:5:6:7:88888"), "非压缩分支段超4位拒绝");
+    ok(!defined inet_pton_ipv6("::12345"), "压缩分支段超4位拒绝");
 };
 
 subtest 'inet_pton_ipv6 输出长度' => sub {

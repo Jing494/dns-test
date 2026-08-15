@@ -1,8 +1,9 @@
 #!/bin/bash
 # ============================================================================
-# 纯 bash 轻量断言单测：run_common_tests（lite 计分口径离线回归）
+# 纯 bash 轻量断言单测：run_common_tests（lite 计分口径 + full @server 回归，离线）
 # 用 mock dig/ping 固定响应，验证 lite 版各测试项计分与总分口径（含稳定性降轮），
-# 并回归 CONFIG_DOMAINS 安全解析（不 source、注入不执行）与 dig @server 前缀（漏 @ 会走本地解析器）
+# 并回归 CONFIG_DOMAINS 安全解析（不 source、注入不执行）、dig @server 前缀（漏 @ 会走本地解析器）、
+# full 模式 @server 恒为被测地址（for t 遮蔽防护）、ECS_SUBNET 注入拦截、par_run 元字符禁令
 # 用法: bash tests/05_run_common_tests.sh   （退出码 0=全过 1=有失败）
 # 说明: 不发起任何真实网络请求；mock dig 按查询域名/类型/+short 返回固定响应
 # ============================================================================
@@ -152,6 +153,36 @@ if [ -s "$STUB/args.log" ] && ! grep -q '^[^@]' "$STUB/args.log"; then
   ok "dig 均带 @server（漏 @ 回归防护）"
 else
   notok "dig 均带 @server（漏 @ 回归防护）"
+fi
+
+# 10. full 模式 @server 回归：所有 dig 的 @ 目标只能是 被测DNS/劫持对比基准（防循环变量遮蔽 $t）
+# 修复前 full 专有分支的 for t 循环（稳定性延迟/DNSSEC类型/TTL值）会把 $t 遮蔽成
+# "10"/"DNSKEY"/"300" 等，导致第 6~15 项全部 dig @错误目标（见 core.sh 审阅#11）
+rm -f "$STUB/full.log"
+MOCK_DIG_LOG="$STUB/full.log" PATH="$STUB:$PATH" run_common_tests 8.8.8.8 "mockDNS" full >/dev/null 2>&1
+# 白名单：@8.8.8.8=被测地址；@[2400:3200::1]/@223.5.5.5=[14]劫持对比基准（mock 下基准可达不降级，降级也放行）
+bad_at=$(grep -oE '@[^ ]+' "$STUB/full.log" 2>/dev/null | grep -vxF -e '@8.8.8.8' -e '@[2400:3200::1]' -e '@223.5.5.5' | head -3)
+if [ -s "$STUB/full.log" ] && [ -z "$bad_at" ]; then
+  ok "full 模式 @server 恒为被测地址/对比基准（for t 遮蔽回归）"
+else
+  notok "full 模式 @server 出现非白名单目标: ${bad_at:-无日志}"
+fi
+
+# 11. ECS_SUBNET 注入回归：非法值（含命令分隔符）加载即回退默认，不得进入 par_run 的 eval
+R3=$(ECS_SUBNET='1.2.3.4/24; touch '"$STUB"'/pwned' PATH="$STUB:$PATH" bash -c 'source lib/core.sh; printf "%s" "$ECS_SUBNET"' 2>/dev/null)
+if [ "$R3" = "240e:52:4800::/48" ] && [ ! -f "$STUB/pwned" ]; then
+  ok "ECS_SUBNET 非法值回退默认（注入拦截）"
+else
+  notok "ECS_SUBNET 非法值回退默认 (got $R3 pwned=$([ -f "$STUB/pwned" ] && echo yes || echo no))"
+fi
+
+# 12. par_run 元字符禁令：命令含 ; & $ ` 时整体拒绝（不执行任何一条）
+rm -f "$STUB/inj.out"
+P4=$(PATH="$STUB:$PATH" TMPDIR="$STUB" bash -c 'source lib/core.sh; PARR_CMDS=("dig @8.8.8.8 a.com A +short; touch '"$STUB"'/inj.out"); par_run >/dev/null 2>&1; echo done' 2>/dev/null)
+if [ ! -f "$STUB/inj.out" ]; then
+  ok "par_run 元字符命令被拒（; 注入不执行）"
+else
+  notok "par_run 元字符命令被拒（inj.out 出现=未拦截）"
 fi
 
 echo ""

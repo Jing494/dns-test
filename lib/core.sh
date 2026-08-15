@@ -177,6 +177,9 @@ STAB_ROUNDS="${STAB_ROUNDS:-20}"
 
 # ECS测试使用的subnet（默认运营商IPv6前缀，示例为运营商DNS；测其他DNS时可设环境变量 ECS_SUBNET 覆盖）
 ECS_SUBNET="${ECS_SUBNET:-240e:52:4800::/48}"
+# 校验必须为 CIDR 格式（hex/冒号/点 + /前缀长度），非法值回退默认
+# （ECS_SUBNET 会拼进 par_run 的 eval 命令串，不校验则可被注入命令执行，见审阅#12）
+[[ "$ECS_SUBNET" =~ ^[0-9a-fA-F:.]+/[0-9]{1,3}$ ]] || ECS_SUBNET="240e:52:4800::/48"
 
 # ping超时参数（Linux -W 单位=秒，macOS -W 单位=毫秒，需区分）
 if [ "$(uname)" = "Darwin" ]; then
@@ -286,10 +289,16 @@ par_run() {
   local i=0 cmd
   # 安全兜底（审阅#7）：par_run 只允许执行 dig 命令——bash 3.2（macOS）不支持数组套数组，
   # 以"命令白名单 + 地址/域名前置校验"把 eval 注入面收窄到零；任一非法命令立即整体拒绝
+  # 元字符禁令（审阅#12）：拒绝命令分隔/替换字符（; & $ `），管道 | 为 compare 延迟取数保留
+  # （调用点管道右侧均为固定 sed，不受控输入已在拼入前校验，如 ECS_SUBNET/DNS 地址）
   for cmd in "${PARR_CMDS[@]}"; do
     case "$cmd" in
       dig\ *) ;;
       *) echo "par_run: 仅允许 dig 命令，已拒绝: $cmd" >&2; PARR_COUNT=0; return 1 ;;
+    esac
+    case "$cmd" in
+      *\;*|*\&*|*\$*|*\`*)
+        echo "par_run: 命令含禁止元字符(; & \$ \`), 已拒绝: $cmd" >&2; PARR_COUNT=0; return 1 ;;
     esac
   done
   for cmd in "${PARR_CMDS[@]}"; do
@@ -534,8 +543,9 @@ run_common_tests() {
   local avg_t=0
   if [ "$full" -eq 1 ] && [ ${#stab_times[@]} -gt 0 ]; then
     local min_t=${stab_times[0]}; local max_t=${stab_times[0]}; local sum=0
-    for t in "${stab_times[@]}"; do
-      [ "$t" -lt "$min_t" ] && min_t=$t; [ "$t" -gt "$max_t" ] && max_t=$t; sum=$((sum + t))
+    # 注意：循环变量不得用 t（会遮蔽上方 dig @server 目标 $t，导致后续项 dig @延迟值 错乱，见审阅#11）
+    for st in "${stab_times[@]}"; do
+      [ "$st" -lt "$min_t" ] && min_t=$st; [ "$st" -gt "$max_t" ] && max_t=$st; sum=$((sum + st))
     done
     avg_t=$((sum / ${#stab_times[@]}))
     printf "  ⏱️  延迟: 最小%dms | 最大%dms | 平均%dms\n" "$min_t" "$max_t" "$avg_t"
@@ -644,8 +654,9 @@ run_common_tests() {
   echo "  ━━━ [10] DNSSEC安全扩展测试（并行） ━━━"
   PARR_CMDS=()
   for d in "${DOMAINS_DNSSEC[@]}"; do
-    for t in DNSKEY DS RRSIG; do
-      PARR_CMDS+=("dig @$t ${d} ${t} +short ${DIG_OPTS} 2>/dev/null")
+    # 注意：循环变量不得用 t（会遮蔽 dig @server 目标 $t，变成 dig @DNSKEY 错乱，见审阅#11）
+    for rt in DNSKEY DS RRSIG; do
+      PARR_CMDS+=("dig @$t ${d} ${rt} +short ${DIG_OPTS} 2>/dev/null")
     done
   done
   par_run
@@ -724,8 +735,9 @@ run_common_tests() {
   done
   if [ ${#ttl_values[@]} -gt 0 ]; then
     local ttl_min=${ttl_values[0]}; local ttl_max=${ttl_values[0]}; local ttl_sum=0
-    for t in "${ttl_values[@]}"; do
-      [ "$t" -lt "$ttl_min" ] && ttl_min=$t; [ "$t" -gt "$ttl_max" ] && ttl_max=$t; ttl_sum=$((ttl_sum + t))
+    # 注意：循环变量不得用 t（会遮蔽 dig @server 目标 $t，导致后续项 dig @TTL值 错乱，见审阅#11）
+    for tv in "${ttl_values[@]}"; do
+      [ "$tv" -lt "$ttl_min" ] && ttl_min=$tv; [ "$tv" -gt "$ttl_max" ] && ttl_max=$tv; ttl_sum=$((ttl_sum + tv))
     done
     local ttl_avg=$((ttl_sum / ${#ttl_values[@]}))
     printf "     📊 TTL范围: %ds ~ %ds | 平均: %ds\n" "$ttl_min" "$ttl_max" "$ttl_avg"

@@ -48,7 +48,9 @@ SUDO=""
 echo "════ 依赖检测 ════"
 
 # 先检测包管理器，决定 dig / shellcheck 的包名
+# 默认通用名（无包管理器场景下 NEED 数组/提示不出现空包名，检测到包管理器后按发行版覆盖）
 PM=""
+PKG_DIG="dig"; PKG_SC="shellcheck"
 if command -v apt-get >/dev/null 2>&1; then
   PM="apt"; PKG_DIG="dnsutils"; PKG_SC="shellcheck"
 elif command -v dnf >/dev/null 2>&1; then
