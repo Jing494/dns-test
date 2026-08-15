@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154  # 变量由 prompt() 内 read -t -p 动态赋值（跨函数，shellcheck 无法追踪）
 # ============================================================================
 # DNS测试统一入口脚本
 # 功能：智能引导用户选择测试类型，支持自定义DNS参数；交互模式带主菜单循环
@@ -17,6 +18,19 @@ source "${SCRIPT_DIR}/lib/core.sh"
 # 版本号输出（统一入口约定）
 if [ "$1" = "--version" ]; then
   echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
+  exit 0
+fi
+
+# 帮助输出（与其余入口脚本一致）
+if [ "$1" = "-h" ] || [ "$1" = "--help" ] || [ "$1" = "help" ]; then
+  echo "用法: bash dns-test.sh [DNS...]"
+  echo "  DNS列表: 一个或多个DNS地址（默认 4 个默认运营商DNS，v4/v6 各 2 个），支持v4/v6混合"
+  echo "  交互: 测完自动返回主菜单，可继续测试或输入 0 退出；全程 30 秒输入超时保护"
+  echo "  示例:"
+  echo "    bash dns-test.sh                       # 默认DNS组（交互选版本/专项）"
+  echo "    bash dns-test.sh 8.8.8.8               # 自定义DNS"
+  echo "    bash dns-test.sh 8.8.8.8 114.114.114.114  # 多个自定义DNS"
+  echo "  环境变量: DEFAULT_DNS_CSV=... 自定义默认DNS组；SAVE_LOG=1 保存日志"
   exit 0
 fi
 
