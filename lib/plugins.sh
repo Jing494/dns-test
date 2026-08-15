@@ -24,7 +24,7 @@ _plugins_load() {
     source "$mf"
     _plugins_loaded=1
   else
-    echo "⚠️ 插件注册表不存在: $mf（专项菜单不可用，可手动直跑 tools/ 脚本）" >&2
+    echo "⚠️ 插件注册表不存在: ${mf}（专项菜单不可用，可手动直跑 tools/ 脚本）" >&2
   fi
 }
 _plugins_load
@@ -70,7 +70,7 @@ plugin_run() {
       fi
       # 校验执行器（perl/bash 白名单，防 manifest 误填执行任意命令）
       if [ "$P_EXEC" != "perl" ] && [ "$P_EXEC" != "bash" ]; then
-        echo "❌ 未知执行器: $P_EXEC（仅支持 perl/bash）" >&2
+        echo "❌ 未知执行器: ${P_EXEC}（仅支持 perl/bash）" >&2
         return 1
       fi
       # 参数策略三态（防 DNS 被误当插件参数）:

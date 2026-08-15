@@ -126,7 +126,7 @@ for _d in "since:$SINCE" "until:$UNTIL"; do
 done
 # --until 不能早于 --since（窗口倒挂必然空集，提前报错比"2=无数据"更可诊断）
 if [ -n "$SINCE" ] && [ -n "$UNTIL" ] && [[ "$UNTIL" < "$SINCE" ]]; then
-  echo "❌ --until（$UNTIL）早于 --since（$SINCE），时间窗口倒挂"
+  echo "❌ --until（${UNTIL}）早于 --since（${SINCE}），时间窗口倒挂"
   exit 1
 fi
 # --alert 阈值校验：1-100 的评分百分制
@@ -198,7 +198,7 @@ if [ "$ARCHIVE" = "1" ] && [ -z "$PRUNE_N" ]; then
     mkdir -p "$OUT_DIR/archive"
     A_TAR="$OUT_DIR/archive/full-$(date '+%Y%m%d-%H%M%S').tar.gz"
     if tar -czf "$A_TAR" -C "$SRC_DIR" "${AFULL[@]}" 2>/dev/null; then
-      echo "  🗄️  --archive: 已全量归档 ${#AFULL[@]} 份 → $A_TAR（原文件保留不动）"
+      echo "  🗄️  --archive: 已全量归档 ${#AFULL[@]} 份 → ${A_TAR}（原文件保留不动）"
     else
       echo "  ⚠️  --archive: tar 打包失败（tar 不可用/磁盘满？），原文件未受影响"
     fi
@@ -501,7 +501,7 @@ svg_chart() {
   local n=0
   while IFS= read -r line; do [ -n "$line" ] && n=$((n+1)); done <<< "$data"
   if [ "$n" -lt 2 ]; then
-    echo "<div class='card'><h2>$addr — $title</h2><div class='meta'>样本不足（$n条，至少2条才出图）</div></div>"
+    echo "<div class='card'><h2>$addr — $title</h2><div class='meta'>样本不足（${n}条，至少2条才出图）</div></div>"
     return
   fi
   local col=2; [ "$metric" = "delay" ] && col=4
@@ -559,7 +559,7 @@ svg_multi_chart() {
   [ -z "$gmin" ] && return 0
   [ "$gmin" = "$gmax" ] && gmax=$((gmin + 1))
   local legend="" ci=0
-  chart_begin "📊 $title（${#RAW_ADDR[@]}个DNS × ${n_rounds}轮）" "" \
+  chart_begin "📊 ${title}（${#RAW_ADDR[@]}个DNS × ${n_rounds}轮）" "" \
     "$w" "$h" "$pad_l" "$pad_t" "$plot_w" "$plot_h" "$gmin" "$gmax"
   # X 轴标签：首/尾 + 中点（轮次≥3才画中点，2轮时中=尾会重叠）
   local mid_r=$((n_rounds / 2))
@@ -827,7 +827,7 @@ if [ -n "$VS_A" ]; then
   if [ "$va_idx" = "-1" ] || [ "$vb_idx" = "-1" ]; then
     _miss=""; [ "$va_idx" = "-1" ] && _miss="$VS_A"
     [ "$vb_idx" = "-1" ] && _miss="${_miss:+$_miss }$VS_B"
-    echo "❌ --vs 的 ${_miss} 不在数据集中（先采集该DNS: bash compare.sh $VS_A $VS_B）"
+    echo "❌ --vs 的 ${_miss} 不在数据集中（先采集该DNS: bash compare.sh ${VS_A} ${VS_B}）"
     exit 1
   fi
   wins_a=0; wins_b=0; draws=0; duel_n=0
@@ -847,8 +847,8 @@ if [ -n "$VS_A" ]; then
     vb_mean=$(trend_stats "${RAW_VAL[$vb_idx]}" | cut -d'|' -f3)
     va_dmean=$(trend_stats "${RAW_VAL[$va_idx]}" | cut -d'|' -f5)
     vb_dmean=$(trend_stats "${RAW_VAL[$vb_idx]}" | cut -d'|' -f5)
-    va_show="$VS_A"; _vl=$(dns_preset_label "$VS_A") && va_show="$VS_A·$_vl"
-    vb_show="$VS_B"; _vl=$(dns_preset_label "$VS_B") && vb_show="$VS_B·$_vl"
+    va_show="$VS_A"; _vl=$(dns_preset_label "$VS_A") && va_show="${VS_A}·$_vl"
+    vb_show="$VS_B"; _vl=$(dns_preset_label "$VS_B") && vb_show="${VS_B}·$_vl"
     vs_verdict="势均力敌"
     [ "$wins_a" -gt $((duel_n * 2 / 3)) ] && vs_verdict="🏆 ${va_show} 占优"
     [ "$wins_b" -gt $((duel_n * 2 / 3)) ] && vs_verdict="🏆 ${vb_show} 占优"
@@ -860,7 +860,7 @@ if [ -n "$VS_A" ]; then
     printf '%s' "$VS_TEXT"
   else
     echo ""
-    echo "  ⚔️  --vs: ${VS_A} 与 ${VS_B} 无同轮都可达的采集记录，无法对决（需同轮对比采集: bash compare.sh $VS_A $VS_B）"
+    echo "  ⚔️  --vs: ${VS_A} 与 ${VS_B} 无同轮都可达的采集记录，无法对决（需同轮对比采集: bash compare.sh ${VS_A} ${VS_B}）"
   fi
 fi
 

@@ -51,7 +51,7 @@ for _a in "$@"; do
       echo "退出码: 0=全部通过 1=存在 FAIL"
       exit 0 ;;
     "") ;;
-    *) echo "❌ 未知参数: $_a（仅支持 --net / --fix / --cron）"; exit 1 ;;
+    *) echo "❌ 未知参数: ${_a}（仅支持 --net / --fix / --cron）"; exit 1 ;;
   esac
 done
 
@@ -74,9 +74,9 @@ case "$OS" in
 esac
 BV=${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}
 if [ "${BASH_VERSINFO[0]}" -ge 4 ]; then
-  ok "bash $BV（≥4，全特性可用）"
+  ok "bash ${BV}（≥4，全特性可用）"
 elif [ "${BASH_VERSINFO[0]}" -eq 3 ] && [ "${BASH_VERSINFO[1]}" -ge 2 ]; then
-  ok "bash $BV（≥3.2，项目最低要求满足；关联数组等 4+ 特性未用）"
+  ok "bash ${BV}（≥3.2，项目最低要求满足；关联数组等 4+ 特性未用）"
 else
   fail "bash $BV 过旧（需 ≥3.2，macOS 2004 后自带版本即满足）"
 fi
@@ -102,17 +102,17 @@ else
 fi
 _t=$(date_plus_minutes 5)
 case "$_t" in
-  [0-2][0-9]:[0-5][0-9]) ok "date_plus_minutes 正常（当前+5min = $_t）" ;;
+  [0-2][0-9]:[0-5][0-9]) ok "date_plus_minutes 正常（当前+5min = ${_t}）" ;;
   *) fail "date_plus_minutes 输出异常: [$_t]（date 命令受损？ETA/新鲜度将缺失）" ;;
 esac
 _e=$(ts_to_epoch "2026-01-01 00:00")
 case "$_e" in
   ''|*[!0-9]*) fail "ts_to_epoch 输出异常: [$_e]（数据新鲜度显示将缺失）" ;;
-  *) ok "ts_to_epoch 正常（2026-01-01 00:00 → epoch $_e）" ;;
+  *) ok "ts_to_epoch 正常（2026-01-01 00:00 → epoch ${_e}）" ;;
 esac
 _d=$(date_days_ago 7)
 case "$_d" in
-  20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ok "date_days_ago 正常（7天前 = $_d，周对比可用）" ;;
+  20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ok "date_days_ago 正常（7天前 = ${_d}，周对比可用）" ;;
   *) fail "date_days_ago 输出异常: [$_d]（周对比小节将隐藏）" ;;
 esac
 
@@ -161,7 +161,7 @@ if [ "$NET_MODE" = "1" ]; then
   echo "  ━━━ 网络连通（--net 实测，离线环境勿用） ━━━"
   _r=$(dig @223.5.5.5 example.com +short +time=3 +tries=1 2>/dev/null | head -1)
   if [ -n "$_r" ]; then
-    ok "dig @223.5.5.5 example.com → $_r（UDP 53 出网正常）"
+    ok "dig @223.5.5.5 example.com → ${_r}（UDP 53 出网正常）"
   else
     fail "dig @223.5.5.5 无响应 — 检查防火墙/UDP 53 出网，或换 119.29.29.29 重试"
   fi
@@ -178,7 +178,7 @@ if [ "$FIX_MODE" = "1" ]; then
       if mkdir -p "$d" 2>/dev/null; then
         echo "  🔧 已创建 $d/"; FIXED_N=$((FIXED_N+1))
       else
-        echo "  ❌ 无法创建 $d/（权限不足，请手动: mkdir -p $d）"
+        echo "  ❌ 无法创建 ${d}/（权限不足，请手动: mkdir -p ${d}）"
       fi
     fi
   done
@@ -192,7 +192,7 @@ if [ "$FIX_MODE" = "1" ]; then
           echo "  🔧 已隔离损坏文件: $(basename "$f") → results/quarantine/"
           QMOVED=$((QMOVED+1)); FIXED_N=$((FIXED_N+1))
         else
-          echo "  ❌ 隔离失败: $f（权限不足？）"
+          echo "  ❌ 隔离失败: ${f}（权限不足？）"
         fi
       }
     done

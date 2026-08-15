@@ -32,7 +32,7 @@ install_completions() {
         echo "$MARK"
         echo "[ -f \"$DIR_C/completions/dns-test.bash\" ] && source \"$DIR_C/completions/dns-test.bash\""
       } >> "$RC"
-      echo "  ✅ bash 补全已写入 $RC（重开终端或 source $RC 生效）"
+      echo "  ✅ bash 补全已写入 ${RC}（重开终端或 source ${RC} 生效）"
     fi
     DID=1
     break
@@ -92,7 +92,7 @@ case "$MODE" in
   "") ;;
   --smoke|--all) ;;
   *)
-    echo "⚠️ 未知参数: $MODE（可用 bash install.sh --help 查看用法）"
+    echo "⚠️ 未知参数: ${MODE}（可用 bash install.sh --help 查看用法）"
     exit 1
     ;;
 esac

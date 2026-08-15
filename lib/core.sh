@@ -340,11 +340,11 @@ dns_preset_label() {
 open_report_file() {
   local f="$1"
   if [ "$(uname -s)" = "Darwin" ] && command -v open >/dev/null 2>&1; then
-    open "$f" && echo "  🔖 已在浏览器打开: $f"
+    open "$f" && echo "  🔖 已在浏览器打开: $f" || echo "  ⚠️  open 打开失败，请手动打开: $f"
   elif command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "$f" >/dev/null 2>&1 && echo "  🔖 已在浏览器打开: $f"
+    xdg-open "$f" >/dev/null 2>&1 && echo "  🔖 已在浏览器打开: $f" || echo "  ⚠️  xdg-open 打开失败（无桌面环境？），请手动打开: $f"
   elif command -v wslview >/dev/null 2>&1; then
-    wslview "$f" >/dev/null 2>&1 && echo "  🔖 已在浏览器打开: $f"
+    wslview "$f" >/dev/null 2>&1 && echo "  🔖 已在浏览器打开: $f" || echo "  ⚠️  wslview 打开失败，请手动打开: $f"
   else
     echo "  ⚠️  未找到浏览器启动器（open/xdg-open/wslview），请手动打开: $f"
   fi
@@ -971,7 +971,7 @@ parse_dns_args() {
 print_dns_list() {
   local _a idx
   for _a in "${DNS_ADDR[@]}"; do
-    valid_dns_addr "$_a" || { echo "❌ 非法DNS地址: $_a（仅支持IPv4/IPv6格式）"; exit 1; }
+    valid_dns_addr "$_a" || { echo "❌ 非法DNS地址: ${_a}（仅支持IPv4/IPv6格式）"; exit 1; }
   done
   print_header "$1"
   START_TIME=$(date +%s)
