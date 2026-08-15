@@ -6,7 +6,8 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
-| v2026.08.11 | v1.7.1（当前） |
+| v2026.08.15 | v1.8（当前） |
+| v2026.08.11 | v1.7.1 |
 | v2026.08.10 | v1.7.0 |
 | v2026.08.9  | v1.7.0 |
 | v2026.08.8  | v1.6.2 |
@@ -26,6 +27,14 @@
   - ⑤ **两处小修**：`tools/vowifi/carrier_epdg.pl` DNS 选项先 `^\d+$` 再数值比较（消除非数字输入的 "isn't numeric" 警告噪音）；`install.sh` 无包管理器场景 `PKG_DIG/PKG_SC` 预置通用名（NEED 数组不再出现空包名导致"必需缺失: "显示为空）
   - ⑥ **回归防护**：`tests/05_run_common_tests.sh` 新增第 10~12 用例——full 模式 mock dig 断言 `@server` 恒为被测地址/[14]劫持对比基准（白名单 `@8.8.8.8`/`@[2400:3200::1]`/`@223.5.5.5`）、ECS_SUBNET 非法值回退默认且注入不执行、par_run 元字符命令整体拒执行；负向验证：用修复前 core.sh 跑三条新用例全部变红，修复后全绿；用例数 9→12，verify/CI/README/CODE_WIKI/AI_GUIDE 文案同步
   - ⑦ 回归：bash -n 全绿、perl -c 全绿、shellcheck 全库 0 告警、单测(18+9+4+18+12) 全绿、伪终端主菜单循环如常
+- 2026-08-15（第八十八轮）：**HTML 报告视觉升级：排名奖牌 + 暗色模式 + 徽章化（compare.sh / trends.sh，发布 v1.8 = v2026.08.15）**
+  - ① **compare.sh 排名表**：汇总表从"输入顺序平铺"升级为按 评分降序+延迟升序 排名（不可达沉底），前三名 🥇🥈🥉 奖牌、综合推荐行整行高亮（`tr.best`）；排序用"可达|评分%03d|延迟%05d|下标"平行文本 sort，兼容 bash 3.2
+  - ② **暗色模式**：compare/trends 两报告统一切 CSS 变量双主题（`prefers-color-scheme` 自动跟随系统 + `<meta name='color-scheme'>`），暗色下卡片/表格/徽章/推荐条/趋势图轴色全套适配；trends SVG 轴线与刻度文字改 class（`.ax/.ax-t`）由 CSS 接管
+  - ③ **数值徽章化**：评分/延迟/稳定性/可达状态与趋势箭头（↑变好/↓变差/→平稳）统一圆角徽章，按阈值绿/黄/红着色，一眼可读；DNS 地址列等宽字体（ui-monospace）
+  - ④ **条形图布局修正**：原 `width:N%` 相对整行导致小屏溢出换行；改 `.row` flex + `.track`（flex:1 轨道槽）+ `.fill`（百分比填充）+ 固定宽数值列，任何屏宽不溢出
+  - ⑤ **表格/打印增强**：thead/tbody 语义化 + 斑马纹 + `white-space:nowrap` + `.tbl-wrap` 小屏横向滚动（替代挤压换行）；`@media print` 打印去阴影防截断
+  - ⑥ **版本升级**：PROJECT_VERSION `v2026.08.11`→`v2026.08.15`、PROJECT_RELEASE `v1.7.1`→`v1.8`（新功能发新版）；README badge/下载名/最新版本说明、CODE_WIKI 版本引用同步
+  - ⑦ 回归：bash -n/shellcheck 全绿；单测(18+9+4+18+12) 全绿；compare 差异化 mock（按 @server 返回 8/45/220ms）实跑 `--html` 验证排名顺序/奖牌/最佳行/暗色/打印样式断言全过；trends 三次采集 mock 验证趋势徽章（升→b-up/降→b-down）与 SVG 轴 class 全过；伪终端主菜单如常
 - 2026-08-15（第八十七轮-补充）：**分支清理 + trends 文件枚举去 ls 解析 + 第八十七轮兼容性核查（trends.sh，不升版本）**
   - ① **分支清理**：删除环境自动提交产生的 `trae/agent-c3Ej6p` 分支（本地+远程，无文件改动）；trae 协作分支仅保留 `trae/agent-q7bDKm`，后续改动均在此分支进行
   - ② **trends 数据扫描去 ls 解析**：`ls "$SRC_DIR"/compare-*.json | sort` 改为 glob 迭代构造文件列表（规避 SC2012 解析 ls 输出的技术债；glob 天然字典序=时间戳文件名的时间序，`head/tail/wc -l` 下游语义不变，空目录/无匹配仍正确 exit 2）

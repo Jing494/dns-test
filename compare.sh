@@ -226,7 +226,7 @@ if [ "$SAVE_JSON" = "1" ]; then
 fi
 
 # ============================================================================
-# 5) HTML 报告（--html）
+# 5) HTML 报告（--html）— 零JS/零外部依赖；CSS 变量双主题（自动跟随系统暗色）
 # ============================================================================
 if [ "$GEN_HTML" = "1" ]; then
   mkdir -p results
@@ -237,21 +237,37 @@ if [ "$GEN_HTML" = "1" ]; then
     echo "<head>"
     echo "<meta charset='utf-8'>"
     echo "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+    echo "<meta name='color-scheme' content='light dark'>"
     echo "<title>DNS对比报告</title>"
     echo "<style>"
-    echo "body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;margin:0;background:#f5f7fa;color:#333}"
+    echo ":root{--bg:#f5f7fa;--card:#fff;--tx:#333;--sub:#888;--th-bg:#fafbfc;--th-tx:#666;--line:#eee;--track:#e5e7eb;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--gtx:#16a34a;--atx:#d97706;--rtx:#dc2626;--rec-bg:#f0fdf4;--rec-bd:#bbf7d0;--rec-tx:#166534;--best:#f0fdf4;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace}"
+    echo "@media(prefers-color-scheme:dark){:root{--bg:#0f172a;--card:#1e293b;--tx:#e2e8f0;--sub:#94a3b8;--th-bg:#283548;--th-tx:#94a3b8;--line:#334155;--track:#334155;--gtx:#4ade80;--atx:#fbbf24;--rtx:#f87171;--rec-bg:#052e16;--rec-bd:#14532d;--rec-tx:#86efac;--best:#052e16}}"
+    echo "body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;margin:0;background:var(--bg);color:var(--tx)}"
     echo ".wrap{max-width:860px;margin:24px auto;padding:0 16px}"
-    echo ".card{background:#fff;border-radius:12px;padding:20px 24px;margin:16px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}"
-    echo "h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:0 0 14px;color:#555}"
-    echo ".meta{color:#888;font-size:13px;margin-bottom:14px}"
+    echo ".card{background:var(--card);border-radius:12px;padding:20px 24px;margin:16px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}"
+    echo "h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:0 0 14px;color:var(--sub)}"
+    echo ".meta{color:var(--sub);font-size:13px;margin:6px 0 14px}"
+    echo ".tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}"
     echo "table{width:100%;border-collapse:collapse;font-size:14px}"
-    echo "th,td{padding:10px 8px;text-align:left;border-bottom:1px solid #eee}"
-    echo "th{background:#fafbfc;color:#666;font-weight:600}"
-    echo ".bar{height:14px;border-radius:7px;min-width:2px;background:#e5e7eb}"
-    echo ".b-green{background:#22c55e}.b-amber{background:#f59e0b}.b-red{background:#ef4444}"
-    echo ".rec{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;padding:12px 16px;border-radius:10px;font-size:15px}"
-    echo ".bad{color:#dc2626}.ok{color:#16a34a}"
-    echo "@media(max-width:600px){.wrap{padding:0 8px}.card{padding:14px}table{font-size:12px}th,td{padding:8px 4px}}"
+    echo "th,td{padding:10px 8px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}"
+    echo "th{background:var(--th-bg);color:var(--th-tx);font-weight:600}"
+    echo "tbody tr:nth-child(even){background:rgba(127,127,127,.04)}"
+    echo "td.addr{font-family:var(--mono);font-size:13px}"
+    echo "tr.best td{background:var(--best)}"
+    echo ".rank{font-family:var(--mono);color:var(--sub)}"
+    echo ".bdg{display:inline-block;min-width:44px;text-align:center;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;font-family:var(--mono)}"
+    echo ".bg-g{background:rgba(34,197,94,.14);color:var(--gtx)}.bg-a{background:rgba(245,158,11,.16);color:var(--atx)}.bg-r{background:rgba(239,68,68,.14);color:var(--rtx)}.bg-n{background:rgba(127,127,127,.12);color:var(--sub)}"
+    echo ".row{display:flex;align-items:center;gap:10px;margin:9px 0}"
+    echo ".lbl{width:180px;flex:none;font-size:13px;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"
+    echo ".track{flex:1;min-width:60px;height:14px;background:var(--track);border-radius:7px;overflow:hidden}"
+    echo ".fill{height:100%;border-radius:7px;min-width:2px}"
+    echo ".f-green{background:var(--green)}.f-amber{background:var(--amber)}.f-red{background:var(--red)}"
+    echo ".val{flex:none;width:70px;font-size:13px;font-family:var(--mono)}"
+    echo ".rec{background:var(--rec-bg);border:1px solid var(--rec-bd);color:var(--rec-tx);padding:12px 16px;border-radius:10px;font-size:15px}"
+    echo ".rec.bad-rec{--rec-bg:#fef2f2;--rec-bd:#fecaca;--rec-tx:#991b1b}"
+    echo "@media(prefers-color-scheme:dark){.rec.bad-rec{--rec-bg:#450a0a;--rec-bd:#7f1d1d;--rec-tx:#fca5a5}}"
+    echo "@media(max-width:600px){.wrap{padding:0 8px}.card{padding:14px}table{font-size:12px}th,td{padding:8px 6px}.lbl{width:120px}.val{width:56px}}"
+    echo "@media print{body{background:#fff}.card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}}"
     echo "</style>"
     echo "</head><body>"
     echo "<div class='wrap'>"
@@ -260,37 +276,75 @@ if [ "$GEN_HTML" = "1" ]; then
     if [ "$BEST_IDX" -ge 0 ]; then
       echo "<div class='rec'>🏆 综合推荐: <b>$BEST</b> — 评分${BEST_SCORE}% ｜ 延迟${BEST_DELAY}ms</div>"
     else
-      echo "<div class='rec' style='background:#fef2f2;border-color:#fecaca;color:#991b1b'>💀 全部DNS不可达，请检查网络/加速器状态后重试</div>"
+      echo "<div class='rec bad-rec'>💀 全部DNS不可达，请检查网络/加速器状态后重试</div>"
     fi
     echo "</div>"
-    # 汇总表
-    echo "<div class='card'><h2>对比明细</h2>"
-    echo "<table><tr><th>DNS</th><th>评分</th><th>延迟(ms)</th><th>稳定性</th><th>状态</th></tr>"
+    # 汇总表：按 评分降序 + 延迟升序 排名（不可达沉底），奖牌标注前三，最佳行高亮
+    # 排序键: 可达(1/0)|评分%03d|延迟%05d|原始下标 —— 平行文本排序，兼容 bash 3.2
+    RANK_LINES=""
     for i in "${!DNS_ARGS[@]}"; do
-      sv="${SCORE_VAL[$i]}"; [ "$sv" != "不可达" ] && sv="${sv}%"
-      tv="${STAB_VAL[$i]}"; [ "$tv" != "-" ] && tv="${tv}%"
-      if [ "${SCORE_VAL[$i]}" = "不可达" ]; then
-        st="<span class='bad'>不可达</span>"
+      s="${SCORE_VAL[$i]}"; dl="${DELAY_VAL[$i]:-0}"
+      if [ "$s" = "不可达" ]; then
+        RANK_LINES="${RANK_LINES}0|000|99999|$i
+"
       else
-        st="<span class='ok'>可达</span>"
+        RANK_LINES="${RANK_LINES}1|$(printf '%03d' "$s")|$(printf '%05d' "$dl")|$i
+"
       fi
-      echo "<tr><td>${DNS_ARGS[$i]}</td><td>$sv</td><td>${DELAY_VAL[$i]:-—}</td><td>$tv</td><td>$st</td></tr>"
     done
-    echo "</table></div>"
-    # 评分柱状
+    echo "<div class='card'><h2>排名（按评分，同分比延迟）</h2>"
+    echo "<div class='tbl-wrap'><table><thead><tr><th>#</th><th>DNS</th><th>评分</th><th>延迟(ms)</th><th>稳定性</th><th>状态</th></tr></thead><tbody>"
+    rank=0
+    while IFS='|' read -r _rk _sk _dk oi; do
+      [ -z "$oi" ] && continue
+      rank=$((rank+1))
+      sv="${SCORE_VAL[$oi]}"; tv="${STAB_VAL[$oi]}"; dl="${DELAY_VAL[$oi]:-—}"
+      bcls="bg-n"; [ "$sv" != "不可达" ] && bcls="bg-g"
+      if [ "$sv" != "不可达" ]; then
+        [ "$sv" -lt 80 ] && bcls="bg-a"
+        [ "$sv" -lt 60 ] && bcls="bg-r"
+        sv="$sv%"
+      fi
+      if [ "$tv" != "-" ]; then
+        tcls="bg-g"; [ "$tv" -lt 80 ] && tcls="bg-a"; [ "$tv" -lt 50 ] && tcls="bg-r"
+        tvs="$tv%"
+      else
+        tcls="bg-n"; tvs="-"
+      fi
+      if [ "$dl" != "—" ]; then
+        dcls="bg-g"; [ "$dl" -ge 100 ] && dcls="bg-a"; [ "$dl" -ge 300 ] && dcls="bg-r"
+        dvs="${dl}ms"
+      else
+        dcls="bg-n"; dvs="—"
+      fi
+      if [ "${SCORE_VAL[$oi]}" = "不可达" ]; then
+        st="<span class='bdg bg-r'>不可达</span>"
+      else
+        st="<span class='bdg bg-g'>可达</span>"
+      fi
+      case "$rank" in
+        1) mk="🥇";; 2) mk="🥈";; 3) mk="🥉";; *) mk="$rank";;
+      esac
+      rowcls=""; [ "$oi" = "$BEST_IDX" ] && rowcls=" class='best'"
+      echo "<tr${rowcls}><td class='rank'>$mk</td><td class='addr'>${DNS_ARGS[$oi]}</td><td><span class='bdg $bcls'>$sv</span></td><td><span class='bdg $dcls'>$dvs</span></td><td><span class='bdg $tcls'>$tvs</span></td><td>$st</td></tr>"
+    done <<EOF
+$(printf '%s' "$RANK_LINES" | sort -t'|' -k1,1r -k2,2r -k3,3n)
+EOF
+    echo "</tbody></table></div></div>"
+    # 评分条形图（track/fill 自适应布局，小屏不溢出换行）
     echo "<div class='card'><h2>综合评分</h2>"
     for i in "${!DNS_ARGS[@]}"; do
       s="${SCORE_VAL[$i]}"; [ "$s" = "不可达" ] && s=0
-      color="b-green"; [ "$s" -lt 80 ] && color="b-amber"; [ "$s" -lt 60 ] && color="b-red"
-      echo "<div style='display:flex;align-items:center;margin:8px 0;flex-wrap:wrap'>"
-      echo "<span style='width:190px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>${DNS_ARGS[$i]}</span>"
-      echo "<div class='bar ${color}' style='width:${s}%;max-width:420px'></div>"
+      color="f-green"; [ "$s" -lt 80 ] && color="f-amber"; [ "$s" -lt 60 ] && color="f-red"
       sv="${SCORE_VAL[$i]}"; [ "$sv" != "不可达" ] && sv="${sv}%"
-      echo "<span style='margin-left:10px;font-size:13px;min-width:48px'>$sv</span>"
+      echo "<div class='row'>"
+      echo "<span class='lbl' title='${DNS_ARGS[$i]}'>${DNS_ARGS[$i]}</span>"
+      echo "<div class='track'><div class='fill ${color}' style='width:${s}%'></div></div>"
+      echo "<span class='val'>$sv</span>"
       echo "</div>"
     done
     echo "</div>"
-    # 延迟柱状（越低越好）
+    # 延迟条形图（越低越好，宽度按最大延迟归一）
     echo "<div class='card'><h2>延迟 (ms) — 越低越好</h2>"
     maxd=1
     for i in "${!DNS_ARGS[@]}"; do
@@ -300,14 +354,14 @@ if [ "$GEN_HTML" = "1" ]; then
     for i in "${!DNS_ARGS[@]}"; do
       dl="${DELAY_VAL[$i]:-0}"
       w=0; [ "$maxd" -gt 0 ] && w=$(( dl * 100 / maxd ))
-      color="b-green"
-      [ "$dl" -ge 100 ] && color="b-amber"
-      [ "$dl" -ge 300 ] && color="b-red"
-      [ "${SCORE_VAL[$i]}" = "不可达" ] && color="b-red"
-      echo "<div style='display:flex;align-items:center;margin:8px 0;flex-wrap:wrap'>"
-      echo "<span style='width:190px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>${DNS_ARGS[$i]}</span>"
-      echo "<div class='bar ${color}' style='width:${w}%;max-width:420px'></div>"
-      echo "<span style='margin-left:10px;font-size:13px;min-width:48px'>${DELAY_VAL[$i]:-—}ms</span>"
+      color="f-green"
+      [ "$dl" -ge 100 ] && color="f-amber"
+      [ "$dl" -ge 300 ] && color="f-red"
+      [ "${SCORE_VAL[$i]}" = "不可达" ] && color="f-red"
+      echo "<div class='row'>"
+      echo "<span class='lbl' title='${DNS_ARGS[$i]}'>${DNS_ARGS[$i]}</span>"
+      echo "<div class='track'><div class='fill ${color}' style='width:${w}%'></div></div>"
+      echo "<span class='val'>${DELAY_VAL[$i]:-—}ms</span>"
       echo "</div>"
     done
     echo "<div class='meta'>颜色: 绿&lt;100ms ｜ 黄100~300ms ｜ 红≥300ms或不可达</div>"

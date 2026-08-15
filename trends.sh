@@ -246,18 +246,18 @@ svg_chart() {
     local y=$((pad_t + (maxv - v) * plot_h / (maxv - minv)))
     pts="$pts $x,$y"
     dots="$dots<circle cx='$x' cy='$y' r='3' fill='$color'/>"
-    if [ $i -eq 0 ] || [ $i -eq $((n - 1)) ] || [ $n -le 10 ]; then
-      labels="$labels<text x='$x' y='$((h - 8))' font-size='10' fill='#999' text-anchor='middle'>${ts:5:11}</text>"
+    if [ $i -eq 0 ] || [ $i -eq $((n - 1)) ] || [ "$n" -le 10 ]; then
+      labels="$labels<text x='$x' y='$((h - 8))' font-size='10' class='ax-t' text-anchor='middle'>${ts:5:11}</text>"
     fi
     i=$((i+1))
   done <<< "$data"
-  echo "<div class='card'><h2>$addr — $title</h2>"
+  echo "<div class='card'><h2><span class='mono'>$addr</span> — $title</h2>"
   echo "<div class='meta'>最新: $last_disp$unit ｜ 均值: $mean_disp$unit ｜ 趋势: $trend</div>"
   echo "<div class='sc'><svg viewBox='0 0 $w $h' style='min-width:${w}px;max-width:100%'>"
-  echo "<line x1='$pad_l' y1='$pad_t' x2='$pad_l' y2='$((pad_t + plot_h))' stroke='#ddd'/>"
-  echo "<line x1='$pad_l' y1='$((pad_t + plot_h))' x2='$((pad_l + plot_w))' y2='$((pad_t + plot_h))' stroke='#ddd'/>"
-  echo "<text x='6' y='$((pad_t + 4))' font-size='10' fill='#999'>$maxv</text>"
-  echo "<text x='6' y='$((pad_t + plot_h + 4))' font-size='10' fill='#999'>$minv</text>"
+  echo "<line class='ax' x1='$pad_l' y1='$pad_t' x2='$pad_l' y2='$((pad_t + plot_h))'/>"
+  echo "<line class='ax' x1='$pad_l' y1='$((pad_t + plot_h))' x2='$((pad_l + plot_w))' y2='$((pad_t + plot_h))'/>"
+  echo "<text x='6' y='$((pad_t + 4))' font-size='10' class='ax-t'>$maxv</text>"
+  echo "<text x='6' y='$((pad_t + plot_h + 4))' font-size='10' class='ax-t'>$minv</text>"
   echo "<polyline points='$pts' fill='none' stroke='$color' stroke-width='2' stroke-linejoin='round'/>"
   echo "$dots"
   echo "$labels"
@@ -313,9 +313,9 @@ for k in "${!RAW_ADDR[@]}"; do
       case "$score_t" in *变好*) stc="up";; *变差*) stc="down";; esac
       dtc="flat"
       case "$delay_t" in *变好*) dtc="up";; *变差*) dtc="down";; esac
-      HTML_ROWS="$HTML_ROWS<tr><td>$addr</td><td>$n_ok</td><td>${score_mean}%</td><td class='$stc'>$score_t</td><td>${delay_mean}ms</td><td class='$dtc'>$delay_t</td></tr>"
+      HTML_ROWS="$HTML_ROWS<tr><td class='addr'>$addr</td><td>$n_ok</td><td>${score_mean}%</td><td><span class='bdg b-$stc'>$score_t</span></td><td>${delay_mean}ms</td><td><span class='bdg b-$dtc'>$delay_t</span></td></tr>"
     else
-      HTML_ROWS="$HTML_ROWS<tr><td>$addr</td><td>0</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>"
+      HTML_ROWS="$HTML_ROWS<tr><td class='addr'>$addr</td><td>0</td><td>—</td><td><span class='bdg b-flat'>—</span></td><td>—</td><td><span class='bdg b-flat'>—</span></td></tr>"
     fi
     ok_lines=$(printf '%s\n' "$lines" | grep -v UNREACH)
     if [ "$n_ok" -ge 2 ]; then
@@ -330,33 +330,43 @@ if [ "$GEN_CSV" = "1" ]; then
   echo "  📄 CSV已导出: $CSVF"
 fi
 
-# ---------- HTML 报告 ----------
+# ---------- HTML 报告（与 compare.sh 同套视觉：CSS 变量双主题，自动跟随系统暗色） ----------
 if [ "$GEN_HTML" = "1" ]; then
   HF="$OUT_DIR/report.html"
   {
     echo "<!DOCTYPE html>"
     echo "<html lang='zh'><head><meta charset='utf-8'>"
     echo "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+    echo "<meta name='color-scheme' content='light dark'>"
     echo "<title>DNS趋势报告</title>"
     echo "<style>"
-    echo "body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;margin:0;background:#f5f7fa;color:#333}"
+    echo ":root{--bg:#f5f7fa;--card:#fff;--tx:#333;--sub:#888;--th-bg:#fafbfc;--th-tx:#666;--line:#eee;--gtx:#16a34a;--rtx:#dc2626;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,'Courier New',monospace}"
+    echo "@media(prefers-color-scheme:dark){:root{--bg:#0f172a;--card:#1e293b;--tx:#e2e8f0;--sub:#94a3b8;--th-bg:#283548;--th-tx:#94a3b8;--line:#334155;--gtx:#4ade80;--rtx:#f87171}}"
+    echo "body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;margin:0;background:var(--bg);color:var(--tx)}"
     echo ".wrap{max-width:920px;margin:24px auto;padding:0 16px}"
-    echo ".card{background:#fff;border-radius:12px;padding:20px 24px;margin:16px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}"
-    echo "h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:14px 0 6px;color:#555}"
-    echo ".meta{color:#888;font-size:13px;margin-bottom:10px}"
-    echo ".up{color:#16a34a}.down{color:#dc2626}.flat{color:#888}"
+    echo ".card{background:var(--card);border-radius:12px;padding:20px 24px;margin:16px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}"
+    echo "h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:14px 0 6px;color:var(--sub)}"
+    echo ".meta{color:var(--sub);font-size:13px;margin-bottom:10px}"
+    echo ".mono{font-family:var(--mono)}"
+    echo "td.addr{font-family:var(--mono);font-size:13px}"
+    echo ".bdg{display:inline-block;min-width:52px;text-align:center;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}"
+    echo ".b-up{background:rgba(34,197,94,.14);color:var(--gtx)}.b-down{background:rgba(239,68,68,.14);color:var(--rtx)}.b-flat{background:rgba(127,127,127,.12);color:var(--sub)}"
+    echo ".tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}"
     echo "table{width:100%;border-collapse:collapse;font-size:14px;margin:10px 0}"
-    echo "th,td{padding:8px;text-align:left;border-bottom:1px solid #eee}"
-    echo "th{background:#fafbfc;color:#666}"
+    echo "th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}"
+    echo "th{background:var(--th-bg);color:var(--th-tx);font-weight:600}"
+    echo "tbody tr:nth-child(even){background:rgba(127,127,127,.04)}"
     echo ".sc{overflow-x:auto}"
+    echo ".ax{stroke:var(--line)}.ax-t{fill:var(--sub)}"
     echo "@media(max-width:600px){.wrap{padding:0 8px}.card{padding:14px}table{font-size:12px}}"
+    echo "@media print{body{background:#fff}.card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}}"
     echo "</style></head><body>"
     echo "<div class='wrap'>"
     echo "<div class='card'><h1>📈 DNS 趋势报告</h1>"
     echo "<div class='meta'>${N_FILES}次采集（${T0_TS} ~ ${T1_TS}）｜ dns-test ${VERSION} ｜ 数据源 ${SRC_DIR}/compare-*.json</div>"
-    echo "<table><tr><th>DNS</th><th>样本</th><th>评分均值</th><th>评分趋势</th><th>延迟均值</th><th>延迟趋势</th></tr>"
+    echo "<div class='tbl-wrap'><table><thead><tr><th>DNS</th><th>样本</th><th>评分均值</th><th>评分趋势</th><th>延迟均值</th><th>延迟趋势</th></tr></thead><tbody>"
     echo "$HTML_ROWS"
-    echo "</table></div>"
+    echo "</tbody></table></div></div>"
     echo "$HTML_CHARTS"
     echo "</div></body></html>"
   } > "$HF"

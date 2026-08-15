@@ -3,8 +3,8 @@
 > 🌐 **English**：[README.en.md](./README.en.md) ｜ **中文**：本文档
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Release: v1.7.1](https://img.shields.io/badge/Release-v1.7.1-blue.svg)
-![Version: v2026.08.11](https://img.shields.io/badge/Version-v2026.08.11-blue.svg)
+![Release: v1.8](https://img.shields.io/badge/Release-v1.8-blue.svg)
+![Version: v2026.08.15](https://img.shields.io/badge/Version-v2026.08.15-blue.svg)
 ![Platform: Linux/macOS/WSL](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20WSL-green.svg)
 ![Bash 3.2+](https://img.shields.io/badge/Bash-3.2%2B-blue.svg)
 ![Perl 5.10+](https://img.shields.io/badge/Perl-5.10%2B-blue.svg)
@@ -14,7 +14,7 @@
 
 > 🏷️ **版本号规则（双轨制）**：`vYYYY.MM.N` 日期式（N=当月发布序号）↔ 语义 `vX.Y`（X=主版本，重大重构才升；Y=次版本，功能更新）。补丁级修复仅递增日期式 N。
 
-> 🔧 **最新版本**：**v1.7.1 = v2026.08.11**（在 v2026.08.11 基础上完成审阅优化：CONFIG_DOMAINS 不再 source 执行防注入、par_run 增加 dig 命令白名单、IPv6 检测改 loopback 防海外误判、lite 稳定性轮次自动减半为 10 提速、JSON 序列化优先 python3、新增计分口径单测 05）。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
+> 🔧 **最新版本**：**v1.8 = v2026.08.15**（HTML 报告全新视觉：排名奖牌表 + 暗色模式自适应 + 数值徽章 + 小屏表格横滑；修复 full 模式 @server 循环变量遮蔽、ECS_SUBNET 注入拦截、IPv6 解析校验补齐）。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；**默认 DNS 列表为公开可测试的运营商公网 DNS**，示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
@@ -101,7 +101,7 @@ cd dns-test
 
 # 方式2: Releases 下载（免 git，直接拿成品包）
 #   前往 https://github.com/Jing494/dns-test/releases
-#   下载 dns-test-v2026.08.11.tar.gz 后解压即可
+#   下载 dns-test-v2026.08.15.tar.gz 后解压即可
 
 # 方式3: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
 ```
