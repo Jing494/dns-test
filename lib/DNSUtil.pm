@@ -30,6 +30,10 @@ sub dns_sockaddr {
 sub inet_pton_ipv6 {
     my ($addr) = @_;
 
+    # 形状预检（RFC 4291）：:: 压缩至多一处；::: / 悬空单冒号（:1::2、1::2:、1:...:8:）一律拒绝
+    # （此前 split 会把 ::: 吞成 ::、悬空冒号段静默置 0，畸形写法被宽容解析成正确地址值）
+    return undef if $addr =~ /:::/ || $addr =~ /::.*::/;
+    return undef if $addr =~ /^:[^:]/ || $addr =~ /[^:]:$/;
     if ($addr =~ /::/) {
         my @parts = split(/::/, $addr, 2);
         my @left = $parts[0] ? split(/:/, $parts[0]) : ();

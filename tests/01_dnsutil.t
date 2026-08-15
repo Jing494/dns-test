@@ -54,6 +54,13 @@ subtest 'inet_pton_ipv6 非法地址' => sub {
     # 段超4位（修复前 pack("n") 静默截断产出错误地址）
     ok(!defined inet_pton_ipv6("1:2:3:4:5:6:7:88888"), "非压缩分支段超4位拒绝");
     ok(!defined inet_pton_ipv6("::12345"), "压缩分支段超4位拒绝");
+    # 冒号形状预检（修复前 ::: 被吞成 ::、悬空单冒号段静默置 0，畸形写法宽容解析成正确值）
+    ok(!defined inet_pton_ipv6(":::"), ":::三连冒号拒绝");
+    ok(!defined inet_pton_ipv6("1:::2"), "1:::2拒绝");
+    ok(!defined inet_pton_ipv6("1::2::3"), "两处::歧义拒绝");
+    ok(!defined inet_pton_ipv6(":1::2"), "起始悬空单冒号拒绝");
+    ok(!defined inet_pton_ipv6("1::2:"), "结束悬空单冒号拒绝");
+    ok(!defined inet_pton_ipv6("1:2:3:4:5:6:7:8:"), "全展开尾单冒号拒绝");
 };
 
 subtest 'inet_pton_ipv6 输出长度' => sub {
