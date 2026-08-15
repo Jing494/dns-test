@@ -130,7 +130,7 @@ bash dns-test.sh
 | 反向解析（v4/v6） | `perl examples/04_reverse_dns.pl 222.172.200.68` |
 | 多DNS横向对比 | `bash compare.sh 223.5.5.5 119.29.29.29`（`--html` 响应式报告 / `--md` Markdown 报告；预设组名可直接对比 `bash compare.sh ali tencent`；`--watch N` 每 N 分钟采集一轮；输出含切换命令建议/环比上次/当前DNS👤标记；`COMPARE_MAX_CONCURRENCY=1` 串行最稳） |
 | DNS历史趋势洞察 | `bash trends.sh --html --csv`（需先积累 compare 数据；`--cron DNS列表` 配 crontab 定时采集；`--prune N` 只保留最近 N 份 JSON 控磁盘，配 `--archive` 删前先打包防误删；报障/迁移 `--export --html --md --csv` 一键三合一包；值守模板 `bash doctor.sh --cron` 一键打印） |
-| 单元测试 | `perl -Ilib tests/01_dnsutil.t`（DNSUtil 18 用例）+ `bash tests/02_plugins.sh`（插件系统 9 用例）+ `bash tests/03_dig_target.sh`（4 用例）+ `bash tests/04_core_functions.sh`（core 纯函数 18 用例）+ `bash tests/05_run_common_tests.sh`（lite 计分口径/full 回归 12 用例）+ `bash tests/06_compare_e2e.sh`（compare 端到端 119 用例，mock 离线）+ `bash tests/07_doctor.sh`（doctor/补全/install/新参数 45 用例），CI 已接入 |
+| 单元测试 | `perl -Ilib tests/01_dnsutil.t`（DNSUtil 18 用例）+ `bash tests/02_plugins.sh`（插件系统 9 用例）+ `bash tests/03_dig_target.sh`（4 用例）+ `bash tests/04_core_functions.sh`（core 纯函数 19 用例）+ `bash tests/05_run_common_tests.sh`（lite 计分口径/full 回归 13 用例）+ `bash tests/06_compare_e2e.sh`（compare 端到端 124 用例，mock 离线）+ `bash tests/07_doctor.sh`（doctor/补全/install/新参数 49 用例）+ `bash tests/08_trends_lib.sh`（trends 纯函数 23 用例），CI 已接入 |
 | 依赖安装/校验 | `bash install.sh`（缺失才装 dig/perl/curl + DoT 能力检测 + 顺手幂等装 shell 补全；`--all` 连可选依赖 shellcheck 一起装；`--smoke` 装完直接冒烟；`--completions` 只装补全；`--help` 看用法） |
 | 专项插件 | `dns-test.sh` 专项菜单由 `tools/manifest.sh` 注册表驱动（`lib/plugins.sh` 加载）；新增专项=manifest 加一行+目录映射，菜单自动出现 |
 | 一键全面自检 | `bash verify.sh`（语法+shellcheck+单测+冒烟+compare+trends+专项，约5分钟，真机推荐；shellcheck 可选依赖未装则跳过，`--strict` 可强制要求，`--help` 看用法） |
@@ -356,7 +356,9 @@ bash trends.sh --archive           # 全量打包当前JSON（备份/迁移/报�
 bash trends.sh --export --html --md --csv  # 一键报障包：数据+报告+doctor自检 → trends/export/
 bash trends.sh --cron 223.5.5.5 119.29.29.29  # 先采集(跑compare)再聚合，配crontab自动积累
 bash doctor.sh                    # 环境自检：依赖/平台兼容/目录可写/数据健康（--net 加真实连通）
+bash doctor.sh --fix              # 自检后自动修复可自愈项（建缺失目录/隔离损坏JSON到results/quarantine/）
 bash doctor.sh --cron             # 打印值守crontab模板（采集+prune归档/告警webhook/每周归档三件套）
+bash trends.sh --archive-keep 10  # 归档包轮转：trends/archive/ 只留最近10个包（长跑防堆积）
 bash install.sh --completions     # 幂等安装shell补全（写~/.bashrc/.zshrc带标记，可重复运行）
 ```
 - 想前台定时采集（非 crontab）：`bash compare.sh 223.5.5.5 119.29.29.29 --watch 30`（每 30 分钟一轮，Ctrl-C 停止）

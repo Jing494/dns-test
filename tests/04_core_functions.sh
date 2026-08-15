@@ -42,6 +42,13 @@ else
   notok "合法IPv6通过"
 fi
 
+# 2b. :: 全零地址合法（0段+::，RFC 4291；与 perl 侧 inet_pton_ipv6 口径一致，修复前 bash 侧误拒）
+if valid_dns_addr '::'; then
+  ok ":: 全零地址合法"
+else
+  notok ":: 全零地址应合法（有::时0-7段）"
+fi
+
 # 3. 非法地址拒绝（注入/超范围/域名/空）
 if valid_dns_addr '8.8.8.8;id' || valid_dns_addr '1.1.1.1$(id)' || valid_dns_addr 'www.example.com' || valid_dns_addr '999.999.999.999' || valid_dns_addr ''; then
   notok "非法地址被拒绝"

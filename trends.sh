@@ -36,6 +36,9 @@ cd "$SCRIPT_DIR" || exit 1
 source lib/core.sh
 source lib/trends_lib.sh
 
+# 异常退出时统一清理 mktemp 临时目录（--export 的 EXP_STAGE 等；与 lite/compare 同款 trap 延迟求值）
+trap '[ "${#TMPDIR_LIST[@]}" -gt 0 ] && rm -rf "${TMPDIR_LIST[@]}" 2>/dev/null; true' EXIT INT TERM
+
 VERSION="${PROJECT_VERSION}"
 SRC_DIR="${COMPARE_RESULTS_DIR:-results}"   # compare JSON 数据源
 OUT_DIR="${TRENDS_DIR:-trends}"             # 趋势产物目录
@@ -328,7 +331,10 @@ round_idx() {
 rec_total=0
 MODE_SEEN=""   # 已见采集模式（lite/full 混采则评分口径不一致，扫描后统一警告）
 LAST_TS=""     # 最新一条采集时间戳（数据新鲜度计算用）
-for f in $FILES; do
+# while read 迭代（不用 for f in $FILES 的 IFS 分词）：数据目录含空格时文件名不被拆断；
+# 进程替换不开子 shell，循环内的数组累积（RAW_ADDR/RAW_VAL/ROUNDS_TS）在主 shell 生效
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
   ts=$(grep -oE '"timestamp": ?"[^"]+"' "$f" | head -1 | sed 's/"timestamp": *"//;s/"$//')
   [ -z "$ts" ] && continue
   # --since/--until 均按 YYYY-MM-DD 日期前缀比较（含两端日期；纯 ASCII 前缀不受 locale 排序影响）
@@ -365,7 +371,7 @@ for f in $FILES; do
       rec_total=$((rec_total+1))
     fi
   done < <(grep -oE '"addr": ?"[^"]+", ?"score": ?"[^"]*", ?"stab": ?"[^"]*", ?"delay_ms": ?[0-9]+' "$f")
-done
+done < <(printf '%s' "$FILES")
 
 if [ "$rec_total" -eq 0 ]; then
   echo "❌ 无可用数据（所有记录均为不可达，或已被 --since/过滤条件排除）"
@@ -1089,6 +1095,7 @@ if [ "$EXPORT" = "1" ]; then
   if [ -z "$EXP_STAGE" ]; then
     echo "  ⚠️  --export: mktemp 失败（临时目录不可写？），跳过打包"
   else
+    TMPDIR_LIST+=("$EXP_STAGE")   # 注册清理清单：cp/tar/doctor 任一步被中断也由 EXIT trap 兜底
     mkdir -p "$EXP_STAGE/results" "$EXP_STAGE/trends"
     # 时间窗过滤（--since/--until 复用主流程变量）：按文件名内嵌日期段 compare-YYYYMMDD- 比较
     EXP_SINCE="${SINCE//-/}"; EXP_UNTIL="${UNTIL//-/}"

@@ -30,14 +30,24 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
-- 2026-08-26（第九十九轮）：**加固轮：突变检测前值0ms除零 + --since/--until locale 无关化 + inet_pton_ipv6 冒号形状预检（trends.sh / lib/DNSUtil.pm / tests/01 / tests/06 / verify.sh / smoke.yml / docs，发布 v2026.08.26，语义版 v1.16A）**
+- 2026-08-26（第九十九轮）：**加固轮：突变检测前值0ms除零 + --since/--until locale 无关化 + inet_pton_ipv6 冒号形状预检 + 全面体检（代码7项+文档8项）（trends.sh / compare.sh / lib/DNSUtil.pm / lib/core.sh / tools/network/ ×2 / tests/01,04,05,06 / verify.sh / smoke.yml / docs，发布 v2026.08.26，语义版 v1.16A）**
   - **突变检测除零守卫**（开放项 #5，本轮判定值得修）：前一轮 delay=0ms 时（本机缓存 DNS 如 127.0.0.53 可真实打出 0ms），awk `$4/prev_d` 除零输出 `inf` 倍数（"为上轮inf倍"）。修法：判定条件加 `prev_d>0`——0ms 为基线的倍数本就无意义，直接不计突增，语义更严谨
   - **--since/--until locale 无关化**（开放项 #4，本轮判定值得修）：`[[ "$ts" < "$SINCE" ]]` 用完整时间戳参与 locale 敏感比较；改为与 --until 同口径的 `YYYY-MM-DD` 日期前缀比较（`${ts:0:10}`），纯 ASCII 前缀在任何 collation 下排序一致。对合法数据行为零变化（含两端日期语义不变，边界用例锁定）
   - **`inet_pton_ipv6` 冒号形状预检**（开放项 #6，同版追加）：原实现 `split(/::/)` 会把 `:::` 吞成 `::`、悬空单冒号段（`:1::2`、`1::2:`、`1:...:8:`）静默置 0——畸形写法被宽容解析成正确地址值。修法：入口两行形状预检（`:::`/两处 `::`/首尾悬空单冒号一律 undef），与 bash 侧 `valid_ipv6_addr` 的严格口径对齐（此前 bash 拒绝、perl 宽容，两端口径不一致）；tests/01 同 subtest +6 断言（:::/1:::2/两处::/首尾悬空/全展开尾冒号）；开发插曲：首版 `:[^:]$` 误杀 `1::2` 正常段尾（8 合法地址全红），改 `[^:]:$` 后双向形状表验证通过。工具侧确认无副本（tools/ 各 .pl 均 `use DNSUtil` 单一来源）
   - **开放项复核结论**：#7（run_common_tests 体量）维持（457 行核心采集引擎重构风险配不上纯可读性收益）；trend_stats 的 `s/NR` 均值经查有 `n_ok<1` 早退保护，无除零风险（本轮排查确认，未改）
   - **tests/06 扩至 124 用例（+3）**：前值 0ms 不出 inf 倍数、前值 0ms 不计突增、`--since` 当日边界含当日（独立夹具，不污染周对比断言）
   - **同步**：verify.sh / smoke.yml / CODE_WIKI 数量标签 121→124；版本落盘 v2026.08.26 / v1.16A
-  - **回归**：全量单测 8 套 257 断言通过；过滤与突变均为加守卫/改比较口径，无参数解析、退出码、传参逻辑变动
+  - **同版追加·全面体检轮**（代码 7 项 + 文档 8 项，双代理扫描 + 逐项人工核实）：
+    - **UDP 端口测试 0 字节误判**（[tools/network/01_port_test.pl]）：`send($sock,"",0,...)` 发空包成功返回 `0`（defined 但为假），原 `if (!$sent)` 永远走"发送失败"——UDP 分支功能性失效且被 CI 漏检（smoke/verify 只 grep 标题行）。改 `!defined $sent`
+    - **trends 无 trap**：`--export` 的 `EXP_STAGE` 仅正常路径清理，Ctrl-C/异常退出泄漏到 /tmp。补 EXIT/INT/TERM trap（与 lite/compare 同款）+ EXP_STAGE 注册 TMPDIR_LIST
+    - **无 curl 时 IPv6 端口探测假阴性**（[tools/network/doh_dot_check.sh]）：bash `/dev/tcp` 不支持 IPv6 字面值（冒号被当分隔符），无 curl 环境对 IPv6 DNS 恒报"443不可达"。改跳过并提示限制
+    - **compare JSON 并发半截读**：`> "$JF"` 直接截断写，trends 同瞬扫描可读到半截文件。改 `.tmp.$$` + 原子 `mv`（同秒双实例互不干扰）
+    - **trends 数据目录含空格断裂**：`for f in $FILES` IFS 分词拆断文件名。改 `while IFS= read -r` + 进程替换（不开子 shell，数组累积不失效）
+    - **STAB_ROUNDS 空串误判**：`${STAB_ROUNDS+x}` 把空串当显式设置，lite 不减半跑 20 轮。改 `${STAB_ROUNDS:-}` 判非空
+    - **bash 侧 `::` 全零地址误拒**：`valid_ipv6_addr` 要求有 `::` 时至少 1 段，`::` 被拒——与 perl 侧 `inet_pton_ipv6`（接受）口径相反。改 0-7 段，双侧对齐
+    - **文档 8 处对齐**：README 双徽章/下载链接 v2026.08.24→v2026.08.26、Release 徽章 v1.16→v1.16A；CODE_WIKI 头部+版本节 v1.15/v2026.08.22→当前；README/CODE_WIKI/AI_GUIDE/SANDBOX_GUIDE 四处测试计数（06 119→124、07 45→49、04 18→19、05 12→13、求和 250→259、目录树 5 数→8 数）；README.en.md 冒烟 25→24（历史轮已定调 2.5 为子项）；AI_GUIDE 补 `doctor --fix`/`trends --archive-keep` 示例
+    - **新增锁定用例 +2**（tests/04 `::` 全零合法 / tests/05 STAB_ROUNDS 空串视为未设置），总数 257→259
+  - **回归**：全量单测 8 套 259 断言通过；过滤与突变均为加守卫/改比较口径，无参数解析、退出码、传参逻辑变动
 - 2026-08-25（第九十八轮）：**补丁轮：补全词表补齐（doctor --fix / trends --archive-keep）+ release.sh 打包自检升级为门禁（completions/ ×2 / release.sh / tests/07 / smoke.yml / docs，发布 v2026.08.25，语义版 v1.16 不变）**
   - **补全漏 `--fix`**（外部审阅发现）：doctor.sh 支持 `--fix` 但 bash/zsh 补全词表均只有 `--net --cron --help`，用户 TAB 看不到该选项。两文件同步补入
   - **补全漏 `--archive-keep`**（本轮自查发现，审阅清单遗漏项）：trends `--archive-keep N`（v1.16 新参数）在 bash/zsh 的 flag 词表与"成对取值参数"列表均缺失——flag 位补不出、值位会误补 DNS/flag。两文件同步补入（flag 列表 + 取值列表，值位不补 flag）

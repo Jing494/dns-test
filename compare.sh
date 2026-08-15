@@ -515,7 +515,8 @@ if [ "$SAVE_JSON" = "1" ]; then
     done
     echo "  ]"
     echo "}"
-  } > "$JF"
+    # 先写 .tmp.$$ 再原子 mv：避免 trends 并发扫描时读到半截 JSON；同秒双实例共写不同 tmp 互不干扰
+  } > "$JF.tmp.$$" && mv -f "$JF.tmp.$$" "$JF"
   echo ""
   echo "  💾 JSON结果已保存: $JF"
   # --json：落盘同时输出到 stdout（管道消费；jq/重定向用户自取）

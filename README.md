@@ -3,8 +3,8 @@
 > 🌐 **English**：[README.en.md](./README.en.md) ｜ **中文**：本文档
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Release: v1.16](https://img.shields.io/badge/Release-v1.16-blue.svg)
-![Version: v2026.08.24](https://img.shields.io/badge/Version-v2026.08.24-blue.svg)
+![Release: v1.16A](https://img.shields.io/badge/Release-v1.16A-blue.svg)
+![Version: v2026.08.26](https://img.shields.io/badge/Version-v2026.08.26-blue.svg)
 ![Platform: Linux/macOS/WSL](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20WSL-green.svg)
 ![Bash 3.2+](https://img.shields.io/badge/Bash-3.2%2B-blue.svg)
 ![Perl 5.10+](https://img.shields.io/badge/Perl-5.10%2B-blue.svg)
@@ -14,7 +14,7 @@
 
 > 🏷️ **版本号规则（双轨制）**：`vYYYY.MM.N` 日期式（N=当月发布序号）↔ 语义 `vX.Y`（X=主版本，重大重构才升；Y=次版本，功能更新）。补丁级修复仅递增日期式 N。
 
-> 🔧 **最新版本**：**v1.16A = v2026.08.26**（加固轮：trends 突变检测前值 0ms 不再除零出 `inf` 倍数；`--since/--until` 改日期前缀比较不受 locale 影响；`inet_pton_ipv6` 补冒号形状预检——`:::`/两处 `::`/悬空单冒号等畸形写法不再被宽容解析，与 bash 侧校验口径对齐；边界均有回归用例）。v2026.08.25 补全词表补齐（doctor `--fix` / trends `--archive-keep`）+ release.sh 打包门禁。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
+> 🔧 **最新版本**：**v1.16A = v2026.08.26**（加固轮：trends 突变检测前值 0ms 不再除零出 `inf` 倍数；`--since/--until` 改日期前缀比较不受 locale 影响；`inet_pton_ipv6` 补冒号形状预检——`:::`/两处 `::`/悬空单冒号等畸形写法不再被宽容解析，bash/perl 两侧校验口径对齐（`::` 全零地址双侧放行）；UDP 端口测试 0 字节发送误判修复；trends 补 EXIT trap 防临时目录泄漏 + 数据目录含空格不再分词断裂；compare JSON 原子落盘防并发读到半截；STAB_ROUNDS 空串按未设置处理；无 curl 时 IPv6 跳过 /dev/tcp 端口探测。v2026.08.25 补全词表补齐（doctor `--fix` / trends `--archive-keep`）+ release.sh 打包门禁。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；**默认 DNS 列表为公开可测试的运营商公网 DNS**，示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
@@ -79,7 +79,7 @@ dns-test/
 ├── verify.sh / smoke_test.sh       # 自检工具（一键验证 / 冒烟测试）
 ├── install.sh / release.sh         # 安装 / 打包发布
 ├── lib/                            # 公共库（core.sh / compat.sh / plugins.sh / DNSUtil.pm）
-├── tests/                          # 单元测试（perl 18 + bash 9 + 4 + 15 + 9 用例）
+├── tests/                          # 单元测试（perl 18 + bash 9 + 4 + 19 + 13 + 124 + 49 + 23 用例，共 259）
 ├── docs/                           # 技术文档（AI_GUIDE / TEST_METHOD / CODE_WIKI / FAQ / CHANGELOG / SANDBOX_GUIDE）
 ├── tools/                          # 专项测试（vowifi/ / network/）
 ├── examples/                       # 通用示例脚本（4 个 Perl）
@@ -101,7 +101,7 @@ cd dns-test
 
 # 方式2: Releases 下载（免 git，直接拿成品包）
 #   前往 https://github.com/Jing494/dns-test/releases
-#   下载 dns-test-v2026.08.24.tar.gz 后解压即可
+#   下载 dns-test-v2026.08.26.tar.gz 后解压即可
 
 # 方式3: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
 ```
@@ -302,7 +302,7 @@ bash install.sh --completions               # 自动写入 ~/.bashrc / ~/.zshrc�
 
 按优先级排序：
 
-- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截）+ `tests/03_dig_target.sh` 4 用例（IPv6 加方括号）+ `tests/04_core_functions.sh` 18 用例（地址校验/响应判断/CDN 判定/入口参数解析）+ `tests/05_run_common_tests.sh` 12 用例（lite 计分口径/稳定性降轮/CONFIG_DOMAINS 安全解析/dig @server 前缀回归/full 模式 @server 遮蔽回归/ECS_SUBNET 注入拦截/par_run 元字符禁令）+ `tests/06_compare_e2e.sh` 119 用例（compare 端到端离线回归：--watch 参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/--rounds/--keep 校验与清理/--json stdout/--watch+--open 子轮HTML回归/断点续采（同签名续采+签名不匹配重开+跑满清除）/采集模式HTML自动刷新/trends --prune/--until/--alert/--vs/周对比/突变检测/--md/--json/--week/--webhook/--archive 归档/--export 报障包/HTML 归档小节，mock dig/ping + 用户 results 目录备份恢复）+ `tests/07_doctor.sh` 45 用例（doctor 自检/参数/--cron 模板/PATH 剥离 FAIL 路径 + bash/zsh 补全 + install --completions 幂等安装（假HOME）+ trends 新参数校验），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh` / `bash tests/03_dig_target.sh` / `bash tests/04_core_functions.sh` / `bash tests/05_run_common_tests.sh` / `bash tests/06_compare_e2e.sh` / `bash tests/07_doctor.sh`
+- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截）+ `tests/03_dig_target.sh` 4 用例（IPv6 加方括号）+ `tests/04_core_functions.sh` 19 用例（地址校验（含 `::` 全零地址）/响应判断/CDN 判定/入口参数解析）+ `tests/05_run_common_tests.sh` 13 用例（lite 计分口径/稳定性降轮（含 STAB_ROUNDS 空串）/CONFIG_DOMAINS 安全解析/dig @server 前缀回归/full 模式 @server 遮蔽回归/ECS_SUBNET 注入拦截/par_run 元字符禁令）+ `tests/06_compare_e2e.sh` 124 用例（compare 端到端离线回归：--watch 参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/--rounds/--keep 校验与清理/--json stdout/--watch+--open 子轮HTML回归/断点续采（同签名续采+签名不匹配重开+跑满清除）/采集模式HTML自动刷新/trends --prune/--until/--alert/--vs/周对比/突变检测（前值0ms边界）/--since 当日边界/--md/--json/--week/--webhook/--archive 归档/--export 报障包/HTML 归档小节，mock dig/ping + 用户 results 目录备份恢复）+ `tests/07_doctor.sh` 49 用例（doctor 自检/参数/--cron 模板/PATH 剥离 FAIL 路径 + bash/zsh 补全（含 --fix/--archive-keep）+ install --completions 幂等安装（假HOME）+ trends 新参数校验）+ `tests/08_trends_lib.sh` 23 用例（trends 纯函数：分位数/斜率判定/--json 等价冒烟），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh` / `bash tests/03_dig_target.sh` / `bash tests/04_core_functions.sh` / `bash tests/05_run_common_tests.sh` / `bash tests/06_compare_e2e.sh` / `bash tests/07_doctor.sh` / `bash tests/08_trends_lib.sh`
   - bats 评估结论（2026-08-13）：**不引入**——现有 perl 单测 + smoke/verify 集成已够，bash 纯函数用零依赖轻量断言（tests/02_plugins.sh）补充，避免增加依赖
 - **par_run 通用化（✅ 已完成）**：PARR_MAX 环境变量可调并发数（默认 8），临时目录自动注册 TMPDIR_LIST 统一清理
 - **trends svg_chart 模板化（✅ 已完成）**：SVG 图表公共框架 `chart_begin`/`chart_end` 下沉（card/Y轴/极值标签统一），svg_chart 与 svg_multi_chart 复用同一框架，点线绘制各自保留

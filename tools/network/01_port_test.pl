@@ -63,8 +63,10 @@ foreach my $t (@targets) {
         
         # 发送一个空的UDP包
         my $sent = send($sock, "", 0, $dest_addr);
-        
-        if (!$sent) {
+
+        # 注意：发送 0 字节成功时返回 0（defined 但为假），必须用 defined 判失败
+        # （修复前 !$sent 把成功的 0 当失败，UDP 分支永远报"发送失败"）
+        if (!defined $sent) {
             print "  UDP: ❌ 发送失败 - $!\n\n";
             close($sock);
             next;

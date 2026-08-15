@@ -68,11 +68,16 @@ if [[ "$DNS" =~ ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-
         echo "  DoH: ⚠️ curl DoH 失败（未提供/路径不同/网络不通，code=$code）"
       fi
     else
-      port_hit=$({ timeout 3 bash -c "echo > \"/dev/tcp/${DNS}/443\"" 2>/dev/null; } && echo 1 || echo 0)
-      if [ "$port_hit" = "1" ]; then
-        echo "  DoH: ✅ 443端口开放（无curl，仅端口级探测）"
+      # bash /dev/tcp 不支持 IPv6 字面值（冒号被当 host:port 分隔符），无 curl 时对 IPv6 跳过端口探测
+      if [[ "$DNS" == *":"* ]]; then
+        echo "  DoH: ⏭️  跳过端口探测（无 curl 且 bash /dev/tcp 不支持 IPv6；装 curl 后可实测）"
       else
-        echo "  DoH: ⚠️ 443端口不可达"
+        port_hit=$({ timeout 3 bash -c "echo > \"/dev/tcp/${DNS}/443\"" 2>/dev/null; } && echo 1 || echo 0)
+        if [ "$port_hit" = "1" ]; then
+          echo "  DoH: ✅ 443端口开放（无curl，仅端口级探测）"
+        else
+          echo "  DoH: ⚠️ 443端口不可达"
+        fi
       fi
     fi
   else

@@ -93,6 +93,10 @@ else
   notok "STAB_ROUNDS 默认20 (got user=$STAB_ROUNDS_USER rounds=$STAB_ROUNDS)"
 fi
 
+# 1b. STAB_ROUNDS 空串应视为未设置（lite 才减半；修复前 ${STAB_ROUNDS+x} 把空串当显式设置）
+U=$(STAB_ROUNDS="" bash -c 'source lib/core.sh >/dev/null 2>&1; echo "${STAB_ROUNDS_USER:-unset}"' 2>/dev/null)
+[ "$U" = "0" ] && ok "STAB_ROUNDS 空串视为未设置(lite减半)" || notok "STAB_ROUNDS 空串被误判为显式设置 (user=$U)"
+
 # 2. 执行 lite 全流程（离线，无真实网络），退出码应为 0
 OUT=$(PATH="$STUB:$PATH" run_common_tests 8.8.8.8 "mockDNS" lite)
 RC=$?

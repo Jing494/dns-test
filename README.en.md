@@ -20,7 +20,7 @@ A unified toolkit for DNS benchmarking and network diagnostics, with a focus on 
 - **Trend Insight** — `trends.sh` aggregates historical compare results (linear-regression trend arrows, delay P50/P95 percentiles, per-hour worst/best and per-day analysis, provider labels, multi-DNS overlay comparison charts, HTML insights card, CSV export, SVG line charts, optional cron collection, `--prune N` history retention control, `--open` auto-launch browser); `--week N` configurable week-over-week window (2–365 days), `--json` machine-readable output (stdout kept clean for `jq`), `--alert T --webhook URL` watchdog alerting (Feishu / DingTalk / WeCom / Telegram / Bark / generic JSON), `--archive` + `--archive-keep N` tar.gz archiving with rotation, `--export` one-command bug-report bundle (data + report + doctor output, `--since/--until` time-window filter)
 - **Environment Doctor** — `doctor.sh` one-command self-check (platform, required/optional deps, macOS–Linux compat layer, writable dirs, data health); `--net` adds connectivity tests, `--fix` auto-repairs healable items (missing dirs, quarantines corrupted JSON), `--cron` prints a ready-to-paste crontab template (collect + alert + weekly archive, with the cron-PATH pitfall pre-solved)
 - **Shell Completions** — bash/zsh completions for all entry scripts (`bash install.sh --completions`, idempotent; flags, preset groups and public-DNS addresses)
-- **Automated Smoke Test** — `smoke_test.sh` validates all core paths in one run (25 checks)
+- **Automated Smoke Test** — `smoke_test.sh` validates all core paths in one run (24 checks)
 
 ## Quick Start
 

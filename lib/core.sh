@@ -169,8 +169,9 @@ fi
 CDN_DOMAINS="www.bilibili.com www.douyin.com www.iqiyi.com www.youku.com www.google.com www.youtube.com www.qq.com www.taobao.com www.jd.com www.163.com www.sina.com.cn www.zhihu.com www.baidu.com"
 
 # 稳定性测试轮次（可用环境变量 STAB_ROUNDS 覆盖，快速模式可调小，如 STAB_ROUNDS=5）
-# 记录用户是否显式设置：未设置时 lite 默认减半（20→10）缩短耗时，full 保持 20（审阅#8）
-STAB_ROUNDS_USER=0; [ -n "${STAB_ROUNDS+x}" ] && STAB_ROUNDS_USER=1
+# 记录用户是否显式设置：未设置（含空串）时 lite 默认减半（20→10）缩短耗时，full 保持 20（审阅#8）
+# 空串视为未设置：${STAB_ROUNDS:-} 判非空（此前 ${STAB_ROUNDS+x} 把空串当显式设置，lite 不减半，与注释意图不符）
+STAB_ROUNDS_USER=0; [ -n "${STAB_ROUNDS:-}" ] && STAB_ROUNDS_USER=1
 STAB_ROUNDS="${STAB_ROUNDS:-20}"
 # 校验必须为正整数，非法值回退默认20（防除零）
 [[ "$STAB_ROUNDS" =~ ^[1-9][0-9]*$ ]] || STAB_ROUNDS=20
@@ -222,7 +223,7 @@ valid_dns_addr() {
 }
 
 # IPv6 地址严格校验（仅依赖正则+字符串运算，bash 3.2/macOS 兼容）
-# 规则：仅hex与冒号；至多一个 ::；非空段1-4位hex；无 :: 时恰8段，有 :: 时1-7段；单冒号不得位于首尾
+# 规则：仅hex与冒号；至多一个 ::；非空段1-4位hex；无 :: 时恰8段，有 :: 时0-7段（0=全零地址::）；单冒号不得位于首尾
 valid_ipv6_addr() {
   local a="$1" left right seg rest nseg=0
   [[ "$a" =~ ^[0-9a-fA-F:]+$ ]] || return 1     # 仅 hex 与冒号
@@ -248,7 +249,8 @@ valid_ipv6_addr() {
     rest="${rest#*:}"
   done
   if [[ "$a" == *"::"* ]]; then
-    [ "$nseg" -ge 1 ] && [ "$nseg" -le 7 ] || return 1
+    # 有 :: 时 0-7 段（0 段即全零地址 ::，RFC 4291 合法，与 perl 侧 inet_pton_ipv6 口径一致）
+    [ "$nseg" -le 7 ] || return 1
   else
     [ "$nseg" -eq 8 ] || return 1
   fi
