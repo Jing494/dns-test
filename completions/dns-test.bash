@@ -13,7 +13,7 @@ _dns_test_complete() {
   script="${COMP_WORDS[0]}"
   # 成对取值参数：光标在其值位，不再补 flag
   case "$prev" in
-    --watch|--rounds|--keep|--limit|--since|--until|--alert|--prune|--vs|--week|--webhook)
+    --watch|--rounds|--keep|--limit|--since|--until|--alert|--prune|--vs|--week|--webhook|--archive-keep)
       return 0 ;;
   esac
   # 常用公共DNS（仅提示词，任意合法IPv4/IPv6均可手输）
@@ -24,10 +24,10 @@ _dns_test_complete() {
       flags="--html --md --open --full --no-save --json --watch --rounds --keep --version --help"
       COMPREPLY=( $(compgen -W "$flags $presets $dns_words" -- "$cur") ) ;;
     trends.sh)
-      flags="--html --open --md --json --csv --vs --cron --detail --limit --since --until --prune --archive --export --alert --webhook --week --version --help"
+      flags="--html --open --md --json --csv --vs --cron --detail --limit --since --until --prune --archive --archive-keep --export --alert --webhook --week --version --help"
       COMPREPLY=( $(compgen -W "$flags $dns_words" -- "$cur") ) ;;
     doctor.sh)
-      COMPREPLY=( $(compgen -W "--net --cron --help" -- "$cur") ) ;;
+      COMPREPLY=( $(compgen -W "--net --cron --fix --help" -- "$cur") ) ;;
     dns-test.sh|lite.sh|full.sh)
       # 入口/极简脚本只吃 DNS 地址
       COMPREPLY=( $(compgen -W "$dns_words" -- "$cur") ) ;;

@@ -78,6 +78,19 @@ SIM6=$(bash -c 'source completions/dns-test.bash
 COMP_WORDS=(trends.sh --ex); COMP_CWORD=1
 _dns_test_complete; echo "${COMPREPLY[@]}"')
 echo "$SIM6" | grep -q -- "--export" && ok "trends.sh --ex<TAB> 补出 --export" || notok "--export 补全缺失: [$SIM6]"
+SIM7=$(bash -c 'source completions/dns-test.bash
+COMP_WORDS=(doctor.sh --f); COMP_CWORD=1
+_dns_test_complete; echo "${COMPREPLY[@]}"')
+echo "$SIM7" | grep -q -- "--fix" && ok "doctor.sh --f<TAB> 补出 --fix" || notok "--fix 补全缺失: [$SIM7]"
+SIM8=$(bash -c 'source completions/dns-test.bash
+COMP_WORDS=(trends.sh --archive-k); COMP_CWORD=1
+_dns_test_complete; echo "${COMPREPLY[@]}"')
+echo "$SIM8" | grep -q -- "--archive-keep" && ok "trends.sh --archive-k<TAB> 补出 --archive-keep" || notok "--archive-keep 补全缺失: [$SIM8]"
+# --archive-keep 值位不补 flag
+SIM9=$(bash -c 'source completions/dns-test.bash
+COMP_WORDS=(trends.sh --archive-keep); COMP_CWORD=2
+_dns_test_complete; echo "n=${#COMPREPLY[@]}"')
+[ "$SIM9" = "n=0" ] && ok "--archive-keep 值位不补 flag" || notok "--archive-keep 值位误补: [$SIM9]"
 
 echo "═══ completions: zsh 补全 ═══"
 grep -q "#compdef compare.sh trends.sh doctor.sh" completions/dns-test.zsh \
@@ -85,7 +98,8 @@ grep -q "#compdef compare.sh trends.sh doctor.sh" completions/dns-test.zsh \
 grep -q -- "--webhook" completions/dns-test.zsh && ok "zsh 含新 flag --webhook" || notok "zsh 缺 --webhook"
 grep -q -- "--archive" completions/dns-test.zsh && ok "zsh 含 --archive" || notok "zsh 缺 --archive"
 grep -q -- "--export" completions/dns-test.zsh && ok "zsh 含 --export" || notok "zsh 缺 --export"
-grep -q -- "--net --cron --help" completions/dns-test.zsh && ok "zsh doctor 含 --cron" || notok "zsh doctor 缺 --cron"
+grep -q -- "--net --cron --fix --help" completions/dns-test.zsh && ok "zsh doctor 含 --cron/--fix" || notok "zsh doctor 缺 --cron/--fix"
+grep -q -- "--archive-keep" completions/dns-test.zsh && ok "zsh 含 --archive-keep" || notok "zsh 缺 --archive-keep"
 
 echo "═══ install.sh: --completions 幂等安装（假 HOME，不动真实 rc） ═══"
 bash -n install.sh && ok "install.sh 语法 OK" || notok "install.sh 语法错误"

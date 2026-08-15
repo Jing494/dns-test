@@ -6,7 +6,8 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
-| v2026.08.24 | v1.16（当前，补丁） |
+| v2026.08.25 | v1.16（当前，补丁） |
+| v2026.08.24 | v1.16（补丁） |
 | v2026.08.23 | v1.16 |
 | v2026.08.22 | v1.15 |
 | v2026.08.21 | v1.14 |
@@ -28,6 +29,14 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-25（第九十八轮）：**补丁轮：补全词表补齐（doctor --fix / trends --archive-keep）+ release.sh 打包自检升级为门禁（completions/ ×2 / release.sh / tests/07 / smoke.yml / docs，发布 v2026.08.25，语义版 v1.16 不变）**
+  - **补全漏 `--fix`**（外部审阅发现）：doctor.sh 支持 `--fix` 但 bash/zsh 补全词表均只有 `--net --cron --help`，用户 TAB 看不到该选项。两文件同步补入
+  - **补全漏 `--archive-keep`**（本轮自查发现，审阅清单遗漏项）：trends `--archive-keep N`（v1.16 新参数）在 bash/zsh 的 flag 词表与"成对取值参数"列表均缺失——flag 位补不出、值位会误补 DNS/flag。两文件同步补入（flag 列表 + 取值列表，值位不补 flag）
+  - **审阅误报澄清**：zsh 取值参数列表并非少 `--watch --rounds --keep`——实际文件与 bash 完全一致（11 项全），无需改动
+  - **release.sh 自检门禁化**（外部审阅发现）："日志/报告应为0 / results目录应为1"原只打印不拦截，异常时照样返回 0 并打印上传命令，可能发布带垃圾的包。现不达标直接 `exit 1`（不打印上传命令，包保留供排查）；计数改 `-eq` 整数比较（免疫 BSD wc/grep -c 前导空格，沿用 tests/06 先例）
+  - **tests/07 扩至 49 用例（+4）**：doctor `--f<TAB>` 补出 `--fix`、trends `--archive-k<TAB>` 补出 `--archive-keep`、`--archive-keep` 值位不补 flag、zsh 含 `--fix`/`--archive-keep`；原 zsh 断言 `--net --cron --help` 适配为 `--net --cron --fix --help`
+  - **CI（smoke.yml）**：单测数量标签同步 45→49
+  - **回归**：全量单测 8 套 254 断言通过；补全仅动词表字符串（补全逻辑/注册/拦截零改动）；release.sh 正常路径 exit 0 + 门禁路径（混入 debug.log 实测）exit 1 双向验证；参数解析/退出码语义零改动
 - 2026-08-24（第九十七轮）：**补丁轮：macOS bash 3.2 多字节展开修复 + --open 降级提示 + CI 双平台加固（trends.sh / doctor.sh / lib/core.sh / lib/plugins.sh / install.sh / tests/06 / .github/workflows/smoke.yml，发布 v2026.08.24，语义版 v1.16 不变）**
   - **根因（CI macOS 首跑实证）**：macOS 自带 bash 3.2 在 UTF-8 locale 下，`"$var（"` 中紧跟变量的全角字符首字节（0xEF/0xC2 等）被误并入变量名 → 展开为空/错位。表现：trends 总图标题丢"综合评分对比"、`--vs` 对决行 DNS 标签坏、时间窗倒挂报错插值坏
   - **修法**：全仓 `$var` 后紧跟非 ASCII 字符的插值一律加花括号 `${var}`（trends.sh 7 处 / lib/core.sh 1 / lib/plugins.sh 2 / doctor.sh 10 / install.sh 2）

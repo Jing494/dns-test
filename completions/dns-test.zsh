@@ -10,7 +10,7 @@ _dns-test() {
   script=${words[1]##*/}
   cur=${words[CURRENT]}
   # 成对取值参数：光标在其值位，不补 flag
-  if [[ ${words[CURRENT-1]} == (--watch|--rounds|--keep|--limit|--since|--until|--alert|--prune|--vs|--week|--webhook) ]]; then
+  if [[ ${words[CURRENT-1]} == (--watch|--rounds|--keep|--limit|--since|--until|--alert|--prune|--vs|--week|--webhook|--archive-keep) ]]; then
     return 0
   fi
   local -a dns_words
@@ -22,10 +22,10 @@ _dns-test() {
         default ali tencent all "${dns_words[@]}" ;;
     trends.sh)
       _values 'option/DNS' \
-        --html --open --md --json --csv --vs --cron --detail --limit --since --until --prune --archive --export --alert --webhook --week --version --help \
+        --html --open --md --json --csv --vs --cron --detail --limit --since --until --prune --archive --archive-keep --export --alert --webhook --week --version --help \
         "${dns_words[@]}" ;;
     doctor.sh)
-      _values 'option' --net --cron --help ;;
+      _values 'option' --net --cron --fix --help ;;
     dns-test.sh|lite.sh|full.sh)
       _values 'DNS' "${dns_words[@]}" ;;
     *) ;;

@@ -19,9 +19,16 @@ tar czf "$OUT" --exclude='.git' --exclude='results/*' --exclude='trends' --exclu
 echo "════ 打包完成 ════"
 echo "  文件: $OUT ($(du -h "$OUT" | cut -f1))"
 echo "  条目: $(tar tzf "$OUT" | wc -l) 个"
-echo "  日志/报告: $(tar tzf "$OUT" | grep -cE '\.log|报告') 处（应为0）"
-echo "  results目录: $(tar tzf "$OUT" | grep -c 'results/$') 个（应为1，防脚本找不到目录）"
+BAD=$(tar tzf "$OUT" | grep -cE '\.log|报告')
+RSLT=$(tar tzf "$OUT" | grep -c 'results/$')
+echo "  日志/报告: ${BAD} 处（应为0）"
+echo "  results目录: ${RSLT} 个（应为1，防脚本找不到目录）"
 echo ""
+# 门禁：混入日志/报告或缺 results 目录 → 拦截发布（不打印上传命令，防止带垃圾出包）
+if [ "$BAD" -ne 0 ] || [ "$RSLT" -ne 1 ]; then
+  echo "❌ 打包自检未达标（日志/报告=${BAD}，results目录=${RSLT}），已拦截；包保留在 $OUT 供排查"
+  exit 1
+fi
 
 # 自动获取 release id（需令牌 + 网络；失败则提示手动）
 REPO="${REPO:-Jing494/dns-test}"
