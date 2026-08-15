@@ -60,15 +60,19 @@ jobs:
           ls "$TMPR/out/report.html" "$TMPR/out/trends.csv" >/dev/null 2>&1 || { echo "❌ trends产物缺失"; exit 1; }
           rm -rf "$TMPR"
           echo "  ✅ trends 聚合+产物"
-          echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 18 + 计分口径 12 + compare e2e 25 + doctor/completions/trends参数 45 + trends_lib纯函数 23）"
+          echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 18 + 计分口径 12 + compare e2e 121 + doctor/completions/trends参数 45 + trends_lib纯函数 23）"
+          # 失败时打印输出尾部（断言名直接进日志，不再盲猜）
+          UTLOG=$(mktemp)
+          ut() { bash "tests/$1" >"$UTLOG" 2>&1 || { echo "❌ $1 失败，输出尾部:"; tail -25 "$UTLOG"; exit 1; }; }
           perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 || { echo "❌ perl单测失败"; exit 1; }
-          bash tests/02_plugins.sh >/dev/null 2>&1 || { echo "❌ bash单测失败"; exit 1; }
-          bash tests/03_dig_target.sh >/dev/null 2>&1 || { echo "❌ dig_target单测失败"; exit 1; }
-          bash tests/04_core_functions.sh >/dev/null 2>&1 || { echo "❌ core函数单测失败"; exit 1; }
-          bash tests/05_run_common_tests.sh >/dev/null 2>&1 || { echo "❌ 计分口径单测失败"; exit 1; }
-          bash tests/06_compare_e2e.sh >/dev/null 2>&1 || { echo "❌ compare e2e单测失败"; exit 1; }
-          bash tests/07_doctor.sh >/dev/null 2>&1 || { echo "❌ doctor/completions单测失败"; exit 1; }
-          bash tests/08_trends_lib.sh >/dev/null 2>&1 || { echo "❌ trends_lib单测失败"; exit 1; }
+          ut 02_plugins.sh
+          ut 03_dig_target.sh
+          ut 04_core_functions.sh
+          ut 05_run_common_tests.sh
+          ut 06_compare_e2e.sh
+          ut 07_doctor.sh
+          ut 08_trends_lib.sh
+          rm -f "$UTLOG"
           echo "  ✅ 单元测试通过"
           echo "--- 7. doctor 环境自检（干净 checkout，无历史数据应 WARN 不 FAIL）"
           bash doctor.sh >/dev/null 2>&1 || { echo "❌ doctor 自检存在 FAIL 项"; exit 1; }
