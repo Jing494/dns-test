@@ -76,7 +76,13 @@ jobs:
           echo "PROBE P7 文件grep中文(h2行): [$(grep 综合评分 /tmp/probe-out/report.html | head -1)]"
           echo "PROBE P8 管道grep中文: [$(cat /tmp/probe-out/report.html | grep -c 综合评分)]次 / 文件grep: [$(grep -c 综合评分 /tmp/probe-out/report.html)]次"
           echo "PROBE P9 h2字节: [$(grep h2 /tmp/probe-out/report.html | head -1 | od -c | head -2 | tr '\n' ' ')]"
-          echo "PROBE P10 倒挂字节: [$(COMPARE_RESULTS_DIR=/tmp/probe-rs TRENDS_DIR=/tmp/probe-out bash trends.sh --since 2026-08-12 --until 2026-08-11 2>&1 | od -c | head -1)]"
+          echo "PROBE P10 倒挂字节: [$(COMPARE_RESULTS_DIR=/tmp/probe-rs TRENDS_DIR=/tmp/probe-out bash trends.sh --since 2026-08-12 --until 2026-08-11 2>&1 | od -An -tx1 | head -c 90)]"
+          # P11-P12: bash 3.2 最小结构复现（local+if/else+中文赋值+$( ) 调用）+ macOS 总图 h2 实际文本
+          _arr=(a b); _ts=(1 2)
+          _mm() { local m="$1"; local n=${#_ts[@]}; [ "$n" -lt 2 ] && return 0; local c=2 t u; if [ "$m" = "score" ]; then t="综合评分对比"; col=2; u="%"; else t="延迟对比"; fi; echo "<h2>XYZ $t（${#_arr[@]}个 × ${n}轮）</h2>"; }
+          echo "PROBE P11 3.2最小结构: [$(echo "$(_mm score)")]"
+          echo "PROBE P12 全部h2: [$(grep '<h2>' /tmp/probe-out/report.html | head -6 | tr '\n' '|')]"
+          echo "PROBE P13 VS行: [$(COMPARE_RESULTS_DIR=/tmp/probe-rs TRENDS_DIR=/tmp/probe-out bash trends.sh --vs 223.5.5.5,119.29.29.29 2>&1 | grep -E '胜|同轮' | od -An -tx1 | head -c 60)]"
           # 失败时打印输出尾部（断言名直接进日志，不再盲猜）
           UTLOG=$(mktemp)
           ut() { bash "tests/$1" >"$UTLOG" 2>&1 || { echo "❌ $1 失败断言（含上下文）:"; grep -n -B1 -A1 "❌" "$UTLOG" | head -80; cp "$UTLOG" "/tmp/utlog-$1.txt"; exit 1; }; }
