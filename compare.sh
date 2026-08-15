@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-# 多DNS对比模式（v3：并行 + 延迟中位数 + 结构化JSON + HTML报告）
+# 多DNS对比模式（v3：并行 + 延迟中位数/抖动 + 提供商标签 + 结构化JSON + HTML/MD报告）
 # 兼容性: bash 3.2+（无关联数组依赖，macOS 默认 bash 可直接运行）
 # 用法: bash compare.sh DNS1|预设组 [DNS2 ...] [--html] [--md] [--no-save] [--watch N]
 #   例: bash compare.sh 223.5.5.5 119.29.29.29 222.172.200.68
@@ -174,13 +174,30 @@ if [ ${#CUR_DNS_LIST[@]} -gt 0 ]; then
   echo "  👤 当前系统DNS: ${CUR_DNS_LIST[*]}"
 fi
 
+# dns_preset_label <addr>：在三组预设地址中反查提供商标签（如 阿里DNS-v4-1），未知返回空
+# 复用 core.sh 预设数组（地址↔名称同下标），与 dns-preset.sh 展示口径一致
+dns_preset_label() {
+  local addr="$1" _i
+  for _i in "${!DEFAULT_DNS_ADDR[@]}"; do
+    [ "${DEFAULT_DNS_ADDR[$_i]}" = "$addr" ] && { echo "${DEFAULT_DNS_NAME[$_i]}"; return 0; }
+  done
+  for _i in "${!ALI_DNS_ADDR[@]}"; do
+    [ "${ALI_DNS_ADDR[$_i]}" = "$addr" ] && { echo "${ALI_DNS_NAME[$_i]}"; return 0; }
+  done
+  for _i in "${!TENCENT_DNS_ADDR[@]}"; do
+    [ "${TENCENT_DNS_ADDR[$_i]}" = "$addr" ] && { echo "${TENCENT_DNS_NAME[$_i]}"; return 0; }
+  done
+  return 1
+}
+
 # ============================================================================
-# 1) 延迟探测：每DNS 3次dig（par_run并行），取中位数
-#    平行数组 DELAY_VAL[i] 对应 DNS_ARGS[i]
+# 1) 延迟探测：每DNS 3次dig（par_run并行），取中位数 + 抖动(max-min)
+#    平行数组 DELAY_VAL[i] / JITTER_VAL[i] 对应 DNS_ARGS[i]
 # ============================================================================
 DELAY_VAL=()
+JITTER_VAL=()
 echo ""
-echo "  ━━━ [0] 延迟探测（每DNS 3次dig → 中位数） ━━━"
+echo "  ━━━ [0] 延迟探测（每DNS 3次dig → 中位数/抖动） ━━━"
 PARR_CMDS=()
 for d in "${DNS_ARGS[@]}"; do
   for i in 1 2 3; do
@@ -199,9 +216,13 @@ for d in "${DNS_ARGS[@]}"; do
   if [ ${#vals[@]} -gt 0 ]; then
     sorted=$(printf '%s\n' "${vals[@]}" | sort -n)
     DELAY_VAL+=("$(echo "$sorted" | sed -n "$(( (${#vals[@]} / 2) + 1 ))p")")
-    printf "     ✅ %-42s 延迟中位 %sms (样本%d)\n" "$d" "${DELAY_VAL[${#DELAY_VAL[@]}-1]}" "${#vals[@]}"
+    # 抖动 = 样本最大-最小（3样本内体现波动；单样本为0）
+    vmin=$(echo "$sorted" | head -1); vmax=$(echo "$sorted" | tail -1)
+    JITTER_VAL+=("$((vmax - vmin))")
+    printf "     ✅ %-42s 延迟中位 %sms 抖动±%sms (样本%d)\n" "$d" "${DELAY_VAL[${#DELAY_VAL[@]}-1]}" "${JITTER_VAL[${#JITTER_VAL[@]}-1]}" "${#vals[@]}"
   else
     DELAY_VAL+=("")
+    JITTER_VAL+=("")
     printf "     ❌ %-42s 不可达（3次dig均无响应）\n" "$d"
   fi
 done
@@ -270,7 +291,12 @@ for i in "${!DNS_ARGS[@]}"; do
   rank=$((rank+1))
   sv="${SCORE_VAL[$i]}"; [ "$sv" != "不可达" ] && sv="${sv}%"
   tv="${STAB_VAL[$i]}"; [ "$tv" != "-" ] && tv="${tv}%"
-  printf "  %-3d %-42s %-9s %-10s %-8s\n" "$rank" "${DNS_ARGS[$i]}" "$sv" "${DELAY_VAL[$i]:-—}" "$tv"
+  # DNS 列拼提供商标签（预设内才有，如 223.5.5.5·阿里DNS-v4-1）；延迟列拼抖动（如 10±4）
+  dshow="${DNS_ARGS[$i]}"
+  _lbl=$(dns_preset_label "${DNS_ARGS[$i]}") && dshow="${dshow}·${_lbl}"
+  dlshow="${DELAY_VAL[$i]:-—}"
+  [ -n "${JITTER_VAL[$i]:-}" ] && dlshow="${dlshow}±${JITTER_VAL[$i]}"
+  printf "  %-3d %-42s %-9s %-10s %-8s\n" "$rank" "$dshow" "$sv" "$dlshow" "$tv"
 done
 
 BEST=""; BEST_IDX=-1; BEST_SCORE=-1; BEST_DELAY=99999
@@ -286,7 +312,8 @@ if [ "$BEST_IDX" -ge 0 ]; then
   echo ""
   _best_note=""
   is_current_dns "$BEST" && _best_note=" — 👤 当前正在使用，无需切换"
-  echo "  🏆 综合推荐: $BEST （评分${BEST_SCORE}% 延迟${BEST_DELAY}ms）${_best_note}"
+  _best_show="$BEST"; _tlbl=$(dns_preset_label "$BEST") && _best_show="${_best_show}（${_tlbl}）"
+  echo "  🏆 综合推荐: $_best_show （评分${BEST_SCORE}% 延迟${BEST_DELAY}ms）${_best_note}"
 else
   echo ""
   echo "  💀 全部DNS不可达"
@@ -373,7 +400,7 @@ if [ "$SAVE_JSON" = "1" ]; then
       esc_d=$(json_enc "$d")
       [ "${SCORE_VAL[$i]}" = "不可达" ] && reachable=false || reachable=true
       comma=""; [ $i -lt $(( ${#DNS_ARGS[@]} - 1 )) ] && comma=","
-      echo "    {\"addr\": ${esc_d}, \"score\": \"${SCORE_VAL[$i]}\", \"stab\": \"${STAB_VAL[$i]}\", \"delay_ms\": ${DELAY_VAL[$i]:-0}, \"reachable\": ${reachable}}${comma}"
+      echo "    {\"addr\": ${esc_d}, \"score\": \"${SCORE_VAL[$i]}\", \"stab\": \"${STAB_VAL[$i]}\", \"delay_ms\": ${DELAY_VAL[$i]:-0}, \"jitter_ms\": ${JITTER_VAL[$i]:-0}, \"reachable\": ${reachable}}${comma}"
       i=$((i+1))
     done
     echo "  ]"
@@ -455,6 +482,7 @@ if [ "$GEN_HTML" = "1" ]; then
     echo "th{background:var(--th-bg);color:var(--th-tx);font-weight:600}"
     echo "tbody tr:nth-child(even){background:rgba(127,127,127,.04)}"
     echo "td.addr{font-family:var(--mono);font-size:13px}"
+    echo ".pname{display:block;font-size:11px;color:var(--sub);font-family:inherit;margin-top:1px}"
     echo "tr.best td{background:var(--best)}"
     echo ".rank{font-family:var(--mono);color:var(--sub)}"
     echo ".bdg{display:inline-block;min-width:44px;text-align:center;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;font-family:var(--mono)}"
@@ -478,7 +506,8 @@ if [ "$GEN_HTML" = "1" ]; then
     echo "<div class='meta'>$(date '+%Y-%m-%d %H:%M:%S') ｜ $( [ "$MODE" = "full" ] && echo "完整版" || echo "lite精简版" ) ${LITE_ITEMS:+${LITE_ITEMS}项}/DNS ｜ dns-test ${VERSION} ｜ 耗时${COST}s</div>"
     if [ "$BEST_IDX" -ge 0 ]; then
       _rec_note=""; is_current_dns "$BEST" && _rec_note=" ｜ 👤 当前正在使用"
-      echo "<div class='rec'>🏆 综合推荐: <b>$BEST</b> — 评分${BEST_SCORE}% ｜ 延迟${BEST_DELAY}ms${_rec_note}</div>"
+      _rec_best="$BEST"; _rlbl=$(dns_preset_label "$BEST") && _rec_best="${_rec_best}（${_rlbl}）"
+      echo "<div class='rec'>🏆 综合推荐: <b>$_rec_best</b> — 评分${BEST_SCORE}% ｜ 延迟${BEST_DELAY}ms${_rec_note}</div>"
     else
       echo "<div class='rec bad-rec'>💀 全部DNS不可达，请检查网络/加速器状态后重试</div>"
     fi
@@ -509,6 +538,8 @@ if [ "$GEN_HTML" = "1" ]; then
       if [ "$dl" != "—" ]; then
         dcls="bg-g"; [ "$dl" -ge 100 ] && dcls="bg-a"; [ "$dl" -ge 300 ] && dcls="bg-r"
         dvs="${dl}ms"
+        # 抖动并进延迟徽章（如 10ms±4；max-min，越小越稳），title 悬浮解释
+        [ -n "${JITTER_VAL[$oi]:-}" ] && dvs="${dvs}±${JITTER_VAL[$oi]}"
       else
         dcls="bg-n"; dvs="—"
       fi
@@ -543,7 +574,9 @@ if [ "$GEN_HTML" = "1" ]; then
       fi
       # 当前系统 DNS 徽章（命中才渲染，不破坏 addr 列等宽字体排版）
       cur_b=""; is_current_dns "${DNS_ARGS[$oi]}" && cur_b=" <span class='bdg bg-n'>👤当前</span>"
-      echo "<tr${rowcls}><td class='rank'>$mk</td><td class='addr'>${DNS_ARGS[$oi]}${cur_b}</td><td><span class='bdg $bcls'>$sv</span></td>${ds_cell}<td><span class='bdg $dcls'>$dvs</span></td>${dd_cell}<td><span class='bdg $tcls'>$tvs</span></td><td>$st</td></tr>"
+      # 提供商标签（预设内的 DNS 才有，地址下方小字副行）
+      pl_b=""; _pl=$(dns_preset_label "${DNS_ARGS[$oi]}") && pl_b="<span class='pname'>${_pl}</span>"
+      echo "<tr${rowcls}><td class='rank'>$mk</td><td class='addr'>${DNS_ARGS[$oi]}${cur_b}${pl_b}</td><td><span class='bdg $bcls'>$sv</span></td>${ds_cell}<td><span class='bdg $dcls' title='中位数±抖动(ms)'>$dvs</span></td>${dd_cell}<td><span class='bdg $tcls'>$tvs</span></td><td>$st</td></tr>"
     done
     echo "</tbody></table></div></div>"
     # 切换命令卡片（终端已打印同款；HTML 内 < > 转义防当标签解析）
@@ -612,7 +645,8 @@ if [ "$GEN_MD" = "1" ]; then
     echo ""
     if [ "$BEST_IDX" -ge 0 ]; then
       _md_note=""; is_current_dns "$BEST" && _md_note=" ｜ 👤 当前正在使用"
-      echo "**🏆 综合推荐: \`${BEST}\`** — 评分${BEST_SCORE}% ｜ 延迟${BEST_DELAY}ms${_md_note}"
+      _md_best="$BEST"; _blbl=$(dns_preset_label "$BEST") && _md_best="${_md_best}（${_blbl}）"
+      echo "**🏆 综合推荐: \`${_md_best}\`** — 评分${BEST_SCORE}% ｜ 延迟${BEST_DELAY}ms${_md_note}"
     else
       echo "**💀 全部DNS不可达，请检查网络/加速器状态后重试**"
     fi
@@ -632,11 +666,15 @@ if [ "$GEN_MD" = "1" ]; then
     for oi in "${RANKED_IDX[@]}"; do
       rank=$((rank+1))
       sv="${SCORE_VAL[$oi]}"; tv="${STAB_VAL[$oi]}"
+      dshow="${DNS_ARGS[$oi]}"
+      _mlbl=$(dns_preset_label "${DNS_ARGS[$oi]}") && dshow="${dshow}（${_mlbl}）"
       if [ "$sv" = "不可达" ]; then
         mk="$rank"; sv="不可达"; dvs="—"; st="❌ 不可达"
       else
         case "$rank" in 1) mk="🥇";; 2) mk="🥈";; 3) mk="🥉";; *) mk="$rank";; esac
-        sv="${sv}%"; dvs="${DELAY_VAL[$oi]}ms"; st="✅ 可达"
+        sv="${sv}%"; dvs="${DELAY_VAL[$oi]}ms"
+        [ -n "${JITTER_VAL[$oi]:-}" ] && dvs="${dvs}±${JITTER_VAL[$oi]}"
+        st="✅ 可达"
       fi
       [ "$tv" != "-" ] && tv="${tv}%" || tv="—"
       cur_md=""; is_current_dns "${DNS_ARGS[$oi]}" && cur_md=" 👤"
@@ -648,9 +686,9 @@ if [ "$GEN_MD" = "1" ]; then
         else
           dd="—"
         fi
-        echo "| ${mk} | \`${DNS_ARGS[$oi]}\`${cur_md} | ${sv} | ${ds} | ${dvs} | ${dd} | ${tv} | ${st} |"
+        echo "| ${mk} | \`${dshow}\`${cur_md} | ${sv} | ${ds} | ${dvs} | ${dd} | ${tv} | ${st} |"
       else
-        echo "| ${mk} | \`${DNS_ARGS[$oi]}\`${cur_md} | ${sv} | ${dvs} | ${tv} | ${st} |"
+        echo "| ${mk} | \`${dshow}\`${cur_md} | ${sv} | ${dvs} | ${tv} | ${st} |"
       fi
     done
     echo ""

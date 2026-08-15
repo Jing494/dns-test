@@ -31,14 +31,12 @@
   - ⑧ **修复三处**：`--watch` 缺值时被静默吞掉跑成单轮（wnext 残留检测显式报错）；空参数 usage 未列 `--md/--watch/预设`；lite 失败行 "稳定性-%"/"评分不可达%" 百分号破相显示（仅数值时拼接）
   - ⑨ **测试转正**：新增 `tests/06_compare_e2e.sh` 19 用例（mock dig/ping 离线端到端：--watch 参数校验 ×3、当前DNS👤标记三出口 ×6、环比Δ ×2、预设展开 ×3、--prune ×5；用户 results/ 自动备份恢复防误删历史数据），接入 verify + CI；总用例 61→80
   - ⑩ 回归：bash -n/shellcheck（-S warning 口径）0 告警；tests 01~06 全绿（80 用例）；真实浏览器四页视觉回归 PASS（compare/trends × 亮/暗，奖牌/徽章/Δ列/👤标记/SVG 轴色无溢出错位）；版本 v1.9 = v2026.08.16，README/CODE_WIKI/AI_GUIDE/CI 同步
-- 2026-08-15（第八十七轮）：**full 模式 @server 错乱修复 + 注入面收尾（lib/core.sh 等，不升版本）**
-  - ① **P0 循环变量遮蔽（审阅#11）**：`run_common_tests` 函数级 `local t=$(dig_target ...)` 是全部 `dig @server` 的目标，但 full 专有的三处 `for t` 循环（稳定性延迟值/DNSSEC 记录类型 DNSKEY-DS-RRSIG/TTL 值）会把它永久遮蔽——实测 full 模式第 6~15 项（NXDOMAIN/连通性/IPv6/一致性/运营商/DNSSEC/ECS/PTR/TTL/劫持对比/递归）出现 `@10`（延迟值）、`@DNSKEY/@DS/@RRSIG`（记录类型）、`@300`（TTL）等错误目标，结果整体不可信；循环变量改名 `st`/`rt`/`tv` 修复（lite 路径不进这些分支故未受影响）
-  - ② **P1 ECS_SUBNET 注入拦截（审阅#12）**：环境变量 `ECS_SUBNET` 未校验即拼进 `par_run` 的 `eval` 命令串，`ECS_SUBNET="1.2.3.4/24; <命令>"` 可穿透"dig 开头"白名单执行任意命令（实测复现）；加载时按 CIDR 格式（`^[0-9a-fA-F:.]+/[0-9]{1,3}$`）校验，非法回退默认 `240e:52:4800::/48`（与 STAB_ROUNDS 校验同风格）
-  - ③ **par_run 元字符禁令**：白名单原仅校验"dig 开头"，`; & $ \`` 等元字符可穿透（compare 的管道 `|` 为延迟取数合法保留）；补禁令拒绝含 `; & $ \`` 的命令整体拒执行，注入面收窄到与注释承诺一致
-  - ④ **DNSUtil.pm IPv6 校验补齐（审阅#13）**：`inet_pton_ipv6` 对 `::` 两侧超 7 段（如 `1:2:3:4:5:6:7:8::9`，missing 为负）静默产出 18 字节、超 4 位 hex 段（如 `88888`）被 `pack("n")` 静默截断——均补显式 `undef` 拒绝（两个分支同规格），tests/01 非法地址子测试补 5 断言锁死
-  - ⑤ **两处小修**：`tools/vowifi/carrier_epdg.pl` DNS 选项先 `^\d+$` 再数值比较（消除非数字输入的 "isn't numeric" 警告噪音）；`install.sh` 无包管理器场景 `PKG_DIG/PKG_SC` 预置通用名（NEED 数组不再出现空包名导致"必需缺失: "显示为空）
-  - ⑥ **回归防护**：`tests/05_run_common_tests.sh` 新增第 10~12 用例——full 模式 mock dig 断言 `@server` 恒为被测地址/[14]劫持对比基准（白名单 `@8.8.8.8`/`@[2400:3200::1]`/`@223.5.5.5`）、ECS_SUBNET 非法值回退默认且注入不执行、par_run 元字符命令整体拒执行；负向验证：用修复前 core.sh 跑三条新用例全部变红，修复后全绿；用例数 9→12，verify/CI/README/CODE_WIKI/AI_GUIDE 文案同步
-  - ⑦ 回归：bash -n 全绿、perl -c 全绿、shellcheck 全库 0 告警、单测(18+9+4+18+12) 全绿、伪终端主菜单循环如常
+- 2026-08-16（第八十九轮-补充）：**提供商标签 + 延迟抖动（compare.sh，并入 v1.9）**
+  - ① **提供商标签**：`dns_preset_label` 复用 core.sh 三组预设"地址↔名称"数组反查——预设内 DNS 在文本结果表显示 `223.5.5.5·阿里DNS-v4-1`、HTML 地址下方小字副行、MD `223.5.5.5（阿里DNS-v4-1）`、推荐行/推荐卡/MD 推荐同步；自定义 DNS 不标注（未知不渲染，无噪音）
+  - ② **延迟抖动 jitter**：延迟探测 3 样本取中位数的同时算 max-min 抖动——探测行 `延迟中位 10ms 抖动±4ms`、文本/HTML/MD 延迟列 `10±4`/`10ms±4`（HTML 带 title 悬浮解释）、JSON 新增 `jitter_ms` 字段（追加在 delay_ms 后，trends/环比的前缀 grep 解析不受影响）
+  - ③ **交互提示**：dns-test.sh 对比输入提示补预设组名说明（`ali,tencent` 也可直接输入）
+  - ④ 修复：tests/05 两条历史 shellcheck 告警（SC2043/SC2034 加 disable 注释说明保留意图）；tests/06 结束清理 trends/ 产物目录（测试不留痕）；CSS `.pname` 字体从不存在的 `--sans` 改为 inherit
+  - ⑤ tests/06 扩至 25 用例（+6：标签三出口 ×3/抖动行/MD 抖动/JSON jitter_ms），总用例 80→86；README.en.md 补 v1.9 特性（此前英文版未同步）；AI_GUIDE/CODE_WIKI/verify/CI 用例数同步
 - 2026-08-15（第八十八轮-补充）：**不可达 DNS 不授奖牌 + v1.8 视觉回归验证（compare.sh，不升版本）**
   - ① 边界修正：全部 DNS 不可达时排名表仍会给故障服务器发 🥇🥈（视觉误导）；不可达行降级为纯序号，正常场景奖牌逻辑不变
   - ② 视觉回归：真实浏览器（HTTP 服务 + 截图）四页验证（compare/trends × 亮/暗）——无横向溢出（scrollWidth 1265<1280）、奖牌/徽章/最佳行高亮正常、暗色对比度可读、SVG 折线暗色下可见；HTML 标签平衡校验通过、无裸实体；trends 趋势徽章语义（评分升→变好/延迟降→变好）正确；全部不可达路径 exit 2 + bad-rec 提示正常
@@ -50,6 +48,14 @@
   - ⑤ **表格/打印增强**：thead/tbody 语义化 + 斑马纹 + `white-space:nowrap` + `.tbl-wrap` 小屏横向滚动（替代挤压换行）；`@media print` 打印去阴影防截断
   - ⑥ **版本升级**：PROJECT_VERSION `v2026.08.11`→`v2026.08.15`、PROJECT_RELEASE `v1.7.1`→`v1.8`（新功能发新版）；README badge/下载名/最新版本说明、CODE_WIKI 版本引用同步
   - ⑦ 回归：bash -n/shellcheck 全绿；单测(18+9+4+18+12) 全绿；compare 差异化 mock（按 @server 返回 8/45/220ms）实跑 `--html` 验证排名顺序/奖牌/最佳行/暗色/打印样式断言全过；trends 三次采集 mock 验证趋势徽章（升→b-up/降→b-down）与 SVG 轴 class 全过；伪终端主菜单如常
+- 2026-08-15（第八十七轮）：**full 模式 @server 错乱修复 + 注入面收尾（lib/core.sh 等，不升版本）**
+  - ① **P0 循环变量遮蔽（审阅#11）**：`run_common_tests` 函数级 `local t=$(dig_target ...)` 是全部 `dig @server` 的目标，但 full 专有的三处 `for t` 循环（稳定性延迟值/DNSSEC 记录类型 DNSKEY-DS-RRSIG/TTL 值）会把它永久遮蔽——实测 full 模式第 6~15 项（NXDOMAIN/连通性/IPv6/一致性/运营商/DNSSEC/ECS/PTR/TTL/劫持对比/递归）出现 `@10`（延迟值）、`@DNSKEY/@DS/@RRSIG`（记录类型）、`@300`（TTL）等错误目标，结果整体不可信；循环变量改名 `st`/`rt`/`tv` 修复（lite 路径不进这些分支故未受影响）
+  - ② **P1 ECS_SUBNET 注入拦截（审阅#12）**：环境变量 `ECS_SUBNET` 未校验即拼进 `par_run` 的 `eval` 命令串，`ECS_SUBNET="1.2.3.4/24; <命令>"` 可穿透"dig 开头"白名单执行任意命令（实测复现）；加载时按 CIDR 格式（`^[0-9a-fA-F:.]+/[0-9]{1,3}$`）校验，非法回退默认 `240e:52:4800::/48`（与 STAB_ROUNDS 校验同风格）
+  - ③ **par_run 元字符禁令**：白名单原仅校验"dig 开头"，`; & $ \`` 等元字符可穿透（compare 的管道 `|` 为延迟取数合法保留）；补禁令拒绝含 `; & $ \`` 的命令整体拒执行，注入面收窄到与注释承诺一致
+  - ④ **DNSUtil.pm IPv6 校验补齐（审阅#13）**：`inet_pton_ipv6` 对 `::` 两侧超 7 段（如 `1:2:3:4:5:6:7:8::9`，missing 为负）静默产出 18 字节、超 4 位 hex 段（如 `88888`）被 `pack("n")` 静默截断——均补显式 `undef` 拒绝（两个分支同规格），tests/01 非法地址子测试补 5 断言锁死
+  - ⑤ **两处小修**：`tools/vowifi/carrier_epdg.pl` DNS 选项先 `^\d+$` 再数值比较（消除非数字输入的 "isn't numeric" 警告噪音）；`install.sh` 无包管理器场景 `PKG_DIG/PKG_SC` 预置通用名（NEED 数组不再出现空包名导致"必需缺失: "显示为空）
+  - ⑥ **回归防护**：`tests/05_run_common_tests.sh` 新增第 10~12 用例——full 模式 mock dig 断言 `@server` 恒为被测地址/[14]劫持对比基准（白名单 `@8.8.8.8`/`@[2400:3200::1]`/`@223.5.5.5`）、ECS_SUBNET 非法值回退默认且注入不执行、par_run 元字符命令整体拒执行；负向验证：用修复前 core.sh 跑三条新用例全部变红，修复后全绿；用例数 9→12，verify/CI/README/CODE_WIKI/AI_GUIDE 文案同步
+  - ⑦ 回归：bash -n 全绿、perl -c 全绿、shellcheck 全库 0 告警、单测(18+9+4+18+12) 全绿、伪终端主菜单循环如常
 - 2026-08-15（第八十七轮-补充）：**分支清理 + trends 文件枚举去 ls 解析 + 第八十七轮兼容性核查（trends.sh，不升版本）**
   - ① **分支清理**：删除环境自动提交产生的 `trae/agent-c3Ej6p` 分支（本地+远程，无文件改动）；trae 协作分支仅保留 `trae/agent-q7bDKm`，后续改动均在此分支进行
   - ② **trends 数据扫描去 ls 解析**：`ls "$SRC_DIR"/compare-*.json | sort` 改为 glob 迭代构造文件列表（规避 SC2012 解析 ls 输出的技术债；glob 天然字典序=时间戳文件名的时间序，`head/tail/wc -l` 下游语义不变，空目录/无匹配仍正确 exit 2）

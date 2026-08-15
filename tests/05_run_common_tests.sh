@@ -72,6 +72,7 @@ EOF
 chmod +x "$STUB/ping"
 
 # 无 perl 的环境也兼容（stub 兜底，与 tests/03 一致）；dig 已在 $STUB 内
+# shellcheck disable=SC2043  # 单元素兜底清单，保留 for 形态便于以后追加依赖
 for c in perl; do
   command -v "$c" >/dev/null 2>&1 || { printf '#!/bin/bash\nexit 0\n' > "$STUB/$c"; chmod +x "$STUB/$c"; }
 done
@@ -178,6 +179,7 @@ fi
 
 # 12. par_run 元字符禁令：命令含 ; & $ ` 时整体拒绝（不执行任何一条）
 rm -f "$STUB/inj.out"
+# shellcheck disable=SC2034  # P4 只为承接子进程输出防止混入测试输出，值本身不使用
 P4=$(PATH="$STUB:$PATH" TMPDIR="$STUB" bash -c 'source lib/core.sh; PARR_CMDS=("dig @8.8.8.8 a.com A +short; touch '"$STUB"'/inj.out"); par_run >/dev/null 2>&1; echo done' 2>/dev/null)
 if [ ! -f "$STUB/inj.out" ]; then
   ok "par_run 元字符命令被拒（; 注入不执行）"

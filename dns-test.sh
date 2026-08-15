@@ -205,7 +205,7 @@ run_prof() {
           bash compare.sh "${DNS_LIST[@]}"
         else
           echo "  对比至少需要2个DNS（当前: ${DNS_LIST[*]:-无}）"
-          if ! prompt cmp_input "  请输入要对比的DNS（逗号分隔，回车默认 223.5.5.5,119.29.29.29）: "; then
+          if ! prompt cmp_input "  请输入要对比的DNS（逗号分隔，回车默认 223.5.5.5,119.29.29.29；也可输预设组名如 ali,tencent）: "; then
             echo ""
             echo "⏰ 等待输入超时，返回主菜单..."
             return 0

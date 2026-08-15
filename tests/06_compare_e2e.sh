@@ -2,8 +2,8 @@
 # ============================================================================
 # 纯 bash 轻量断言单测：compare.sh 端到端 + trends --prune（离线，mock dig/ping）
 # 覆盖: --watch 参数校验（缺值/非法值/0）、当前系统DNS检测与👤标记（头部/表格/推荐注记，
-#       文本+HTML+MD 三出口）、环比 Δ 计算（fixture 对比）、预设组名展开（ali 含 IPv6）、
-#       未知词报错、trends --prune 保留/删除/校验
+#       文本+HTML+MD 三出口）、环比 Δ 计算（fixture 对比）、提供商标签（三出口+抖动+JSON jitter_ms）、
+#       预设组名展开（ali 含 IPv6）、未知词报错、trends --prune 保留/删除/校验
 # 用法: bash tests/06_compare_e2e.sh   （退出码 0=全过 1=有失败）
 # 说明: 不发起任何真实网络请求；compare.sh 硬编码 results/ 落盘，
 #       测试前备份用户 results/ 到沙目录，结束时 trap 原样恢复（防误删历史数据）
@@ -70,7 +70,7 @@ restore_results() {
   else
     rm -rf results
   fi
-  rm -rf "$STUB"
+  rm -rf trends "$STUB"   # trends.sh 聚合时会 mkdir trends/（产物目录），测试不留痕
 }
 trap restore_results EXIT INT TERM
 
@@ -112,6 +112,18 @@ grep -q "\`$CUR\` 👤" results/report.md && ok "MD 含 👤 标记" || notok "M
 grep -q "当前正在使用" results/report.md && ok "MD 推荐行含注记" || notok "MD 推荐行无注记"
 echo "$OUT" | grep -q "环比上次采集" && ok "环比输出存在" || notok "环比输出缺失"
 grep -q "Δ评分" results/report.html && ok "HTML Δ列存在" || notok "HTML Δ列缺失"
+
+echo "═══ compare.sh e2e: 提供商标签 + 延迟抖动 ═══"
+# 预设内 DNS（223.5.5.5=阿里）应带标签；自定义 DNS 不带
+OUT4=$(bash compare.sh 223.5.5.5 --no-save 2>&1)
+echo "$OUT4" | grep -q "223.5.5.5·阿里DNS-v4-1" && ok "文本结果表带提供商标签" || notok "文本结果表缺标签"
+echo "$OUT4" | grep -q "抖动±" && ok "探测行带抖动" || notok "探测行缺抖动"
+bash compare.sh 223.5.5.5 --md >/dev/null 2>&1
+grep -q "223.5.5.5（阿里DNS-v4-1）" results/report.md && ok "MD 表带标签" || notok "MD 表缺标签"
+grep -qE "ms±[0-9]+" results/report.md && ok "MD 延迟带抖动" || notok "MD 延迟缺抖动"
+bash compare.sh 223.5.5.5 --html >/dev/null 2>&1
+grep -q "class='pname'>阿里DNS-v4-1" results/report.html && ok "HTML addr 带标签副行" || notok "HTML 缺标签副行"
+grep -q "jitter_ms" results/compare-*.json 2>/dev/null && ok "JSON 含 jitter_ms 字段" || notok "JSON 缺 jitter_ms"
 
 echo "═══ compare.sh e2e: 预设组名展开 ═══"
 OUT2=$(bash compare.sh ali --no-save 2>&1)

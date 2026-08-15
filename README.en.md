@@ -16,8 +16,8 @@ A unified toolkit for DNS benchmarking and network diagnostics, with a focus on 
 - **DoH / DoT Support Check** — adaptive: real test via `dig +tls` / `curl --doh-url` when available, port-level probe otherwise
 - **IPv6 support** — v4/v6 dual-stack everywhere, IPv6 connectivity test (ping6)
 - **AI Operator Manual** — 12-chapter guide teaching AI agents how to interact with users properly (ask DNS → pick version → guide to specialty tests)
-- **DNS Comparison** — `compare.sh` compares multiple DNS side-by-side (score / latency median / stability), optional responsive HTML report + structured JSON results
-- **Trend Insight** — `trends.sh` aggregates historical compare results (linear-regression trend arrows, CSV export, SVG line charts, optional cron collection)
+- **DNS Comparison** — `compare.sh` compares multiple DNS side-by-side (score / latency median / stability), preset groups supported (`bash compare.sh ali tencent`), optional responsive HTML / Markdown reports + structured JSON results, period-over-period deltas, per-OS switch commands, current-system-DNS marker (👤), and `--watch N` timed collection
+- **Trend Insight** — `trends.sh` aggregates historical compare results (linear-regression trend arrows, CSV export, SVG line charts, optional cron collection, `--prune N` history retention control)
 - **Automated Smoke Test** — `smoke_test.sh` validates all core paths in one run (25 checks)
 
 ## Quick Start
@@ -53,9 +53,12 @@ bash lite.sh 223.5.5.5 0   # benchmark a DNS
 bash lite.sh                      # default: Yunnan Telecom DNS (lite)
 bash full.sh 8.8.8.8 0            # full test, single DNS (index param to avoid timeout)
 bash dns-preset.sh ali lite 0     # Alibaba DNS preset
-bash compare.sh 223.5.5.5 119.29.29.29 --html  # DNS comparison + HTML report
+bash compare.sh ali tencent                   # compare preset groups (default/ali/tencent/all, mixable with IPs)
+bash compare.sh 223.5.5.5 119.29.29.29 --html  # DNS comparison + HTML report (+ --md for Markdown)
 bash compare.sh 223.5.5.5 119.29.29.29 --full   # full-mode comparison (77~78 checks/DNS)
+bash compare.sh 223.5.5.5 119.29.29.29 --watch 30  # collect every 30 min (Ctrl-C to stop; feeds trends)
 bash trends.sh --html --csv       # trend insight (needs accumulated compare data)
+bash trends.sh --prune 200        # keep only the latest 200 JSON snapshots, then aggregate
 perl tools/vowifi/carrier_epdg.pl all   # carrier ePDG deployment check
 perl tools/vowifi/03_test_router_dns.pl 192.168.1.1   # router forwarding check
 bash tools/network/doh_dot_check.sh 223.5.5.5          # DoH/DoT check

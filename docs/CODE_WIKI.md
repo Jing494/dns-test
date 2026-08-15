@@ -86,7 +86,7 @@
 ### 2.3 数据流
 
 - **基础测试**：入口脚本 → `core.sh` 的 `run_common_tests`（mode=full/lite 控制差异） → 并行 `dig` → 解析 → 汇总评分
-- **对比测试**：`compare.sh` → 延迟探测 + 批量调用 `lite.sh`/`full.sh` → 文本表格 + JSON + HTML
+- **对比测试**：`compare.sh` → 延迟探测 + 批量调用 `lite.sh`/`full.sh` → 文本表格 + JSON + HTML/MD 报告（预设组名展开、当前DNS👤标记、环比Δ、切换命令建议、`--watch N` 定时采集）
 - **趋势洞察**：`trends.sh` → 扫描 `results/compare-*.json` → 线性回归 → CSV + SVG 折线图
 - **专项测试**：`dns-test.sh` → `plugins.sh` → `manifest.sh` → 执行 `tools/` 下 perl/bash 脚本
 
@@ -102,7 +102,7 @@ dns-test/
 ├── dns-test.sh                   # 统一交互入口（选 DNS 组/测试类型/专项）
 ├── dns-preset.sh                 # 预设快捷测试（默认/阿里/腾讯）
 ├── full.sh / lite.sh             # 基础测试入口（完整版 16 项 / 精简版 10 项）
-├── compare.sh                    # 多 DNS 对比（并行+延迟中位数+HTML/JSON）
+├── compare.sh                    # 多 DNS 对比（并行+延迟中位数+JSON/HTML/MD+预设组+定时采集）
 ├── trends.sh                     # DNS 趋势洞察（聚合 compare 历史）
 ├── verify.sh                     # 一键全面验证（语法+单测+冒烟+对比+趋势）
 ├── smoke_test.sh                 # 自动化冒烟测试（24 项）
@@ -119,7 +119,7 @@ dns-test/
 │   ├── 03_dig_target.sh          # dig_target 4 用例（IPv6加方括号）
 │   ├── 04_core_functions.sh      # core 纯函数 18 用例（地址校验/响应判断/CDN/入口参数解析）
 │   ├── 05_run_common_tests.sh    # lite 计分口径/full 回归 12 用例（稳定性降轮/CONFIG_DOMAINS安全解析/dig @server回归/for t遮蔽回归/ECS_SUBNET注入拦截/par_run元字符禁令，mock dig/ping 离线）
-│   └── 06_compare_e2e.sh         # compare 端到端 19 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/预设组名展开/trends --prune，mock dig/ping 离线 + 用户 results 备份恢复）
+│   └── 06_compare_e2e.sh         # compare 端到端 25 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune，mock dig/ping 离线 + 用户 results 备份恢复）
 ├── tools/                        # 专项测试工具
 │   ├── manifest.sh               # 插件注册表
 │   ├── vowifi/                   # VoWiFi 专项（ePDG/路由器）
@@ -147,8 +147,8 @@ dns-test/
 | [dns-preset.sh](file:///workspace/dns-preset.sh) | 预设快捷测试（default/ali/tencent/all） | 支持 `PRESET_DNS_CSV` 自定义；索引参数避免超时 |
 | [full.sh](file:///workspace/full.sh) | 完整版基础测试（16 项，77~78 评分点） | `SAVE_LOG=1` 存日志；`trap` 清理临时目录 |
 | [lite.sh](file:///workspace/lite.sh) | 精简版基础测试（10 项，53~54 评分点） | 同上，输出更短 |
-| [compare.sh](file:///workspace/compare.sh) | 多 DNS 横向对比 | 延迟中位数 + 批量并发 + JSON/HTML 报告 |
-| [trends.sh](file:///workspace/trends.sh) | 聚合 compare 历史 JSON 出趋势 | 线性回归 + SVG 折线图 + CSV + `--cron` 定时采集 |
+| [compare.sh](file:///workspace/compare.sh) | 多 DNS 横向对比 | 延迟中位数 + 批量并发 + JSON/HTML/MD 报告 + 预设组展开 + 环比Δ + 切换命令 + 当前DNS标记 + `--watch` 定时采集 |
+| [trends.sh](file:///workspace/trends.sh) | 聚合 compare 历史 JSON 出趋势 | 线性回归 + SVG 折线图 + CSV + `--cron` 定时采集 + `--prune N` 留存清理 |
 | [verify.sh](file:///workspace/verify.sh) | 一键全面自检 | 7 步：语法/shellcheck/单测/冒烟/compare/trends/专项 |
 | [smoke_test.sh](file:///workspace/smoke_test.sh) | 自动化冒烟（24 项） | CI 与改动后回归必跑 |
 | [install.sh](file:///workspace/install.sh) | 依赖检测与安装 | 自动识别 apt/yum/dnf/brew/apk/pacman/zypper |
@@ -380,7 +380,7 @@ dns-test.sh 选"专项测试"
 | [tests/03_dig_target.sh](file:///workspace/tests/03_dig_target.sh) | dig_target 4 用例（IPv4 原样/IPv6 加方括号/特殊 IPv6/空输入） | `bash tests/03_dig_target.sh` |
 | [tests/04_core_functions.sh](file:///workspace/tests/04_core_functions.sh) | core 纯函数 18 用例（valid_dns_addr 合法/非法+超范围/IPv6 畸形结构、is_valid_response 错误/纯 OPT、is_cdn_domain、parse_dns_args 入口参数） | `bash tests/04_core_functions.sh` |
 | [tests/05_run_common_tests.sh](file:///workspace/tests/05_run_common_tests.sh) | lite 计分口径/full 回归 12 用例（稳定性降轮 20→10、AAAA 空响应计分、综合评分 45/53、CONFIG_DOMAINS 注入不执行/非法 token 忽略、dig @server 前缀回归、full 模式 @server 遮蔽回归、ECS_SUBNET 注入拦截、par_run 元字符禁令；mock dig/ping 离线） | `bash tests/05_run_common_tests.sh` |
-| [tests/06_compare_e2e.sh](file:///workspace/tests/06_compare_e2e.sh) | compare 端到端 19 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、预设组名展开含 IPv6、未知词报错、trends --prune 保留/删除/校验；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
+| [tests/06_compare_e2e.sh](file:///workspace/tests/06_compare_e2e.sh) | compare 端到端 25 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、提供商标签+抖动三出口+JSON jitter_ms、预设组名展开含 IPv6、未知词报错、trends --prune 保留/删除/校验；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
 
 `02/03/04/05/06_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
 
@@ -396,7 +396,7 @@ dns-test.sh 选"专项测试"
 
 1. 语法检查（.sh + .pl）
 2. shellcheck（可选依赖，`--strict` 强制）
-3. 单元测试（18+9+4+18+12+19 用例）
+3. 单元测试（18+9+4+18+12+25 用例）
 4. 冒烟测试（24 项）
 5. compare 快测（2 DNS）
 6. trends 聚合（无数据/超时跳过）
@@ -437,9 +437,12 @@ bash dns-preset.sh ali lite 0                 # 预设：阿里精简版第 1 �
 ### 9.3 多 DNS 对比与趋势
 
 ```bash
-bash compare.sh 223.5.5.5 119.29.29.29 --html # 对比 + 生成 results/report.html
+bash compare.sh 223.5.5.5 119.29.29.29 --html # 对比 + 生成 results/report.html（--md 同理出 Markdown）
+bash compare.sh ali tencent                   # 预设组名直接对比（default/ali/tencent/all，可与IP混用）
+bash compare.sh 223.5.5.5 119.29.29.29 --watch 30  # 每30分钟采集一轮（Ctrl-C停止，趋势数据源）
 bash compare.sh 223.5.5.5 119.29.29.29 --full # 完整版对比（77~78 项/DNS）
 bash trends.sh --html --csv                   # 趋势洞察（需先积累 compare 数据）
+bash trends.sh --prune 200                    # 只保留最近200份JSON再聚合（长期采集控磁盘）
 bash trends.sh --cron 223.5.5.5 119.29.29.29  # 先采集再聚合（配 crontab）
 ```
 
