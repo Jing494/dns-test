@@ -744,6 +744,12 @@ if [ "$GEN_HTML" = "1" ]; then
     done
     echo "<div class='meta'>颜色: 绿&lt;100ms ｜ 黄100~300ms ｜ 红≥300ms或不可达</div>"
     echo "</div>"
+    # 趋势报告互链（有历史聚合才显示；compare 在 results/ 下，trends 报告在 ../trends/）
+    if [ -f "trends/report.html" ]; then
+      echo "<div class='card'><h2>📈 趋势洞察</h2><div class='meta'>已有历史趋势报告 — <a href='../trends/report.html'>点击查看</a>（多轮聚合/趋势箭头/P95/周对比）</div></div>"
+    else
+      echo "<div class='card'><h2>📈 趋势洞察</h2><div class='meta'>积累多轮数据后可看趋势: <code>bash trends.sh --html</code></div></div>"
+    fi
     echo "</div>"
     echo "</body></html>"
   } > "$HF"

@@ -14,7 +14,7 @@
 
 > 🏷️ **版本号规则（双轨制）**：`vYYYY.MM.N` 日期式（N=当月发布序号）↔ 语义 `vX.Y`（X=主版本，重大重构才升；Y=次版本，功能更新）。补丁级修复仅递增日期式 N。
 
-> 🔧 **最新版本**：**v1.15 = v2026.08.22**（trends `--export` 一键报障包（数据+报告+doctor自检三合一）+ HTML 报告归档包小节 + `install.sh --completions` 幂等装补全（装完依赖顺手配好））。v1.14 带来 `--archive` 归档与 `doctor --cron` 值守模板。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
+> 🔧 **最新版本**：**v1.16 = v2026.08.23**（收官轮：`--archive-keep` 归档包轮转 + `doctor --fix` 自动修可自愈项 + `--export --since/--until` 时间窗 + trends 纯函数下沉 `lib/trends_lib.sh`（tests/08 独立单测）+ compare HTML 嵌趋势报告互链 + CI strict 层补挂全量单测）。v1.15 带来 `--export` 报障包与 `install.sh --completions`。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；**默认 DNS 列表为公开可测试的运营商公网 DNS**，示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
@@ -190,6 +190,7 @@ bash compare.sh 223.5.5.5 --watch 30 --keep 200             # JSON只保留最�
 #   采集模式HTML报告带自动刷新（挂屏监控到点自动更新）
 #   环境变量: COMPARE_MAX_CONCURRENCY=3  lite并行数（设1串行最稳）
 #   输出: results/compare-<时间戳>.json 结构化结果（历史趋势积累用）
+#   HTML 报告带趋势互链：已有 trends/report.html 时直接可跳转查看，否则显示生成指引
 
 # DNS趋势洞察（基于compare历史JSON聚合，需先积累至少2次compare数据）
 bash trends.sh                              # 全部DNS趋势总览（文本，含P95延迟+时段/日级/周对比/突变检测）
@@ -206,7 +207,9 @@ bash trends.sh --alert 70 --webhook https://open.feishu.cn/open-apis/bot/v2/hook
 bash trends.sh --prune 200                  # 只保留最近200份JSON再聚合（--watch长期采集配套）
 bash trends.sh --prune 200 --archive        # 清理前先把被删JSON打包到 trends/archive/（防误删）
 bash trends.sh --archive                    # 全量打包当前JSON（备份/迁移/报障分享，不删文件）
+bash trends.sh --prune 200 --archive --archive-keep 20  # 归档包只留最近20个（防无限堆积，自动删最老）
 bash trends.sh --export --html --md --csv   # 一键报障包：数据JSON+本次报告+doctor自检 → trends/export/
+bash trends.sh --export --since 2026-08-01  # 报障包只打包该日期起的数据（--until 同理，窗口过滤）
 bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合——crontab自动积累用
 
 #   定时值守三件套模板（采集+prune归档/告警webhook/每周全量归档）一键打印，改路径即可粘进 crontab -e：
@@ -216,6 +219,7 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 # 环境自检（跑不起来先自诊；报障请附其输出）
 bash doctor.sh                              # 依赖/平台兼容/目录可写/数据健康 一键体检
 bash doctor.sh --net                        # 追加真实网络连通检查（dig 223.5.5.5）
+bash doctor.sh --fix                        # 体检后自动修可自愈项（建缺失目录/损坏JSON隔离到 results/quarantine/）
 bash doctor.sh --cron                       # 打印值守 crontab 模板（采集/告警/归档，不跑体检）
 
 # shell 补全（可选；compare/trends 参数多，补全提升手感；幂等可重复运行）

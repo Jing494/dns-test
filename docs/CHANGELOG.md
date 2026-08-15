@@ -6,7 +6,8 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
-| v2026.08.22 | v1.15（当前） |
+| v2026.08.23 | v1.16（当前） |
+| v2026.08.22 | v1.15 |
 | v2026.08.21 | v1.14 |
 | v2026.08.20 | v1.13 |
 | v2026.08.19 | v1.12 |
@@ -26,6 +27,16 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-23（第九十六轮）：**收官轮：--archive-keep 归档轮转 + doctor --fix 自愈 + --export 时间窗 + trends 纯函数下沉 + compare↔trends 互链 + CI/文档全量同步（trends.sh / doctor.sh / lib/trends_lib.sh / compare.sh / verify.sh / .github/workflows/smoke.yml / tests/06 / tests/08 / docs，发布 v1.16 = v2026.08.23）**
+  - **`trends --archive-keep N` 归档包轮转**：`trends/archive/` 只留最近 N 个 tar.gz（删最老的总数−N 个，逐个报名）；≤N 提示无需轮转；正整数校验；与 `--prune N --archive` 长期值守配套（归档不再无限堆积，也不动数据 JSON）
+  - **`trends --export --since/--until` 时间窗**：报障包按文件名内嵌日期段（`compare-YYYYMMDD-`）过滤，窗口外计数提示未打包；非标准命名的老文件不过滤保留（宁可多带不丢数据）；`--since/--until` 传参逻辑与主流程过滤零改动
+  - **`doctor --fix` 自动修复**：体检后自动修可自愈项——建缺失工作目录（含 trends/archive、trends/export、results/quarantine）、缺 `"timestamp"` 的损坏 JSON 移入 `results/quarantine/` 隔离（不删可回溯）；修完提示重跑复核；不动任何正常数据
+  - **trends 纯函数下沉 `lib/trends_lib.sh`**：`trends_percentile`（分位数，口径 `int(NR*r+0.5)` 与原内联逐字符等价）/ `trends_slope_judge`（斜率显著性 + 首尾辅助的全 10 态判定）从 trends.sh 主链路抽出，主链路改调用（行为零变化）；新增 tests/08_trends_lib.sh 23 用例（空/单值/奇偶样本/P95 取位/边界 clamp + score/delay 全 10 态 + trends.sh 端到端等价冒烟）
+  - **compare HTML 嵌 trends 互链**：HTML 报告新增"📈 趋势洞察"卡——`trends/report.html` 存在时直链（`../trends/report.html`），否则引导 `bash trends.sh --html`；tests/06 用例 +2（备份/恢复用户 trends 报告，两种形态断言）
+  - **CI（smoke.yml）strict 层更新**：单测链补挂 tests/07/08（上一轮起 CI 就缺 07）；ubuntu 侧顺带装 dnsutils/iputils-ping（doctor 与 07 需要 dig/ping，macOS runner 自带）；新增第 7 步 doctor 干净 checkout 自检（无历史数据应 WARN 不 FAIL）；插件检查顺延为第 8 步
+  - **verify.sh**：单测链补挂 tests/08，用例数标签同步 119→121（06 互链 +2）/+23（08）
+  - **文档**：README.md 补 `--archive-keep`/`doctor --fix`/`--export --since`/互链说明与版本徽章 v1.16；README.en.md 同步 doctor/completions 条目与 trends 新参数全量示例（此前停在 v1.12 时代）；CODE_WIKI 目录树/测试清单/CI 描述同步 trends_lib 与 08
+  - **回归**：全量单测 8 套（18+9+4+18+12+121+45+23 = 250 断言）通过；注入拦截/不可达预检/参数校验路径未动，兼容性与传参逻辑零破坏
 - 2026-08-22（第九十五轮）：**trends --export 一键报障包 + HTML 归档小节 + install --completions 幂等装补全（trends.sh / install.sh / completions/ / verify.sh / tests/06 / tests/07 / docs，发布 v1.15 = v2026.08.22）**
   - **`trends --export` 报障/迁移包**：`bash trends.sh --export --html --md --csv` 产出 `trends/export/dns-test-export-<时间>.tar.gz`——**数据 JSON + 本次报告 + doctor 自检输出**三合一（报障时整包附 issue，维护者拿到环境+数据+报告一次看全；迁移时解包到新机仓库根即续用历史 `tar -xzf 包名 -C /path/to/dns-test`）。置于告警判定**之前**：`--alert` 命中 exit 3 前包也已产出（报障场景往往正是告警时）。与 `--archive` 分工：archive 只包数据 JSON（留存治理），export 是三合一对外包
   - **HTML 报告新增"归档包"小节**：`trends/archive/` 下有 `prune-*/full-*.tar.gz` 时自动列出（包名/类型/大小，附 `tar -xzf` 恢复提示）；大小用 `wc -c` 计（不解析 `ls`，shellcheck 零告警），时间即文件名内嵌时间戳，无跨平台 stat 差异

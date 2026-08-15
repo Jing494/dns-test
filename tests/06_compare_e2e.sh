@@ -123,6 +123,17 @@ grep -q "223.5.5.5（阿里DNS-v4-1）" results/report.md && ok "MD 表带标签
 grep -qE "ms±[0-9]+" results/report.md && ok "MD 延迟带抖动" || notok "MD 延迟缺抖动"
 bash compare.sh 223.5.5.5 --html >/dev/null 2>&1
 grep -q "class='pname'>阿里DNS-v4-1" results/report.html && ok "HTML addr 带标签副行" || notok "HTML 缺标签副行"
+
+echo "═══ compare.sh e2e: 趋势报告互链（无→引导 / 有→链接） ═══"
+T_BAK=0; [ -f trends/report.html ] && { mv trends/report.html /tmp/t06-tr-bak.html; T_BAK=1; }
+bash compare.sh 223.5.5.5 --html >/dev/null 2>&1
+grep -q "积累多轮数据后可看趋势" results/report.html && ok "HTML 无趋势报告时显示引导" || notok "无趋势引导缺失"
+mkdir -p trends && echo '<html>fake</html>' > trends/report.html   # mkdir：上一轮 trap 会清掉 trends/，目录缺失则重定向失败致互链断言误红
+DBG_OUT=$(bash compare.sh 223.5.5.5 --html 2>&1); DBG_RC=$?
+[ -n "$DNS_TEST_DEBUG" ] && { echo "DBG rc=$DBG_RC"; echo "$DBG_OUT" | tail -5; ls -la trends/report.html 2>&1; }
+grep -q "href='../trends/report.html'" results/report.html && ok "HTML 有趋势报告时带互链" || notok "趋势互链缺失"
+rm -f trends/report.html
+[ "$T_BAK" = "1" ] && mv /tmp/t06-tr-bak.html trends/report.html
 grep -q "jitter_ms" results/compare-*.json 2>/dev/null && ok "JSON 含 jitter_ms 字段" || notok "JSON 缺 jitter_ms"
 
 echo "═══ compare.sh e2e: 预设组名展开 ═══"

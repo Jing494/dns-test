@@ -2,7 +2,7 @@
 # ============================================================================
 # DNS 趋势洞察：聚合 compare.sh 的历史 JSON 结果，输出趋势总览/CSV/HTML报告
 # 兼容性: bash 3.2+（无关联数组依赖，macOS 默认 bash 可直接运行）
-# 用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--json] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--prune N] [--archive] [--export] [--alert N] [--webhook URL] [--week N]
+# 用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--json] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--prune N] [--archive] [--archive-keep N] [--export] [--alert N] [--webhook URL] [--week N]
 #   例: bash trends.sh                              # 全部DNS趋势总览（文本，含P95/时段/日级/周对比/突变检测）
 #       bash trends.sh 223.5.5.5                    # 只看223.5.5.5
 #       bash trends.sh --html --csv                 # 生成 trends/report.html + trends.csv
@@ -20,6 +20,8 @@
 #       bash trends.sh --prune 200 --archive        # 清理前先把被删JSON打包到 trends/archive/（防误删）
 #       bash trends.sh --archive                    # 全量打包当前JSON到 trends/archive/（备份/迁移/报障分享）
 #       bash trends.sh --export --html --md --csv   # 一键报障包：数据JSON+本次报告+doctor自检 → trends/export/
+#       bash trends.sh --export --since 2026-08-01  # 报障包只带该日期之后的数据（配 --until 收窄窗口）
+#       bash trends.sh --archive-keep 10            # 归档包轮转：trends/archive/ 只留最近10个包（长跑防堆积）
 # 环境变量:
 #   TRENDS_DIR              趋势产物目录（默认 trends/）
 #   COMPARE_RESULTS_DIR     compare JSON 数据源目录（默认 results/）
@@ -32,6 +34,7 @@
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
 cd "$SCRIPT_DIR" || exit 1
 source lib/core.sh
+source lib/trends_lib.sh
 
 VERSION="${PROJECT_VERSION}"
 SRC_DIR="${COMPARE_RESULTS_DIR:-results}"   # compare JSON 数据源
@@ -49,6 +52,7 @@ UNTIL=""
 ALERT_N=""
 PRUNE_N=""
 ARCHIVE=0
+ARCHIVE_KEEP=""
 EXPORT=0
 VS_ARG=""
 WEBHOOK_URL=""
@@ -77,12 +81,13 @@ while [ $i -lt ${#ARGS[@]} ]; do
     --alert)  i=$((i+1)); ALERT_N="${ARGS[$i]:-}"; [ -z "$ALERT_N" ] && { echo "❌ --alert 缺少阈值（1-100，例: --alert 70）"; exit 1; } ;;
     --prune)  i=$((i+1)); PRUNE_N="${ARGS[$i]:-}"; [ -z "$PRUNE_N" ] && { echo "❌ --prune 缺少值"; exit 1; } ;;
     --archive) ARCHIVE=1 ;;
+    --archive-keep) i=$((i+1)); ARCHIVE_KEEP="${ARGS[$i]:-}"; [ -z "$ARCHIVE_KEEP" ] && { echo "❌ --archive-keep 缺少值（保留包数，例: --archive-keep 10）"; exit 1; } ;;
     --export)  EXPORT=1 ;;
     --version)
       echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
       exit 0 ;;
     --help|-h)
-      echo "用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--json] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since Y-M-D] [--until Y-M-D] [--prune N] [--archive] [--export] [--alert N] [--webhook URL] [--week N]"
+      echo "用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--json] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since Y-M-D] [--until Y-M-D] [--prune N] [--archive] [--archive-keep N] [--export] [--alert N] [--webhook URL] [--week N]"
       echo "  例: bash trends.sh --html --csv"
       echo "      bash trends.sh --html --open                    # 生成HTML并自动打开(隐含--html)"
       echo "      bash trends.sh --md                             # 生成 trends/report.md（GitHub/PR友好）"
@@ -97,6 +102,8 @@ while [ $i -lt ${#ARGS[@]} ]; do
       echo "      bash trends.sh --prune 200 --archive           # 被清理的JSON先打包trends/archive/再删(防误删)"
       echo "      bash trends.sh --archive                       # 全量打包当前JSON(备份/迁移/报障分享,不删文件)"
       echo "      bash trends.sh --export --html --md --csv      # 一键报障包:数据+报告+doctor自检→trends/export/"
+      echo "      bash trends.sh --export --since 2026-08-01    # 报障包只带该日期后的数据(配--until收窄)"
+      echo "      bash trends.sh --archive-keep 10              # 归档包轮转:archive/只留最近10个包(长跑防堆积)"
       echo "环境变量: TRENDS_DIR(默认trends/)  COMPARE_RESULTS_DIR(默认results/)"
       echo "退出码: 0=完成 1=参数错 2=无数据 3=--alert告警命中"
       exit 0 ;;
@@ -241,6 +248,34 @@ if [ -n "$PRUNE_N" ]; then
         fi
       done
     fi
+  fi
+fi
+
+# ---------- --archive-keep N：归档包轮转（trends/archive/ 只留最近 N 个包，长跑防堆积） ----------
+# prune-* 与 full-* 统一按文件名时间戳排序（字典序=时间序），删最老的 总数-N 个
+# 建议与 --archive/--prune --archive 组合（先归档再轮转，一轮完成"打包+控量"）；单独用也可
+if [ -n "$ARCHIVE_KEEP" ]; then
+  if ! [[ "$ARCHIVE_KEEP" =~ ^[1-9][0-9]*$ ]]; then
+    echo "❌ --archive-keep 参数必须为正整数（保留包数），收到: $ARCHIVE_KEEP"; exit 1
+  fi
+  KFILES=()
+  for _f in "$OUT_DIR"/archive/*.tar.gz; do
+    [ -e "$_f" ] && KFILES+=("$_f")
+  done
+  KTOTAL=${#KFILES[@]}
+  if [ "$KTOTAL" -le "$ARCHIVE_KEEP" ]; then
+    echo "  🗄️  --archive-keep: 共 ${KTOTAL} 个归档包 ≤ 保留 ${ARCHIVE_KEEP} 个，无需轮转"
+  else
+    KDEL=$((KTOTAL - ARCHIVE_KEEP))
+    echo "  🗄️  --archive-keep: 共 ${KTOTAL} 个归档包，保留最近 ${ARCHIVE_KEEP} 个，删除 ${KDEL} 个:"
+    k=0
+    for _f in "${KFILES[@]}"; do
+      k=$((k+1))
+      if [ "$k" -le "$KDEL" ]; then
+        echo "     🗑️  $(basename "$_f")"
+        rm -f "$_f"
+      fi
+    done
   fi
 fi
 
@@ -409,38 +444,24 @@ trend_stats() {
   score_last=$(printf '%s\n' "$ok_lines" | tail -1 | cut -d'|' -f2)
   delay_last=$(printf '%s\n' "$ok_lines" | tail -1 | cut -d'|' -f4)
   # 延迟分位数：P50 中位 / P95 长尾上界（均值被长尾拉高时，P50 更接近体感）
-  local p50="-" p95="-"
-  if [ "$n_ok" -ge 2 ]; then
-    p50=$(printf '%s\n' "$ok_lines" | awk -F'|' '{print $4}' | sort -n | awk '{a[NR]=$1} END{print a[int((NR+1)/2)]}')
-    p95=$(printf '%s\n' "$ok_lines" | awk -F'|' '{print $4}' | sort -n | awk '{a[NR]=$1} END{print a[int(NR*0.95+0.5)]}')
-  fi
+  # 纯函数在 lib/trends_lib.sh（tests/08 覆盖）；样本<2 函数自回 "-"
+  local p50 p95 _delays
+  _delays=$(printf '%s\n' "$ok_lines" | awk -F'|' '{print $4}')
+  p50=$(trends_percentile "$_delays" 0.5)
+  p95=$(trends_percentile "$_delays" 0.95)
   local score_slope=0 delay_slope=0
   if [ "$n_ok" -ge 3 ]; then
     score_slope=$(printf '%s\n' "$ok_lines" | awk -F'|' '{n++;sx+=n-1;sy+=$2;sxx+=(n-1)*(n-1);sxy+=(n-1)*$2} END{d=n*sxx-sx*sx; printf "%.4f", (d==0)?0:(n*sxy-sx*sy)/d}')
     delay_slope=$(printf '%s\n' "$ok_lines" | awk -F'|' '{n++;sx+=n-1;sy+=$4;sxx+=(n-1)*(n-1);sxy+=(n-1)*$4} END{d=n*sxx-sx*sx; printf "%.4f", (d==0)?0:(n*sxy-sx*sy)/d}')
   fi
-  local score_first delay_first score_diff delay_diff
+  local score_first delay_first
   score_first=$(printf '%s\n' "$ok_lines" | head -1 | cut -d'|' -f2)
   delay_first=$(printf '%s\n' "$ok_lines" | head -1 | cut -d'|' -f4)
-  score_diff=$((score_last - score_first))
-  delay_diff=$((delay_last - delay_first))
 
-  # 评分趋势（回归为主，首尾为辅）
-  local score_t="→ 平稳"
-  if awk "BEGIN{exit !($score_slope > 0.05)}"; then score_t="↑ 变好"
-  elif awk "BEGIN{exit !($score_slope < -0.05)}"; then score_t="↓ 变差"
-  else
-    if [ "$score_diff" -gt 0 ]; then score_t="↗ 微升"
-    elif [ "$score_diff" -lt 0 ]; then score_t="↘ 微降"; fi
-  fi
-  # 延迟趋势（箭头=好坏方向）
-  local delay_t="→ 平稳"
-  if awk "BEGIN{exit !($delay_slope > 0.05)}"; then delay_t="↓ 变差"
-  elif awk "BEGIN{exit !($delay_slope < -0.05)}"; then delay_t="↑ 变好"
-  else
-    if [ "$delay_diff" -gt 0 ]; then delay_t="↘ 变差"
-    elif [ "$delay_diff" -lt 0 ]; then delay_t="↗ 变好"; fi
-  fi
+  # 趋势判定（纯函数在 lib/trends_lib.sh，tests/08 覆盖；回归为主，首尾为辅）
+  local score_t delay_t
+  score_t=$(trends_slope_judge "$score_slope" "$score_first" "$score_last" score)
+  delay_t=$(trends_slope_judge "$delay_slope" "$delay_first" "$delay_last" delay)
   echo "$score_t|$delay_t|$score_mean|$stab_mean|$delay_mean|$score_last|$delay_last|$n_ok|$n_un|$p50|$p95"
 }
 
@@ -1068,10 +1089,25 @@ if [ "$EXPORT" = "1" ]; then
     echo "  ⚠️  --export: mktemp 失败（临时目录不可写？），跳过打包"
   else
     mkdir -p "$EXP_STAGE/results" "$EXP_STAGE/trends"
-    EXP_N=0
+    # 时间窗过滤（--since/--until 复用主流程变量）：按文件名内嵌日期段 compare-YYYYMMDD- 比较
+    EXP_SINCE="${SINCE//-/}"; EXP_UNTIL="${UNTIL//-/}"
+    EXP_N=0; EXP_SKIP=0
     for _f in "$SRC_DIR"/compare-*.json; do
-      [ -e "$_f" ] && { cp "$_f" "$EXP_STAGE/results/" 2>/dev/null; EXP_N=$((EXP_N+1)); }
+      [ -e "$_f" ] || continue
+      if [ -n "$EXP_SINCE" ] || [ -n "$EXP_UNTIL" ]; then
+        EXP_D=$(basename "$_f" | sed 's/^compare-\([0-9]\{8\}\)-.*/\1/')
+        case "$EXP_D" in
+          [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+          *) EXP_D="" ;;  # 文件名异常（非标准命名）不过滤，保留
+        esac
+        if [ -n "$EXP_D" ]; then
+          if [ -n "$EXP_SINCE" ] && [ "$EXP_D" -lt "$EXP_SINCE" ] 2>/dev/null; then EXP_SKIP=$((EXP_SKIP+1)); continue; fi
+          if [ -n "$EXP_UNTIL" ] && [ "$EXP_D" -gt "$EXP_UNTIL" ] 2>/dev/null; then EXP_SKIP=$((EXP_SKIP+1)); continue; fi
+        fi
+      fi
+      cp "$_f" "$EXP_STAGE/results/" 2>/dev/null && EXP_N=$((EXP_N+1))
     done
+    [ "$EXP_SKIP" -gt 0 ] && echo "  ℹ️  --export: ${EXP_SKIP} 份在 --since/--until 窗口外，未打包"
     EXP_R=0
     for _r in report.html report.md trends.csv; do
       [ -f "$OUT_DIR/$_r" ] && { cp "$OUT_DIR/$_r" "$EXP_STAGE/trends/" 2>/dev/null; EXP_R=$((EXP_R+1)); }

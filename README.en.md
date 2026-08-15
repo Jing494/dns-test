@@ -17,7 +17,9 @@ A unified toolkit for DNS benchmarking and network diagnostics, with a focus on 
 - **IPv6 support** — v4/v6 dual-stack everywhere, IPv6 connectivity test (ping6)
 - **AI Operator Manual** — 12-chapter guide teaching AI agents how to interact with users properly (ask DNS → pick version → guide to specialty tests)
 - **DNS Comparison** — `compare.sh` compares multiple DNS side-by-side (score / latency median / stability), preset groups supported (`bash compare.sh ali tencent`), optional responsive HTML / Markdown reports + structured JSON results, period-over-period deltas, per-OS switch commands, current-system-DNS marker (👤), `--watch N` timed collection with `--rounds M` limit, `--keep K` JSON retention, `--json` stdout output, resumable collection (rerun the same command after Ctrl-C to continue from the last round) and auto-refreshing HTML report in watch mode
-- **Trend Insight** — `trends.sh` aggregates historical compare results (linear-regression trend arrows, delay P50/P95 percentiles, per-hour worst/best and per-day analysis, provider labels, multi-DNS overlay comparison charts, HTML insights card, CSV export, SVG line charts, optional cron collection, `--prune N` history retention control, `--open` auto-launch browser)
+- **Trend Insight** — `trends.sh` aggregates historical compare results (linear-regression trend arrows, delay P50/P95 percentiles, per-hour worst/best and per-day analysis, provider labels, multi-DNS overlay comparison charts, HTML insights card, CSV export, SVG line charts, optional cron collection, `--prune N` history retention control, `--open` auto-launch browser); `--week N` configurable week-over-week window (2–365 days), `--json` machine-readable output (stdout kept clean for `jq`), `--alert T --webhook URL` watchdog alerting (Feishu / DingTalk / WeCom / Telegram / Bark / generic JSON), `--archive` + `--archive-keep N` tar.gz archiving with rotation, `--export` one-command bug-report bundle (data + report + doctor output, `--since/--until` time-window filter)
+- **Environment Doctor** — `doctor.sh` one-command self-check (platform, required/optional deps, macOS–Linux compat layer, writable dirs, data health); `--net` adds connectivity tests, `--fix` auto-repairs healable items (missing dirs, quarantines corrupted JSON), `--cron` prints a ready-to-paste crontab template (collect + alert + weekly archive, with the cron-PATH pitfall pre-solved)
+- **Shell Completions** — bash/zsh completions for all entry scripts (`bash install.sh --completions`, idempotent; flags, preset groups and public-DNS addresses)
 - **Automated Smoke Test** — `smoke_test.sh` validates all core paths in one run (25 checks)
 
 ## Quick Start
@@ -64,6 +66,14 @@ bash compare.sh 223.5.5.5 119.29.29.29 --json      # also print JSON to stdout (
 bash trends.sh --html --csv       # trend insight (needs accumulated compare data)
 bash trends.sh --html --open      # generate HTML and auto-open in browser (implies --html)
 bash trends.sh --prune 200        # keep only the latest 200 JSON snapshots, then aggregate
+bash trends.sh --prune 200 --archive --archive-keep 20   # archive pruned JSON to tar.gz before deletion, keep last 20 archives
+bash trends.sh --week 14          # week-over-week window = 14 days (default 7, range 2-365)
+bash trends.sh --json | jq '.dns[0].score_trend'   # machine-readable output (human text goes to stderr)
+bash trends.sh --alert 70 --webhook "$WEBHOOK_URL" # exit 3 + push alert if avg score < 70 or all unreachable
+#   webhook auto-detected: Feishu / DingTalk / WeCom / Telegram / Bark / generic JSON (via curl)
+bash trends.sh --export --since 2026-08-01         # bug-report bundle: data JSON + report + doctor output in one tar.gz
+bash doctor.sh                    # environment self-check (--net: connectivity; --fix: auto-repair; --cron: crontab template)
+bash install.sh --completions     # install bash/zsh shell completions (idempotent)
 perl tools/vowifi/carrier_epdg.pl all   # carrier ePDG deployment check
 perl tools/vowifi/03_test_router_dns.pl 192.168.1.1   # router forwarding check
 bash tools/network/doh_dot_check.sh 223.5.5.5          # DoH/DoT check
