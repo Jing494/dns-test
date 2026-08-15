@@ -63,7 +63,7 @@ jobs:
           echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 18 + 计分口径 12 + compare e2e 121 + doctor/completions/trends参数 45 + trends_lib纯函数 23）"
           # 失败时打印输出尾部（断言名直接进日志，不再盲猜）
           UTLOG=$(mktemp)
-          ut() { bash "tests/$1" >"$UTLOG" 2>&1 || { echo "❌ $1 失败断言:"; grep -n "❌" "$UTLOG"; tail -3 "$UTLOG"; exit 1; }; }
+          ut() { bash "tests/$1" >"$UTLOG" 2>&1 || { echo "❌ $1 失败断言（含上下文）:"; grep -n -B1 -A1 "❌" "$UTLOG" | head -80; cp "$UTLOG" "/tmp/utlog-$1.txt"; exit 1; }; }
           perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 || { echo "❌ perl单测失败"; exit 1; }
           ut 02_plugins.sh
           ut 03_dig_target.sh
@@ -93,6 +93,14 @@ jobs:
           bash -c 'PLUGIN_MANIFEST=/dev/null; PLUGIN_ITEMS=("x|dns-test.sh|测试|python|"); PLUGIN_DIR_x="."; source lib/plugins.sh && plugin_run 1' >/dev/null 2>&1 && { echo "❌ 未知执行器未拦截"; exit 1; }
           echo "  ✅ 插件拦截"
           echo "════ Strict checks 全部通过 ════"
+
+      - name: Upload failed test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: utlog-${{ matrix.os }}
+          path: /tmp/utlog-*.txt
+          if-no-files-found: ignore
 
   # 容错层：完整冒烟（含网络敏感项：ePDG/路由器/省级DNS等）
   # 海外 runner 网络波动可能偶发超时，故 continue-on-error：失败不阻塞，产物仍上传可排查
