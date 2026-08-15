@@ -61,28 +61,6 @@ jobs:
           rm -rf "$TMPR"
           echo "  ✅ trends 聚合+产物"
           echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 18 + 计分口径 12 + compare e2e 121 + doctor/completions/trends参数 45 + trends_lib纯函数 23）"
-          # 6.0 平台差异探针（诊断 macOS 挂点：[[<>]] collation / grep -oE 多行 / --vs 提取）
-          echo "PROBE P1 [[<]]: $([[ 2026-08-11 < 2026-08-13 ]] && echo T || echo F)"
-          echo "PROBE P2 [[>]]: $([[ 2026-08-13 > 2026-08-11 ]] && echo T || echo F)"
-          mkdir -p /tmp/probe-rs
-          printf '{"tool":"x","timestamp":"2026-08-11 08:00:00 +0800","mode":"lite","dns":[{"addr":"223.5.5.5","score":"90","stab":"100","delay_ms":20,"reachable":true},{"addr":"119.29.29.29","score":"80","stab":"95","delay_ms":30,"reachable":true}]}' > /tmp/probe-rs/compare-20260811-080000.json
-          printf '{"tool":"x","timestamp":"2026-08-12 08:00:00 +0800","mode":"lite","dns":[{"addr":"223.5.5.5","score":"91","stab":"100","delay_ms":21,"reachable":true},{"addr":"119.29.29.29","score":"79","stab":"95","delay_ms":31,"reachable":true}]}' > /tmp/probe-rs/compare-20260812-080000.json
-          echo "PROBE P3 倒挂输出: [$(COMPARE_RESULTS_DIR=/tmp/probe-rs TRENDS_DIR=/tmp/probe-out bash trends.sh --since 2026-08-12 --until 2026-08-11 2>&1 | tail -1)]"
-          echo "PROBE P4 --vs 输出: [$(COMPARE_RESULTS_DIR=/tmp/probe-rs TRENDS_DIR=/tmp/probe-out bash trends.sh --vs 223.5.5.5,119.29.29.29 2>&1 | grep 头对头 | head -2)]"
-          COMPARE_RESULTS_DIR=/tmp/probe-rs TRENDS_DIR=/tmp/probe-out bash trends.sh --html >/dev/null 2>&1
-          echo "PROBE P5 总图标题行: [$(grep -o "综合评分对比[^<]*" /tmp/probe-out/report.html | head -1)]"
-          echo "PROBE P6 轮次轴行: [$(grep -c polyline /tmp/probe-out/report.html)] 条折线"
-          # P7-P9 字节级取证：文件 vs 管道、中文 pattern、标题行实际字节
-          echo "PROBE P7 文件grep中文(h2行): [$(grep 综合评分 /tmp/probe-out/report.html | head -1)]"
-          echo "PROBE P8 管道grep中文: [$(cat /tmp/probe-out/report.html | grep -c 综合评分)]次 / 文件grep: [$(grep -c 综合评分 /tmp/probe-out/report.html)]次"
-          echo "PROBE P9 h2字节: [$(grep h2 /tmp/probe-out/report.html | head -1 | od -c | head -2 | tr '\n' ' ')]"
-          echo "PROBE P10 倒挂字节: [$(COMPARE_RESULTS_DIR=/tmp/probe-rs TRENDS_DIR=/tmp/probe-out bash trends.sh --since 2026-08-12 --until 2026-08-11 2>&1 | od -An -tx1 | head -c 90)]"
-          # P11-P12: bash 3.2 最小结构复现（local+if/else+中文赋值+$( ) 调用）+ macOS 总图 h2 实际文本
-          _arr=(a b); _ts=(1 2)
-          _mm() { local m="$1"; local n=${#_ts[@]}; [ "$n" -lt 2 ] && return 0; local c=2 t u; if [ "$m" = "score" ]; then t="综合评分对比"; col=2; u="%"; else t="延迟对比"; fi; echo "<h2>XYZ $t（${#_arr[@]}个 × ${n}轮）</h2>"; }
-          echo "PROBE P11 3.2最小结构: [$(echo "$(_mm score)")]"
-          echo "PROBE P12 全部h2: [$(grep '<h2>' /tmp/probe-out/report.html | head -6 | tr '\n' '|')]"
-          echo "PROBE P13 VS行: [$(COMPARE_RESULTS_DIR=/tmp/probe-rs TRENDS_DIR=/tmp/probe-out bash trends.sh --vs 223.5.5.5,119.29.29.29 2>&1 | grep -E '胜|同轮' | od -An -tx1 | head -c 60)]"
           # 失败时打印输出尾部（断言名直接进日志，不再盲猜）
           UTLOG=$(mktemp)
           ut() { bash "tests/$1" >"$UTLOG" 2>&1 || { echo "❌ $1 失败断言（含上下文）:"; grep -n -B1 -A1 "❌" "$UTLOG" | head -80; cp "$UTLOG" "/tmp/utlog-$1.txt"; exit 1; }; }
