@@ -8,4 +8,4 @@
 # 各脚本（core.sh/release.sh 等）统一 source 本文件，改版本只需改这一处。
 # ============================================================================
 PROJECT_VERSION="v2026.08.26"
-PROJECT_RELEASE="v1.16A"
+PROJECT_RELEASE="v1.18"
