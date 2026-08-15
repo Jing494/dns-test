@@ -2,13 +2,18 @@
 # ============================================================================
 # 多DNS对比模式（v3：并行 + 延迟中位数/抖动 + 提供商标签 + 结构化JSON + HTML/MD报告）
 # 兼容性: bash 3.2+（无关联数组依赖，macOS 默认 bash 可直接运行）
-# 用法: bash compare.sh DNS1|预设组 [DNS2 ...] [--html] [--md] [--no-save] [--watch N]
+# 用法: bash compare.sh DNS1|预设组 [DNS2 ...] [--html] [--md] [--open] [--no-save] [--json]
+#                  [--watch N] [--rounds M] [--keep K]
 #   例: bash compare.sh 223.5.5.5 119.29.29.29 222.172.200.68
 #       bash compare.sh ali tencent          # 预设组名直接对比（default/ali/tencent/all，可与IP混用）
 #       bash compare.sh 223.5.5.5 119.29.29.29 --html   # 生成 results/report.html
+#       bash compare.sh 223.5.5.5 119.29.29.29 --open   # 生成HTML并自动在浏览器打开（隐含--html）
 #       bash compare.sh 223.5.5.5 --no-save             # 不保存JSON结果
 #       bash compare.sh 223.5.5.5 119.29.29.29 --md     # 生成 results/report.md（GitHub/PR友好）
+#       bash compare.sh 223.5.5.5 119.29.29.29 --json   # JSON 同时输出到 stdout（管道消费）
 #       bash compare.sh 223.5.5.5 119.29.29.29 --watch 30 --html  # 每30分钟采集一轮（Ctrl-C停止）
+#       bash compare.sh 223.5.5.5 --watch 30 --rounds 12  # 采集12轮后自动停止（有边界基准）
+#       bash compare.sh 223.5.5.5 --watch 30 --keep 200  # JSON只保留最近200份（自动清老）
 # 环境变量:
 #   COMPARE_MAX_CONCURRENCY  lite测试并行数上限（默认3；设1为串行，结果最稳）
 # 输出:
@@ -35,41 +40,63 @@ MODE="lite"    # lite(默认) / full
 LITE_ITEMS="53"
 
 # ---------- 参数解析 ----------
-# --watch N（定时采集）先行剥离：其取值参数与自身不进正常解析，剩余参数存 CLEAN_ARGS 供采集轮回放
+# --watch N / --rounds M / --keep K（定时采集/轮数上限/JSON保留份数）先行剥离：取值参数与自身不进正常解析，剩余存 CLEAN_ARGS 供采集轮回放
 WATCH_N=""
+ROUNDS_N=""
+KEEP_N=""
 wnext=0
+rnext=0
+knext=0
 CLEAN_ARGS=()
 for a in "$@"; do
   if [ "$wnext" = "1" ]; then
     WATCH_N="$a"; wnext=0; continue
   fi
+  if [ "$rnext" = "1" ]; then
+    ROUNDS_N="$a"; rnext=0; continue
+  fi
+  if [ "$knext" = "1" ]; then
+    KEEP_N="$a"; knext=0; continue
+  fi
   case "$a" in
-    --watch)   wnext=1 ;;
-    --watch=*) WATCH_N="${a#--watch=}" ;;
-    *)         CLEAN_ARGS+=("$a") ;;
+    --watch)    wnext=1 ;;
+    --watch=*)  WATCH_N="${a#--watch=}" ;;
+    --rounds)   rnext=1 ;;
+    --rounds=*) ROUNDS_N="${a#--rounds=}" ;;
+    --keep)     knext=1 ;;
+    --keep=*)   KEEP_N="${a#--keep=}" ;;
+    *)          CLEAN_ARGS+=("$a") ;;
   esac
 done
-# --watch 后必须跟正整数值；缺值时 wnext 残留为1，静默吞掉会跑成"单轮无提示"，必须显式报错
+# --watch/--rounds/--keep 后必须跟正整数值；缺值时 next 标志残留，静默吞掉会跑成"单轮无提示"，必须显式报错
 [ "$wnext" = "1" ] && { echo "❌ --watch 缺少分钟数值（例: --watch 30）"; exit 1; }
+[ "$rnext" = "1" ] && { echo "❌ --rounds 缺少轮数值（例: --rounds 12）"; exit 1; }
+[ "$knext" = "1" ] && { echo "❌ --keep 缺少保留份数（例: --keep 200）"; exit 1; }
 DNS_ARGS=()
 for a in "${CLEAN_ARGS[@]}"; do
   case "$a" in
     --html)     GEN_HTML=1 ;;
     --md)       GEN_MD=1 ;;
+    --open)     GEN_HTML=1; OPEN_REPORT=1 ;;   # --open 隐含 --html（打开的前提是生成）
+    --json)     GEN_JSON_OUT=1 ;;              # JSON 落盘同时输出到 stdout（管道消费）
     --full)     MODE="full" ;;
     --no-save)  SAVE_JSON=0 ;;
     --version)
       echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
       exit 0 ;;
     --help|-h)
-      echo "用法: bash compare.sh DNS1|预设组 [DNS2 ...] [--html] [--md] [--full] [--no-save] [--watch N]"
+      echo "用法: bash compare.sh DNS1|预设组 [DNS2 ...] [--html] [--md] [--open] [--full] [--no-save] [--json] [--watch N] [--rounds M] [--keep K]"
       echo "  预设组: default(默认) / ali / tencent / all —— 可与IP混用，展开后自动去重"
       echo "  例: bash compare.sh 223.5.5.5 119.29.29.29 222.172.200.68"
       echo "      bash compare.sh ali tencent               # 直接对比预设组"
       echo "      bash compare.sh 223.5.5.5 119.29.29.29 --html    # 生成 results/report.html"
+      echo "      bash compare.sh 223.5.5.5 119.29.29.29 --open    # 生成HTML并自动打开（隐含--html）"
       echo "      bash compare.sh 223.5.5.5 119.29.29.29 --md      # 生成 results/report.md（GitHub/PR友好）"
+      echo "      bash compare.sh 223.5.5.5 119.29.29.29 --json    # JSON 同时输出到 stdout（管道消费）"
       echo "      bash compare.sh 223.5.5.5 119.29.29.29 --full    # 用完整版测试(77~78项/DNS)"
       echo "      bash compare.sh 223.5.5.5 119.29.29.29 --watch 30 # 每30分钟采集一轮(Ctrl-C停止,供trends)"
+      echo "      bash compare.sh 223.5.5.5 --watch 30 --rounds 12  # 采集12轮后自动停止"
+      echo "      bash compare.sh 223.5.5.5 --watch 30 --keep 200   # JSON只保留最近200份（自动清老）"
       echo "环境变量: COMPARE_MAX_CONCURRENCY=3  (并行数,1=串行最稳)"
       exit 0 ;;
     *) DNS_ARGS+=("$a") ;;
@@ -107,16 +134,41 @@ for d in "${DNS_ARGS[@]}"; do
 done
 DNS_ARGS=("${UNIQ[@]}")
 if [ ${#DNS_ARGS[@]} -eq 0 ]; then
-  echo "用法: bash compare.sh DNS1|预设组 [DNS2 ...] [--html] [--md] [--full] [--no-save] [--watch N]"
+  echo "用法: bash compare.sh DNS1|预设组 [DNS2 ...] [--html] [--md] [--open] [--full] [--no-save] [--json] [--watch N] [--rounds M] [--keep K]"
   echo "  预设组: default(默认) / ali / tencent / all —— 可与IP混用，例: bash compare.sh ali 119.29.29.29"
   exit 1
 fi
 
 # ---------- 定时采集模式（--watch N）：每N分钟重放一轮自身，打通 trends.sh 数据源 ----------
+# --rounds M / --keep K 仅在采集模式下有意义（限定总轮数 / JSON 保留份数）
+if [ -n "$ROUNDS_N" ] && [ -z "$WATCH_N" ]; then
+  echo "❌ --rounds 仅与 --watch 搭配使用（例: bash compare.sh 223.5.5.5 --watch 30 --rounds 12）"
+  exit 1
+fi
+if [ -n "$KEEP_N" ] && [ -z "$WATCH_N" ]; then
+  echo "❌ --keep 仅与 --watch 搭配使用（例: bash compare.sh 223.5.5.5 --watch 30 --keep 200）"
+  exit 1
+fi
+# --json 输出以落盘为前提：与 --no-save 互斥，忽略 --no-save 并从回放参数物理剔除（防子轮回放又落空）
+if [ "${GEN_JSON_OUT:-0}" = "1" ] && [ "$SAVE_JSON" = "0" ]; then
+  echo "  ⚠️  --json 需要 JSON 落盘，已忽略 --no-save"
+  SAVE_JSON=1
+  CA1=()
+  for ca in "${CLEAN_ARGS[@]}"; do
+    [ "$ca" != "--no-save" ] && CA1+=("$ca")
+  done
+  CLEAN_ARGS=("${CA1[@]}")
+fi
 if [ -n "$WATCH_N" ]; then
   # 分钟数必须为正整数（与 STAB_ROUNDS 校验同风格）
   if ! [[ "$WATCH_N" =~ ^[1-9][0-9]*$ ]]; then
     echo "❌ --watch 参数必须为正整数分钟数，收到: $WATCH_N"; exit 1
+  fi
+  if [ -n "$ROUNDS_N" ] && ! [[ "$ROUNDS_N" =~ ^[1-9][0-9]*$ ]]; then
+    echo "❌ --rounds 参数必须为正整数轮数，收到: $ROUNDS_N"; exit 1
+  fi
+  if [ -n "$KEEP_N" ] && ! [[ "$KEEP_N" =~ ^[1-9][0-9]*$ ]]; then
+    echo "❌ --keep 参数必须为正整数份数，收到: $KEEP_N"; exit 1
   fi
   # 采集的意义在于落 JSON 攒趋势；配 --no-save 属自相矛盾，从回放参数中剔除并提示
   if [ "$SAVE_JSON" = "0" ]; then
@@ -127,15 +179,60 @@ if [ -n "$WATCH_N" ]; then
     done
     CLEAN_ARGS=("${CA2[@]}")
   fi
+  # 每轮都弹浏览器只会刷屏，采集模式剔除 --open（报告仍每轮生成）
+  if [ "$OPEN_REPORT" = "1" ]; then
+    echo "  ⚠️  采集模式不逐轮打开浏览器，已忽略 --open（HTML 报告仍每轮生成）"
+    CA3=()
+    has_html=0
+    for ca in "${CLEAN_ARGS[@]}"; do [ "$ca" = "--html" ] && has_html=1; done
+    for ca in "${CLEAN_ARGS[@]}"; do
+      [ "$ca" != "--open" ] && CA3+=("$ca")
+    done
+    # --open 隐含的 --html 只在父进程生效；子轮回放需显式 --html 才每轮出报告（否则提示与行为不符）
+    [ "$has_html" = "0" ] && CA3+=("--html")
+    CLEAN_ARGS=("${CA3[@]}")
+  fi
+  # 逐轮打印 JSON 只会刷屏，采集模式剔除 --json（JSON 仍每轮落盘 results/）
+  if [ "${GEN_JSON_OUT:-0}" = "1" ]; then
+    echo "  ⚠️  采集模式不逐轮打印 JSON，已忽略 --json（JSON 仍每轮落盘 results/）"
+    CA4=()
+    for ca in "${CLEAN_ARGS[@]}"; do
+      [ "$ca" != "--json" ] && CA4+=("$ca")
+    done
+    CLEAN_ARGS=("${CA4[@]}")
+  fi
   WROUND=0
-  trap 'echo ""; echo "🛑 已停止采集（共完成 ${WROUND} 轮，可用 bash trends.sh --html 查看趋势）"; exit 0' INT TERM
-  echo "⏱️  定时采集: 每 ${WATCH_N} 分钟一轮（Ctrl-C 停止）  对比DNS: ${DNS_ARGS[*]}"
+  WDONE=0   # 已完整跑完的轮数（Ctrl-C 打断在子轮中时，该轮不计入"完成"）
+  trap 'echo ""; echo "🛑 已停止采集（共完成 ${WDONE} 轮，可用 bash trends.sh --html 查看趋势）"; exit 0' INT TERM
+  echo "⏱️  定时采集: 每 ${WATCH_N} 分钟一轮${ROUNDS_N:+（共 ${ROUNDS_N} 轮）}${KEEP_N:+，保留最近 ${KEEP_N} 份JSON}（Ctrl-C 停止）  对比DNS: ${DNS_ARGS[*]}"
   while :; do
     WROUND=$((WROUND+1))
     echo ""
     echo "════ 第 ${WROUND} 轮采集 $(date '+%Y-%m-%d %H:%M:%S') ════"
     # 子轮重放（含 --html/--md 等原参数）；子轮自身 exit 2（全不可达）不终止采集
     bash "$0" "${CLEAN_ARGS[@]}" || true
+    WDONE=$WROUND
+    # --keep K：JSON 超出保留份数时清最老的（glob 字典序=时间序，与 trends --prune 同口径）
+    if [ -n "$KEEP_N" ]; then
+      KFILES=()
+      for kf in results/compare-*.json; do [ -e "$kf" ] && KFILES+=("$kf"); done
+      KTOT=${#KFILES[@]}
+      if [ "$KTOT" -gt "$KEEP_N" ]; then
+        KDEL=$((KTOT - KEEP_N))
+        ki=0
+        for kf in "${KFILES[@]}"; do
+          ki=$((ki+1))
+          [ "$ki" -le "$KDEL" ] && rm -f "$kf"
+        done
+        echo "  ♻️  --keep: 已清理 ${KDEL} 份旧JSON（保留最近 ${KEEP_N} 份）"
+      fi
+    fi
+    # 轮数到限：跑满即收工，不再进入等待
+    if [ -n "$ROUNDS_N" ] && [ "$WROUND" -ge "$ROUNDS_N" ]; then
+      echo ""
+      echo "✅ 已完成指定 ${ROUNDS_N} 轮采集（可用 bash trends.sh --html 查看趋势）"
+      exit 0
+    fi
     echo "  ⏳ ${WATCH_N} 分钟后进行下一轮（Ctrl-C 停止）"
     # sleep 后台化 + wait：Ctrl-C 能立即中断等待而不是等满整个间隔
     sleep $((WATCH_N * 60)) & wait $!
@@ -174,21 +271,7 @@ if [ ${#CUR_DNS_LIST[@]} -gt 0 ]; then
   echo "  👤 当前系统DNS: ${CUR_DNS_LIST[*]}"
 fi
 
-# dns_preset_label <addr>：在三组预设地址中反查提供商标签（如 阿里DNS-v4-1），未知返回空
-# 复用 core.sh 预设数组（地址↔名称同下标），与 dns-preset.sh 展示口径一致
-dns_preset_label() {
-  local addr="$1" _i
-  for _i in "${!DEFAULT_DNS_ADDR[@]}"; do
-    [ "${DEFAULT_DNS_ADDR[$_i]}" = "$addr" ] && { echo "${DEFAULT_DNS_NAME[$_i]}"; return 0; }
-  done
-  for _i in "${!ALI_DNS_ADDR[@]}"; do
-    [ "${ALI_DNS_ADDR[$_i]}" = "$addr" ] && { echo "${ALI_DNS_NAME[$_i]}"; return 0; }
-  done
-  for _i in "${!TENCENT_DNS_ADDR[@]}"; do
-    [ "${TENCENT_DNS_ADDR[$_i]}" = "$addr" ] && { echo "${TENCENT_DNS_NAME[$_i]}"; return 0; }
-  done
-  return 1
-}
+# dns_preset_label 已下沉 lib/core.sh（compare/trends 共用，报告口径一致）
 
 # ============================================================================
 # 1) 延迟探测：每DNS 3次dig（par_run并行），取中位数 + 抖动(max-min)
@@ -408,6 +491,11 @@ if [ "$SAVE_JSON" = "1" ]; then
   } > "$JF"
   echo ""
   echo "  💾 JSON结果已保存: $JF"
+  # --json：落盘同时输出到 stdout（管道消费；jq/重定向用户自取）
+  if [ "${GEN_JSON_OUT:-0}" = "1" ]; then
+    echo "  📤 JSON 输出:"
+    cat "$JF"
+  fi
 fi
 
 # ============================================================================
@@ -630,6 +718,11 @@ if [ "$GEN_HTML" = "1" ]; then
   } > "$HF"
   echo ""
   echo "  📄 HTML报告已生成: $HF"
+fi
+
+# ---------- --open：生成后自动用系统浏览器打开报告（open_report_file 已下沉 lib/core.sh） ----------
+if [ "${OPEN_REPORT:-0}" = "1" ] && [ "${GEN_HTML:-0}" = "1" ] && [ -n "${HF:-}" ]; then
+  open_report_file "$HF"
 fi
 
 # ============================================================================

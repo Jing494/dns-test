@@ -319,6 +319,37 @@ dig_target() {
   esac
 }
 
+# 在三组预设地址中反查 DNS 的提供商标签（如 223.5.5.5→阿里DNS-v4-1），未知地址返回非0
+# 预设数组"地址↔名称"同下标（文件头部定义）；compare.sh 报告与 trends.sh 聚合共用，展示口径一致
+dns_preset_label() {
+  local addr="$1" _i
+  for _i in "${!DEFAULT_DNS_ADDR[@]}"; do
+    [ "${DEFAULT_DNS_ADDR[$_i]}" = "$addr" ] && { printf '%s' "${DEFAULT_DNS_NAME[$_i]}"; return 0; }
+  done
+  for _i in "${!ALI_DNS_ADDR[@]}"; do
+    [ "${ALI_DNS_ADDR[$_i]}" = "$addr" ] && { printf '%s' "${ALI_DNS_NAME[$_i]}"; return 0; }
+  done
+  for _i in "${!TENCENT_DNS_ADDR[@]}"; do
+    [ "${TENCENT_DNS_ADDR[$_i]}" = "$addr" ] && { printf '%s' "${TENCENT_DNS_NAME[$_i]}"; return 0; }
+  done
+  return 1
+}
+
+# 用系统默认浏览器打开报告文件（macOS open / Linux xdg-open / WSL wslview）
+# 找不到任一启动器时降级为手动打开提示，不作为错误（无桌面环境的 SSH 场景常见）；compare/trends 共用
+open_report_file() {
+  local f="$1"
+  if [ "$(uname -s)" = "Darwin" ] && command -v open >/dev/null 2>&1; then
+    open "$f" && echo "  🔖 已在浏览器打开: $f"
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$f" >/dev/null 2>&1 && echo "  🔖 已在浏览器打开: $f"
+  elif command -v wslview >/dev/null 2>&1; then
+    wslview "$f" >/dev/null 2>&1 && echo "  🔖 已在浏览器打开: $f"
+  else
+    echo "  ⚠️  未找到浏览器启动器（open/xdg-open/wslview），请手动打开: $f"
+  fi
+}
+
 # ============================================================================
 # 辅助函数
 # ============================================================================

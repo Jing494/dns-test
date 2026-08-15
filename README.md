@@ -3,8 +3,8 @@
 > 🌐 **English**：[README.en.md](./README.en.md) ｜ **中文**：本文档
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Release: v1.9](https://img.shields.io/badge/Release-v1.9-blue.svg)
-![Version: v2026.08.16](https://img.shields.io/badge/Version-v2026.08.16-blue.svg)
+![Release: v1.10](https://img.shields.io/badge/Release-v1.10-blue.svg)
+![Version: v2026.08.17](https://img.shields.io/badge/Version-v2026.08.17-blue.svg)
 ![Platform: Linux/macOS/WSL](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20WSL-green.svg)
 ![Bash 3.2+](https://img.shields.io/badge/Bash-3.2%2B-blue.svg)
 ![Perl 5.10+](https://img.shields.io/badge/Perl-5.10%2B-blue.svg)
@@ -14,7 +14,7 @@
 
 > 🏷️ **版本号规则（双轨制）**：`vYYYY.MM.N` 日期式（N=当月发布序号）↔ 语义 `vX.Y`（X=主版本，重大重构才升；Y=次版本，功能更新）。补丁级修复仅递增日期式 N。
 
-> 🔧 **最新版本**：**v1.9 = v2026.08.16**（compare 七大增强：`--watch N` 定时采集打通趋势数据源、按当前系统给出切换命令、`--md` Markdown 报告导出、自动环比上次 Δ评分/Δ延迟、预设组名直接对比（`bash compare.sh ali tencent`）、当前系统 DNS 自动检测与 👤 标记、trends `--prune N` 历史数据清理；v1.8 带来 HTML 报告排名奖牌表 + 暗色模式 + 徽章化）。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
+> 🔧 **最新版本**：**v1.10 = v2026.08.17**（趋势报告大升级：trends 提供商标签/延迟 P95 分位/多DNS同图对比总图/时段分析/`--open`；compare 新增 `--rounds M` 限定采集轮数、`--keep K` JSON 自动清理、`--json` 管道输出，并修复 `--watch+--open` 子轮丢 HTML 报告等问题）。v1.9 带来 compare `--watch` 定时采集、切换命令建议、`--md` 导出、环比 Δ、预设组对比、当前 DNS 👤 标记。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；**默认 DNS 列表为公开可测试的运营商公网 DNS**，示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
@@ -101,7 +101,7 @@ cd dns-test
 
 # 方式2: Releases 下载（免 git，直接拿成品包）
 #   前往 https://github.com/Jing494/dns-test/releases
-#   下载 dns-test-v2026.08.16.tar.gz 后解压即可
+#   下载 dns-test-v2026.08.17.tar.gz 后解压即可
 
 # 方式3: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
 ```
@@ -182,13 +182,17 @@ bash compare.sh 223.5.5.5 119.29.29.29 --html               # 生成 results/rep
 bash compare.sh 223.5.5.5 119.29.29.29 --md                 # 生成 results/report.md（GitHub/PR友好）
 bash compare.sh 223.5.5.5 119.29.29.29 --full               # 用完整版测试对比（77~78项/DNS）
 bash compare.sh 223.5.5.5 --no-save                         # 不保存JSON结果
+bash compare.sh 223.5.5.5 119.29.29.29 --json               # JSON 同时输出到 stdout（管道消费）
 bash compare.sh 223.5.5.5 119.29.29.29 --watch 30           # 每30分钟采集一轮(Ctrl-C停止,趋势数据源)
+bash compare.sh 223.5.5.5 --watch 30 --rounds 12            # 采集12轮后自动停止（有边界基准）
+bash compare.sh 223.5.5.5 --watch 30 --keep 200             # JSON只保留最近200份（自动清老）
 #   环境变量: COMPARE_MAX_CONCURRENCY=3  lite并行数（设1串行最稳）
 #   输出: results/compare-<时间戳>.json 结构化结果（历史趋势积累用）
 
 # DNS趋势洞察（基于compare历史JSON聚合，需先积累至少2次compare数据）
-bash trends.sh                              # 全部DNS趋势总览（文本）
-bash trends.sh --html --csv                 # 生成 trends/report.html（SVG折线图）+ trends.csv
+bash trends.sh                              # 全部DNS趋势总览（文本，含P95延迟+时段分析）
+bash trends.sh --html --csv                 # 生成 trends/report.html（多DNS同图总图+SVG折线图）+ trends.csv
+bash trends.sh --html --open                # 生成HTML并自动在浏览器打开（隐含--html）
 bash trends.sh --detail --limit 5           # 每个DNS列最近5条明细
 bash trends.sh --since 2026-08-01           # 只看该日期后的数据
 bash trends.sh --prune 200                  # 只保留最近200份JSON再聚合（--watch长期采集配套）
@@ -272,7 +276,7 @@ bash trends.sh --cron 223.5.5.5 119.29.29.29 # 先采集(跑compare)再聚合—
 
 按优先级排序：
 
-- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截）+ `tests/03_dig_target.sh` 4 用例（IPv6 加方括号）+ `tests/04_core_functions.sh` 18 用例（地址校验/响应判断/CDN 判定/入口参数解析）+ `tests/05_run_common_tests.sh` 12 用例（lite 计分口径/稳定性降轮/CONFIG_DOMAINS 安全解析/dig @server 前缀回归/full 模式 @server 遮蔽回归/ECS_SUBNET 注入拦截/par_run 元字符禁令）+ `tests/06_compare_e2e.sh` 25 用例（compare 端到端离线回归：--watch 参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune，mock dig/ping + 用户 results 目录备份恢复），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh` / `bash tests/03_dig_target.sh` / `bash tests/04_core_functions.sh` / `bash tests/05_run_common_tests.sh` / `bash tests/06_compare_e2e.sh`
+- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截）+ `tests/03_dig_target.sh` 4 用例（IPv6 加方括号）+ `tests/04_core_functions.sh` 18 用例（地址校验/响应判断/CDN 判定/入口参数解析）+ `tests/05_run_common_tests.sh` 12 用例（lite 计分口径/稳定性降轮/CONFIG_DOMAINS 安全解析/dig @server 前缀回归/full 模式 @server 遮蔽回归/ECS_SUBNET 注入拦截/par_run 元字符禁令）+ `tests/06_compare_e2e.sh` 46 用例（compare 端到端离线回归：--watch 参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/--rounds/--keep 校验与清理/--json stdout/--watch+--open 子轮HTML回归/trends --prune/标签/P95/同图总图/时段分析/计数修复，mock dig/ping + 用户 results 目录备份恢复），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh` / `bash tests/03_dig_target.sh` / `bash tests/04_core_functions.sh` / `bash tests/05_run_common_tests.sh` / `bash tests/06_compare_e2e.sh`
   - bats 评估结论（2026-08-13）：**不引入**——现有 perl 单测 + smoke/verify 集成已够，bash 纯函数用零依赖轻量断言（tests/02_plugins.sh）补充，避免增加依赖
 - **par_run 通用化（✅ 已完成）**：PARR_MAX 环境变量可调并发数（默认 8），临时目录自动注册 TMPDIR_LIST 统一清理
 - **trends svg_chart 模板化**：HTML/SVG 内联字符串改 heredoc/独立模板文件（当前功能正常，纯可读性优化）

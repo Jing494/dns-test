@@ -1,7 +1,7 @@
 # DNS/网络测试工具集 — Code Wiki
 
 > 本文档是项目的结构化代码 Wiki，涵盖整体架构、模块职责、关键类与函数、依赖关系及运行方式。
-> 对应仓库：`dns-test`（MIT，当前版本 `v1.9 / v2026.08.16`）
+> 对应仓库：`dns-test`（MIT，当前版本 `v1.10 / v2026.08.17`）
 > 适用对象：开发者 / 二次维护者 / AI 助手
 
 > 🤖 **给 AI 的指引**：本工具集最重要的使用方是 AI 助手。需要**理解或修改本仓库代码**时，请先读本文档（代码结构与实现），再配合 [docs/AI_GUIDE.md](docs/AI_GUIDE.md)（操作流程）使用——两者分工互补：**AI_GUIDE 教你"怎么操作测试"**（初始化/流程/排障），**本文档教你"代码长什么样、想改哪里看哪里"**（架构/模块/函数/依赖）。修改代码后务必运行 `bash smoke_test.sh` + `bash verify.sh` 做回归验证，并同步更新 [docs/CHANGELOG.md](docs/CHANGELOG.md) 记录变更轮次。
@@ -43,7 +43,7 @@
 
 - `vYYYY.MM.N`：日期式，N=当月发布序号（补丁级修复仅递增 N）
 - `vX.Y`：语义版本（X=主版本，重大重构才升；Y=次版本，功能更新）
-- 当前：`v1.9 = v2026.08.16`
+- 当前：`v1.10 = v2026.08.17`
 
 ---
 
@@ -119,7 +119,7 @@ dns-test/
 │   ├── 03_dig_target.sh          # dig_target 4 用例（IPv6加方括号）
 │   ├── 04_core_functions.sh      # core 纯函数 18 用例（地址校验/响应判断/CDN/入口参数解析）
 │   ├── 05_run_common_tests.sh    # lite 计分口径/full 回归 12 用例（稳定性降轮/CONFIG_DOMAINS安全解析/dig @server回归/for t遮蔽回归/ECS_SUBNET注入拦截/par_run元字符禁令，mock dig/ping 离线）
-│   └── 06_compare_e2e.sh         # compare 端到端 25 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune，mock dig/ping 离线 + 用户 results 备份恢复）
+│   └── 06_compare_e2e.sh         # compare 端到端 46 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune，mock dig/ping 离线 + 用户 results 备份恢复）
 ├── tools/                        # 专项测试工具
 │   ├── manifest.sh               # 插件注册表
 │   ├── vowifi/                   # VoWiFi 专项（ePDG/路由器）
@@ -380,7 +380,7 @@ dns-test.sh 选"专项测试"
 | [tests/03_dig_target.sh](file:///workspace/tests/03_dig_target.sh) | dig_target 4 用例（IPv4 原样/IPv6 加方括号/特殊 IPv6/空输入） | `bash tests/03_dig_target.sh` |
 | [tests/04_core_functions.sh](file:///workspace/tests/04_core_functions.sh) | core 纯函数 18 用例（valid_dns_addr 合法/非法+超范围/IPv6 畸形结构、is_valid_response 错误/纯 OPT、is_cdn_domain、parse_dns_args 入口参数） | `bash tests/04_core_functions.sh` |
 | [tests/05_run_common_tests.sh](file:///workspace/tests/05_run_common_tests.sh) | lite 计分口径/full 回归 12 用例（稳定性降轮 20→10、AAAA 空响应计分、综合评分 45/53、CONFIG_DOMAINS 注入不执行/非法 token 忽略、dig @server 前缀回归、full 模式 @server 遮蔽回归、ECS_SUBNET 注入拦截、par_run 元字符禁令；mock dig/ping 离线） | `bash tests/05_run_common_tests.sh` |
-| [tests/06_compare_e2e.sh](file:///workspace/tests/06_compare_e2e.sh) | compare 端到端 25 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、提供商标签+抖动三出口+JSON jitter_ms、预设组名展开含 IPv6、未知词报错、trends --prune 保留/删除/校验；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
+| [tests/06_compare_e2e.sh](file:///workspace/tests/06_compare_e2e.sh) | compare 端到端 46 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、提供商标签+抖动三出口+JSON jitter_ms、预设组名展开含 IPv6、未知词报错、trends --prune 保留/删除/校验；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
 
 `02/03/04/05/06_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
 
@@ -396,7 +396,7 @@ dns-test.sh 选"专项测试"
 
 1. 语法检查（.sh + .pl）
 2. shellcheck（可选依赖，`--strict` 强制）
-3. 单元测试（18+9+4+18+12+25 用例）
+3. 单元测试（18+9+4+18+12+46 用例）
 4. 冒烟测试（24 项）
 5. compare 快测（2 DNS）
 6. trends 聚合（无数据/超时跳过）

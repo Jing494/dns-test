@@ -6,7 +6,8 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
-| v2026.08.16 | v1.9（当前） |
+| v2026.08.17 | v1.10（当前） |
+| v2026.08.16 | v1.9 |
 | v2026.08.15 | v1.8 |
 | v2026.08.11 | v1.7.1 |
 | v2026.08.10 | v1.7.0 |
@@ -20,6 +21,17 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-17（第九十轮）：**趋势报告大升级 + compare 采集三参数 + 四项修复（compare.sh / trends.sh / lib/core.sh / tests/06，发布 v1.10 = v2026.08.17）**
+  - **trends 六项增强**：
+    - ① **提供商标签接入**：总览表/明细头/HTML 行（.pname 副行）/SVG 图表标题全量显示 `223.5.5.5·阿里DNS-v4-1`（dns_preset_label 下沉 core.sh 后 trends 正式接入，与 compare 报告口径一致）
+    - ② **延迟 P50/P95 分位**：总览表与 HTML 表新增 P95 延迟列（排序取位；长尾场景均值失真，P95 更接近真实上界）
+    - ③ **多DNS同图对比总图**：所有 DNS 的评分/延迟画在同一坐标系（svg_multi_chart，纯 bash 生成 SVG），共享轮次 X 轴（ROUNDS_TS 全局轴，各 DNS 按所属轮次对齐，缺轮自然留缺口），8 色循环 + 图例 + 首/中/尾轮时间标注；≥2 DNS 且 ≥2 轮才出，先总后分放在单 DNS 明细图之前
+    - ④ **时段分析**：按小时聚合延迟，标出每个 DNS 的最优/最差时段（每小时 ≥3 样本才统计，n_ok≥3 才分析；如"最差 20:00 均延90ms ｜ 最优 08:00 均延12ms"）
+    - ⑤ **`--open`**：生成 HTML 后自动用系统浏览器打开（隐含 --html；open_report_file 下沉 core.sh 与 compare 共用，无桌面环境降级为手动打开提示）
+    - ⑥ **`--since` 格式校验**：必须 YYYY-MM-DD，非法格式显式报错（此前写错格式会静默全排除/全保留）；`--cron` 模式 cron.log 超 512KB 自动轮转为 cron.log.1（防长期 cron 无限增长）
+  - **compare 三参数**：`--rounds M` 限定采集轮数（跑满自动停，有边界基准）；`--keep K` 每轮后自动清理旧 JSON 只留最近 K 份（--watch 长期采集的磁盘配套，与 trends --prune 同口径）；`--json` JSON 落盘同时输出 stdout（管道消费；与 --no-save 互斥自动忽略，采集模式下自动剔除防刷屏）
+  - **修复**：① `--watch+--open`（无显式 --html）时子轮不生成 HTML 但提示"仍每轮生成"——剔除 --open 时若无 --html 自动补上；② Ctrl-C 打断在子轮执行中时"共完成 N 轮"计数偏多 1（新增 WDONE 已完成轮数，打断轮不计入）；③ trends `N_FILES` 因 FILES 尾换行多算 1（"7次采集"实为 6）、`tail -1` 取到空行导致"期间"终点显示为空（统一非空行口径取首/尾/计数）；④ 用法提示行与 --help 参数清单不同步（补 --open/--rounds/--keep/--json）
+  - **测试**：tests/06 扩至 46 用例（+21：--rounds/--keep/--json 校验与清理/--watch+--open 子轮 HTML 回归/trends 标签、P95、双总图、图例、时段分析、计数修复、--since 校验、--open 提示）；mock 全程离线
 - 2026-08-16（第八十九轮）：**compare 七大增强 + e2e 测试转正（compare.sh / trends.sh / tests/06，发布 v1.9 = v2026.08.16）**
   - ① **定时采集 `--watch N`**：每 N 分钟重放一轮自身（子轮含 `--html/--md/--full` 等原参数，`--no-save` 自动剔除并提示），落 JSON 打通 trends.sh 数据源；`sleep` 后台化 + `wait`，Ctrl-C 立即中断等待并优雅退出（打印完成轮数与趋势查看指引）；正整数校验与 STAB_ROUNDS 同风格
   - ② **切换命令建议**：按当前系统给可直接复制的切换命令（macOS networksetup / WSL resolv.conf+wsl.conf / NetworkManager nmcli / systemd-resolved resolvectl / 通用 resolv.conf 兜底），终端/HTML/MD 三出口同款，HTML 内 `< >` 转义防标签解析

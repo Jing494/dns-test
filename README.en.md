@@ -16,8 +16,8 @@ A unified toolkit for DNS benchmarking and network diagnostics, with a focus on 
 - **DoH / DoT Support Check** — adaptive: real test via `dig +tls` / `curl --doh-url` when available, port-level probe otherwise
 - **IPv6 support** — v4/v6 dual-stack everywhere, IPv6 connectivity test (ping6)
 - **AI Operator Manual** — 12-chapter guide teaching AI agents how to interact with users properly (ask DNS → pick version → guide to specialty tests)
-- **DNS Comparison** — `compare.sh` compares multiple DNS side-by-side (score / latency median / stability), preset groups supported (`bash compare.sh ali tencent`), optional responsive HTML / Markdown reports + structured JSON results, period-over-period deltas, per-OS switch commands, current-system-DNS marker (👤), and `--watch N` timed collection
-- **Trend Insight** — `trends.sh` aggregates historical compare results (linear-regression trend arrows, CSV export, SVG line charts, optional cron collection, `--prune N` history retention control)
+- **DNS Comparison** — `compare.sh` compares multiple DNS side-by-side (score / latency median / stability), preset groups supported (`bash compare.sh ali tencent`), optional responsive HTML / Markdown reports + structured JSON results, period-over-period deltas, per-OS switch commands, current-system-DNS marker (👤), `--watch N` timed collection with `--rounds M` limit, `--keep K` JSON retention and `--json` stdout output
+- **Trend Insight** — `trends.sh` aggregates historical compare results (linear-regression trend arrows, delay P50/P95 percentiles, per-hour worst/best analysis, provider labels, multi-DNS overlay comparison charts, CSV export, SVG line charts, optional cron collection, `--prune N` history retention control, `--open` auto-launch browser)
 - **Automated Smoke Test** — `smoke_test.sh` validates all core paths in one run (25 checks)
 
 ## Quick Start
@@ -57,7 +57,10 @@ bash compare.sh ali tencent                   # compare preset groups (default/a
 bash compare.sh 223.5.5.5 119.29.29.29 --html  # DNS comparison + HTML report (+ --md for Markdown)
 bash compare.sh 223.5.5.5 119.29.29.29 --full   # full-mode comparison (77~78 checks/DNS)
 bash compare.sh 223.5.5.5 119.29.29.29 --watch 30  # collect every 30 min (Ctrl-C to stop; feeds trends)
+bash compare.sh 223.5.5.5 --watch 30 --rounds 12   # auto-stop after 12 rounds (--keep 200 caps JSON files)
+bash compare.sh 223.5.5.5 119.29.29.29 --json      # also print JSON to stdout (pipe-friendly)
 bash trends.sh --html --csv       # trend insight (needs accumulated compare data)
+bash trends.sh --html --open      # generate HTML and auto-open in browser (implies --html)
 bash trends.sh --prune 200        # keep only the latest 200 JSON snapshots, then aggregate
 perl tools/vowifi/carrier_epdg.pl all   # carrier ePDG deployment check
 perl tools/vowifi/03_test_router_dns.pl 192.168.1.1   # router forwarding check

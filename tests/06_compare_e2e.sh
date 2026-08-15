@@ -147,6 +147,59 @@ echo "$PT" | grep -q "保留最近 3 份，删除 2 份" && ok "prune 判定正�
 echo "$PT" | grep -q "223.5.5.5" && ok "prune 后聚合正常出数" || notok "prune 后聚合无数据"
 bash trends.sh --prune 0 2>&1 | grep -q "正整数" && ok "--prune 0 报错" || notok "--prune 0 未报错"
 
+echo "═══ compare.sh e2e: --rounds/--keep 校验 + --json stdout ═══"
+bash compare.sh 223.5.5.5 --rounds 3 2>&1 | grep -q "\-\-rounds 仅与 --watch" && ok "--rounds 单独用报错" || notok "--rounds 单独用未报错"
+bash compare.sh 223.5.5.5 --keep 5 2>&1 | grep -q "\-\-keep 仅与 --watch" && ok "--keep 单独用报错" || notok "--keep 单独用未报错"
+bash compare.sh 223.5.5.5 --watch 1 --keep 0 2>&1 | grep -q "正整数" && ok "--keep 0 报错" || notok "--keep 0 未报错"
+JOUT=$(bash compare.sh 223.5.5.5 --json 2>/dev/null)
+echo "$JOUT" | grep -q '"tool": "dns-test/compare.sh"' && ok "--json 输出到 stdout" || notok "--json 未输出 stdout"
+bash compare.sh 223.5.5.5 --json --no-save 2>&1 | grep -q "已忽略 --no-save" && ok "--json 冲突忽略 --no-save" || notok "--json/--no-save 冲突未处理"
+bash compare.sh 223.5.5.5 --watch 1 --rounds 1 --json 2>&1 | grep -q "已忽略 --json" && ok "采集模式剔除 --json" || notok "采集模式未剔除 --json"
+
+echo "═══ compare.sh e2e: --watch+--open 子轮HTML回归（修复：--open隐含的--html只在父进程生效） ═══"
+rm -f results/report.html
+bash compare.sh 223.5.5.5 --watch 1 --rounds 1 --open >/dev/null 2>&1
+[ -f results/report.html ] && ok "--watch+--open(无--html) 子轮生成HTML" || notok "子轮丢HTML（回归）"
+
+echo "═══ compare.sh e2e: --watch+--keep 自动清理 ═══"
+rm -f results/compare-*.json
+for ts in 20260810 20260811 20260812; do
+  echo "{\"tool\":\"x\",\"timestamp\":\"${ts} 00:00:00 +0800\",\"dns\":[{\"addr\":\"223.5.5.5\",\"score\":\"90\",\"stab\":\"100\",\"delay_ms\":10}]}" > "results/compare-${ts}-000000.json"
+done
+KW=$(bash compare.sh 223.5.5.5 --watch 1 --rounds 1 --keep 2 2>&1)
+echo "$KW" | grep -q "已清理 2 份旧JSON" && ok "--keep 清理判定(4→2,删2)" || notok "--keep 清理判定错误"
+KNOW=$(ls results/compare-*.json 2>/dev/null | wc -l | tr -d ' ')
+[ "$KNOW" = "2" ] && ok "--keep 后留存2份" || notok "--keep 后留存${KNOW}份(应2)"
+
+echo "═══ trends.sh: 标签/P95/同图总图/时段分析/计数修复 ═══"
+rm -rf results; mkdir -p results
+# 2 DNS × 6 轮：3份20点档(延迟高) + 3份08点档(延迟低) → 时段分析可出、同图总图可出
+for i in 1 2 3; do
+  cat > "results/compare-2026081${i}-200000.json" <<EOF3
+{"tool":"dns-test/compare.sh","version":"v2026.08.16","timestamp":"2026-08-1${i} 20:00:00 +0800","mode":"lite","cost_s":10,
+ "dns":[{"addr":"223.5.5.5","score":"8${i}","stab":"100","delay_ms":$((80+i*5)),"reachable":true},
+        {"addr":"119.29.29.29","score":"7${i}","stab":"95","delay_ms":$((90+i*5)),"reachable":true}]}
+EOF3
+  cat > "results/compare-2026081${i}-080000.json" <<EOF3
+{"tool":"dns-test/compare.sh","version":"v2026.08.16","timestamp":"2026-08-1${i} 08:00:00 +0800","mode":"lite","cost_s":10,
+ "dns":[{"addr":"223.5.5.5","score":"9${i}","stab":"100","delay_ms":$((10+i)),"reachable":true},
+        {"addr":"119.29.29.29","score":"8${i}","stab":"95","delay_ms":$((15+i)),"reachable":true}]}
+EOF3
+done
+TT=$(bash trends.sh --html 2>&1)
+echo "$TT" | grep -q "6次采集" && ok "采集计数正确(6份=6次)" || notok "采集计数错误"
+echo "$TT" | grep -q "2026-08-13 20:00$" && ok "期间终点正常显示" || notok "期间终点为空"
+echo "$TT" | grep -q "223.5.5.5·阿里DNS-v4-1" && ok "文本表带提供商标签" || notok "文本表缺标签"
+echo "$TT" | grep -q "P95延迟" && ok "文本表含P95列" || notok "文本表缺P95列"
+echo "$TT" | grep -q "最差 20:00 均延90.0ms" && ok "时段分析标出最差时段" || notok "时段分析缺最差时段"
+grep -q "综合评分对比（2个DNS × 6轮）" trends/report.html && ok "HTML 多DNS同图总图(评分)" || notok "HTML 缺评分总图"
+grep -q "延迟对比 (ms) — 越低越好（2个DNS × 6轮）" trends/report.html && ok "HTML 多DNS同图总图(延迟)" || notok "HTML 缺延迟总图"
+grep -q "class='legend'" trends/report.html && ok "总图图例存在" || notok "总图缺图例"
+grep -q "class='pname'>阿里DNS-v4-1" trends/report.html && ok "HTML 总览表带标签副行" || notok "HTML 缺标签副行"
+grep -q "P95延迟" trends/report.html && ok "HTML 表含P95列" || notok "HTML 缺P95列"
+bash trends.sh --since 2026/08/01 2>&1 | grep -q "YYYY-MM-DD" && ok "--since 非法格式报错" || notok "--since 未校验格式"
+bash trends.sh --open 2>&1 | grep -q "已在浏览器打开\|手动打开" && ok "--open 输出打开/降级提示" || notok "--open 无提示"
+
 echo ""
 echo "═══ 结果: $PASS 通过 / $FAIL 失败 ═══"
 [ "$FAIL" = "0" ]
