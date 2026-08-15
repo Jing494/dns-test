@@ -6,7 +6,9 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
-| v2026.08.19 | v1.12（当前） |
+| v2026.08.21 | v1.14（当前） |
+| v2026.08.20 | v1.13 |
+| v2026.08.19 | v1.12 |
 | v2026.08.18 | v1.11 |
 | v2026.08.17 | v1.10 |
 | v2026.08.16 | v1.9 |
@@ -23,6 +25,21 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-21（第九十四轮）：**trends --archive 数据归档 + doctor --cron 值守模板 + 数据产物 Schema 文档（trends.sh / doctor.sh / completions/ / verify.sh / tests/06 / tests/07 / docs，发布 v1.14 = v2026.08.21）**
+  - **`trends --archive`（与 `--prune` 配套 / 单独用，两种语义）**：① `--prune N --archive`：被清理的旧 JSON 先打包到 `trends/archive/prune-<时间>.tar.gz` 再删——长期值守 `--prune` 终于有了"防误删"安全网；tar 打包失败则**放弃本次清理**（数据安全优先，聚合照常），不会出现"包没打成、文件先没了"；② `--archive` 单独用：全量打包当前 `compare-*.json` 到 `trends/archive/full-<时间>.tar.gz`（备份/迁移/报障分享，不删任何文件）；tar 用 `-C` 相对路径（BSD/GNU 双兼容），空数据静默跳过；归档包不自动清理（积多自删）
+  - **`doctor --cron`**：一键打印值守 crontab 模板（不跑体检、exit 0）——采集行（`trends --cron ... --prune 200 --archive`）+ 告警行（`--alert 70 --webhook 飞书示例`）+ 每周全量归档行，带 `PATH=` 首行避坑（cron 精简 PATH 是头号翻车点）与 crontab 存在性提示；路径自动取当前仓库绝对路径，改 DNS/阈值/webhook 即可粘贴
+  - **verify.sh 修复遗留缺口**：单测链补挂 tests/07（上轮新增但未接入 verify），用例数标签同步 59→112/35 实际值
+  - **docs/CODE_WIKI.md 新增第十一章"数据产物 Schema"**：compare 采集 JSON / trends --json / trends.csv / 归档包 四产物的字段级说明（类型+语义+null 条件），供看板/jq 管道/AI 对接消费；所有键名按 v1.14 实际输出校对
+  - **completions/**：bash/zsh 同步补 `--archive`（trends）与 `--cron`（doctor）
+  - **测试**：tests/06 扩至 112 用例（+8：--archive 全量归档提示/包生成/不删原文件/包内容、prune 删前归档提示/包含被删文件/留存数、空数据跳过）；tests/07 扩至 35 用例（+11：--cron exit 0/采集行/prune+archive/告警行/PATH 行/绝对路径/不跑体检 + bash --arc/--c TAB 补全 + zsh --archive/--cron）
+- 2026-08-20（第九十三轮）：**trends --webhook 告警推送 + --json 机器可读 + --week 可配窗口 + doctor 自检 + shell 补全（trends.sh / lib/core.sh / doctor.sh / completions/ / tests/06 / tests/07，发布 v1.13 = v2026.08.20）**
+  - **`--webhook URL`（配 `--alert`）**：告警命中时推送 IM——按 URL 自动识别通道：飞书（msg_type）/钉钉/企微（msgtype）text 消息体、Telegram（-G --data-urlencode，URL 自带 chat_id）、Bark（GET 路径标题+?body= 正文，百分号编码）、其余通用 JSON `{"text","content"}`（Slack/Discord/自建均兼容）；纯 curl 实现，无 curl 或推送失败仅提示不阻断，**exit 3 语义不变**；未命中不推送
+  - **lib/core.sh 新增三助手**：`urlencode`（纯 awk LC_ALL=C 按字节百分号编码）/ `json_escape`（反斜杠/引号/制表/回车/换行转义，注意 awk gsub 替换串 8 层转义写法）/ `webhook_push`（通道识别+payload 构造+结果提示）
+  - **`--json`**：趋势汇总 JSON 独占 stdout（fd 切换：`exec 3>&1 1>&2`，人类文本全转 stderr，jq/Grafana 管道友好）；逐 DNS 输出 addr/label/样本/均值/末值/趋势/P50/P95/突变计数/周对比对象，顶层含 period/freshness/modes/week_window_days/alert（阈值+命中+明细）；非数字字段输出 null，Δ 剥前导 + 号（JSON 数字语法）；告警命中时 JSON 先吐完再 exit 3
+  - **`--week N`**：周对比窗口可配（2-365 天，默认 7），近N天 vs 前N天，文本/HTML/MD 三出口标题同步参数化
+  - **`doctor.sh` 环境自检**：平台与 shell/依赖（必需 dig/ping/awk 等+可选 curl/perl）/兼容层三函数实测/目录可写/数据健康（数量/最新/坏文件/混采）/`--net` 真实连通；**刻意不 source core.sh**（其缺 dig/perl 直接 exit，恰是 doctor 要诊断的场景），退出码 0/1
+  - **completions/**：bash（compgen，flags+预设组 default/ali/tencent/all+常用公共DNS+成对参数值位不补）与 zsh（#compdef+`_values`）双补全，注册 6 个入口脚本
+  - **测试**：tests/06 扩至 104 用例（+16：--json 工具标识/突变计数/Δ评分无+号/告警命中/默认窗口/语法合法 json.tool/exit 3 保持/--week 标题/窗口切分/默认语义不变/--webhook 触发提示/飞书 payload/URL/详情/未命中不推送/失败降级）；新增 tests/07_doctor.sh 24 用例（doctor 正常/参数/PATH 剥离 FAIL 路径 + bash 补全语法/注册/模拟 TAB 三场景 + zsh 头与内容 + trends 新参数校验）
 - 2026-08-19（第九十二轮）：**trends 周对比 + 头对头 + 突变检测 + --md 报告（trends.sh / lib/compat.sh / tests/06，发布 v1.12 = v2026.08.19）**
   - **周对比**：近 7 天（含今天）vs 前 7 天 的评分/延迟均值 Δ（两窗都有样本才显示；箭头=好坏方向，评分升/延迟降=↑）；文本小节 + HTML 洞察卡 + `--md` 小节，直接回答"这周 DNS 变好还是变差"；窗口切分用日期字符串字典序比较（零子进程开销），边界日期由新增 `date_days_ago` 跨平台计算（BSD `-v-`/GNU `-d` 双语法，极端环境不可用时静默跳过该节）
   - **`--vs A,B` 头对头**：两 DNS 同轮对决胜负计数（同轮都可达才成局，评分高者胜），附全期均值对比与占优判定（胜局 > 2/3 才判"占优"，样本少不轻易下结论）；A/B 必须为逗号分隔的两个不同合法地址，不在数据集中时显式报错并给采集指引

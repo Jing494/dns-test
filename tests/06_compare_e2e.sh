@@ -320,7 +320,82 @@ grep -q "## 周对比" /tmp/t06-trends-out2/report.md && ok "--md 含周对比�
 grep -q "## 突变检测" /tmp/t06-trends-out2/report.md && ok "--md 含突变小节" || notok "--md 缺突变"
 grep -q "## 头对头" /tmp/t06-trends-out2/report.md && ok "--md 含头对头小节" || notok "--md 缺头对头"
 grep -q "bash compare.sh DNS1 DNS2 --watch 30" /tmp/t06-trends-out2/report.md && ok "--md 尾注含采集指引" || notok "--md 缺尾注"
+
+echo "═══ trends.sh: --json 机器可读输出 + --week 可配窗口 ═══"
+# --json：stdout 应为纯 JSON（文本全部转 stderr），关键字段齐全且语法合法
+JS=$(tr2 --json --alert 95 2>/dev/null)
+echo "$JS" | grep -q '"tool": "dns-test/trends.sh"' && ok "--json 工具标识" || notok "--json 缺 tool 字段"
+echo "$JS" | grep -q '"mutation_count": 1,' && ok "--json 突变计数=1" || notok "--json 突变计数错误"
+echo "$JS" | grep -q '"delta_score": -20.0' && ok "--json 周对比Δ评分(无+号JSON数字)" || notok "--json Δ评分错误"
+echo "$JS" | grep -q '"hit": true' && ok "--json 告警命中状态" || notok "--json 缺告警状态"
+echo "$JS" | grep -q '"week_window_days": 7' && ok "--json 默认周窗口7天" || notok "--json 周窗口字段错误"
+command -v python3 >/dev/null 2>&1 && echo "$JS" | python3 -m json.tool >/dev/null 2>&1 \
+  && ok "--json 语法合法(json.tool)" || notok "--json 语法非法"
+# --json 告警命中时仍 exit 3 且 JSON 已先吐完
+tr2 --json --alert 95 >/dev/null 2>&1; [ $? = "3" ] && ok "--json+--alert 命中仍 exit 3" || notok "--json+--alert 退出码错误"
+# --week 14：夹具再加 20 天前样本，前窗(14天前~8天前)与近窗(13天内)均有数据才出 Δ
+source lib/compat.sh; D20=$(date_days_ago 20); D20F=${D20//-/}
+cat > "$TRD/compare-${D20F}-080000.json" <<EOF5
+{"tool":"x","timestamp":"$D20 08:00:00 +0800","mode":"lite","dns":[
+ {"addr":"223.5.5.5","score":"90","stab":"100","delay_ms":20,"reachable":true},
+ {"addr":"119.29.29.29","score":"80","stab":"95","delay_ms":30,"reachable":true}]}
+EOF5
+WV14=$(tr2 --week 14 2>&1)
+echo "$WV14" | grep -q "近14天 vs 前14天" && ok "--week 14 标题正确" || notok "--week 14 标题错误"
+# 近14窗含 D10/D5 三轮((90+72+68)/3=76.7)，前14窗含 D20(90)：D20 独享前窗=扩窗生效
+echo "$WV14" | grep -qF "评分 90.0%→76.7%" && ok "--week 14 前窗样本入列(90→76.7)" || notok "--week 14 窗口切分错误"
+# 默认 --week 7 时 20 天前样本不在任何窗 → 该 DNS 无周对比行（窗口语义边界）
+WV7=$(tr2 2>&1)
+echo "$WV7" | grep -qF "评分 90.0%→70.0%" && ok "默认7天窗仍按旧语义" || notok "默认窗口被改动"
 rm -rf "$TRD" /tmp/t06-trends-out2
+
+echo "═══ trends.sh: --webhook 告警推送（mock curl 抓 payload） ═══"
+TRD=/tmp/t06-hook; rm -rf "$TRD" /tmp/t06-hook-out; mkdir -p "$TRD"
+cat > "$TRD/compare-20260814-080000.json" <<'EOF6'
+{"tool":"x","timestamp":"2026-08-14 08:00:00 +0800","mode":"lite","dns":[
+ {"addr":"223.5.5.5","score":"50","stab":"100","delay_ms":20,"reachable":true}]}
+EOF6
+HOOKSTUB=$(mktemp -d)
+printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s/hook.log"\necho "{\\\"ok\\\":true}"\n' "$HOOKSTUB" "$HOOKSTUB" > "$HOOKSTUB/curl"
+chmod +x "$HOOKSTUB/curl"
+HW=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-hook-out PATH="$HOOKSTUB:$PATH" \
+  bash trends.sh --alert 70 --webhook https://open.feishu.cn/open-apis/bot/v2/hook/TESTKEY 2>&1)
+echo "$HW" | grep -q "📡 webhook 已推送" && ok "告警命中触发推送提示" || notok "推送提示缺失"
+grep -q '"msg_type":"text"' "$HOOKSTUB/hook.log" && ok "飞书 payload 形态正确" || notok "飞书 payload 错误"
+grep -q "TESTKEY" "$HOOKSTUB/hook.log" && ok "推送到指定 URL" || notok "URL 错误"
+grep -q "低于阈值 70" "$HOOKSTUB/hook.log" && ok "payload 含告警详情" || notok "payload 缺详情"
+# 告警未命中 → 不推送（hook.log 不新增）
+BEFORE=$(wc -l < "$HOOKSTUB/hook.log")
+COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-hook-out PATH="$HOOKSTUB:$PATH" \
+  bash trends.sh --alert 40 --webhook https://open.feishu.cn/x >/dev/null 2>&1
+[ "$(wc -l < "$HOOKSTUB/hook.log")" = "$BEFORE" ] && ok "未命中不推送" || notok "未命中误推送"
+# 推送失败（连接拒绝）→ 仅提示不改变 exit 3
+HW2=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-hook-out bash trends.sh --alert 70 --webhook https://127.0.0.1:1/h 2>&1 | grep -c "webhook 未推送\|推送失败")
+[ "$HW2" -ge 1 ] && ok "推送失败时降级提示" || notok "推送失败时静默"
+rm -rf "$TRD" /tmp/t06-hook-out "$HOOKSTUB"
+
+echo "═══ trends.sh: --archive 归档（全量打包 / prune 删前归档） ═══"
+TRD=/tmp/t06-arch; rm -rf "$TRD" /tmp/t06-arch-out; mkdir -p "$TRD"
+for i in 1 2 3; do
+  printf '{"tool":"x","timestamp":"2026-08-1%s 08:00:00 +0800","mode":"lite","dns":[{"addr":"223.5.5.5","score":"90","stab":"100","delay_ms":20,"reachable":true}]}' "$i" \
+    > "$TRD/compare-2026081$i-080000.json"
+done
+# 单独 --archive：全量打包且不删原文件
+AR=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-arch-out bash trends.sh --archive 2>&1)
+echo "$AR" | grep -q "已全量归档 3 份" && ok "--archive 全量归档提示" || notok "全量归档提示缺失"
+ls /tmp/t06-arch-out/archive/full-*.tar.gz >/dev/null 2>&1 && ok "full-*.tar.gz 生成" || notok "full 包未生成"
+[ "$(ls "$TRD"/compare-*.json | wc -l)" = "3" ] && ok "全量归档不删原文件" || notok "全量归档误删原文件"
+tar -tzf /tmp/t06-arch-out/archive/full-*.tar.gz | grep -q "compare-20260811" && ok "full 包内容正确" || notok "full 包内容异常"
+# --prune N --archive：被删文件先打包再删
+PR=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-arch-out bash trends.sh --prune 1 --archive 2>&1)
+echo "$PR" | grep -q "已归档待清理的 2 份" && ok "prune 删前归档提示" || notok "删前归档提示缺失"
+tar -tzf /tmp/t06-arch-out/archive/prune-*.tar.gz | grep -q "compare-20260812" && ok "prune 包含被删文件" || notok "prune 包缺被删文件"
+[ "$(ls "$TRD"/compare-*.json | wc -l)" = "1" ] && ok "prune 后仅存最近1份" || notok "prune 后留存数异常"
+# 空数据 --archive：跳过归档不报错
+rm -f "$TRD"/*.json
+AR2=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-arch-out bash trends.sh --archive 2>&1 | grep -c "暂无 compare")
+[ "$AR2" = "1" ] && ok "空数据归档跳过提示" || notok "空数据归档异常"
+rm -rf "$TRD" /tmp/t06-arch-out
 
 echo ""
 echo "═══ 结果: $PASS 通过 / $FAIL 失败 ═══"

@@ -2,17 +2,23 @@
 # ============================================================================
 # DNS 趋势洞察：聚合 compare.sh 的历史 JSON 结果，输出趋势总览/CSV/HTML报告
 # 兼容性: bash 3.2+（无关联数组依赖，macOS 默认 bash 可直接运行）
-# 用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--prune N] [--alert N]
+# 用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--json] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--prune N] [--archive] [--alert N] [--webhook URL] [--week N]
 #   例: bash trends.sh                              # 全部DNS趋势总览（文本，含P95/时段/日级/周对比/突变检测）
 #       bash trends.sh 223.5.5.5                    # 只看223.5.5.5
 #       bash trends.sh --html --csv                 # 生成 trends/report.html + trends.csv
 #       bash trends.sh --html --open                # 生成HTML并自动在浏览器打开（隐含--html）
 #       bash trends.sh --md                         # 生成 trends/report.md（GitHub/PR友好）
+#       bash trends.sh --json                       # 趋势汇总JSON到stdout（文本转stderr，jq/看板友好）
 #       bash trends.sh --vs 223.5.5.5,119.29.29.29  # 两DNS头对头：同轮对决胜负计数
 #       bash trends.sh --cron 223.5.5.5 119.29.29.29  # 先采集(跑compare)再聚合（crontab用）
 #       bash trends.sh --detail --limit 5           # 每个DNS列最近5条明细
 #       bash trends.sh --since 2026-08-01 --until 2026-08-07  # 只看该周的窗口数据
+#       bash trends.sh --week 14                    # 周对比窗口改14天（默认7：近N天 vs 前N天）
 #       bash trends.sh --alert 70                   # 值守告警：评分均值<70或全不可达 → 提示+exit 3（cron用）
+#       bash trends.sh --alert 70 --webhook https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+#                                                  # 告警命中时推送（飞书/钉钉/企微/Telegram/Bark/通用JSON）
+#       bash trends.sh --prune 200 --archive        # 清理前先把被删JSON打包到 trends/archive/（防误删）
+#       bash trends.sh --archive                    # 全量打包当前JSON到 trends/archive/（备份/迁移/报障分享）
 # 环境变量:
 #   TRENDS_DIR              趋势产物目录（默认 trends/）
 #   COMPARE_RESULTS_DIR     compare JSON 数据源目录（默认 results/）
@@ -32,6 +38,7 @@ OUT_DIR="${TRENDS_DIR:-trends}"             # 趋势产物目录
 GEN_HTML=0
 GEN_CSV=0
 GEN_MD=0
+GEN_JSON=0
 GEN_OPEN=0
 CRON_MODE=0
 DETAIL=0
@@ -40,7 +47,10 @@ SINCE=""
 UNTIL=""
 ALERT_N=""
 PRUNE_N=""
+ARCHIVE=0
 VS_ARG=""
+WEBHOOK_URL=""
+WEEK_N=7
 FILTER=()
 
 # ---------- 参数解析（while+shift风格，兼容--limit N成对取值） ----------
@@ -53,6 +63,9 @@ while [ $i -lt ${#ARGS[@]} ]; do
     --open)   GEN_HTML=1; GEN_OPEN=1 ;;   # --open 隐含 --html（打开的前提是生成）
     --csv)    GEN_CSV=1 ;;
     --md)     GEN_MD=1 ;;
+    --json)   GEN_JSON=1 ;;
+    --week)   i=$((i+1)); WEEK_N="${ARGS[$i]:-}"; [ -z "$WEEK_N" ] && { echo "❌ --week 缺少天数（例: --week 14 = 近14天 vs 前14天）"; exit 1; } ;;
+    --webhook) i=$((i+1)); WEBHOOK_URL="${ARGS[$i]:-}"; [ -z "$WEBHOOK_URL" ] && { echo "❌ --webhook 缺少 URL（例: --webhook https://open.feishu.cn/open-apis/bot/v2/hook/xxx）"; exit 1; } ;;
     --vs)     i=$((i+1)); VS_ARG="${ARGS[$i]:-}"; [ -z "$VS_ARG" ] && { echo "❌ --vs 缺少值（例: --vs 223.5.5.5,119.29.29.29）"; exit 1; } ;;
     --cron)   CRON_MODE=1 ;;
     --detail) DETAIL=1 ;;
@@ -61,19 +74,25 @@ while [ $i -lt ${#ARGS[@]} ]; do
     --until)  i=$((i+1)); UNTIL="${ARGS[$i]:-}"; [ -z "$UNTIL" ] && { echo "❌ --until 缺少值"; exit 1; } ;;
     --alert)  i=$((i+1)); ALERT_N="${ARGS[$i]:-}"; [ -z "$ALERT_N" ] && { echo "❌ --alert 缺少阈值（1-100，例: --alert 70）"; exit 1; } ;;
     --prune)  i=$((i+1)); PRUNE_N="${ARGS[$i]:-}"; [ -z "$PRUNE_N" ] && { echo "❌ --prune 缺少值"; exit 1; } ;;
+    --archive) ARCHIVE=1 ;;
     --version)
       echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
       exit 0 ;;
     --help|-h)
-      echo "用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since Y-M-D] [--until Y-M-D] [--prune N] [--alert N]"
+      echo "用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--json] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since Y-M-D] [--until Y-M-D] [--prune N] [--archive] [--alert N] [--webhook URL] [--week N]"
       echo "  例: bash trends.sh --html --csv"
       echo "      bash trends.sh --html --open                    # 生成HTML并自动打开(隐含--html)"
       echo "      bash trends.sh --md                             # 生成 trends/report.md（GitHub/PR友好）"
+      echo "      bash trends.sh --json                           # 趋势汇总JSON到stdout(文本转stderr,jq/看板友好)"
       echo "      bash trends.sh --vs 223.5.5.5,119.29.29.29      # 头对头:两DNS同轮对决胜负计数"
       echo "      bash trends.sh --cron 223.5.5.5 119.29.29.29   # 先采集再聚合(crontab用)"
       echo "      bash trends.sh --since 2026-08-01 --until 2026-08-07  # 窗口分析(含两端日期)"
-      echo "      bash trends.sh --alert 70                       # 值守:评分均值<70或全不可达 → exit 3(cron用)"
+      echo "      bash trends.sh --week 14                        # 周对比窗口改14天(默认7,近N天vs前N天)"
+      echo "      bash trends.sh --alert 70 --webhook https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+      echo "                                                    # 值守:告警命中推飞书/钉钉/企微/TG/Bark/通用 → exit 3"
       echo "      bash trends.sh --prune 200 --html              # 只保留最近200份JSON再聚合(--watch配套)"
+      echo "      bash trends.sh --prune 200 --archive           # 被清理的JSON先打包trends/archive/再删(防误删)"
+      echo "      bash trends.sh --archive                       # 全量打包当前JSON(备份/迁移/报障分享,不删文件)"
       echo "环境变量: TRENDS_DIR(默认trends/)  COMPARE_RESULTS_DIR(默认results/)"
       echo "退出码: 0=完成 1=参数错 2=无数据 3=--alert告警命中"
       exit 0 ;;
@@ -118,6 +137,22 @@ if [ -n "$VS_ARG" ]; then
     fi
   done
 fi
+# --week 窗口校验：2-365 的整数天（近N天 vs 前N天，默认 7）
+if ! [[ "$WEEK_N" =~ ^[0-9]+$ ]] || [ "$WEEK_N" -lt 2 ] || [ "$WEEK_N" -gt 365 ]; then
+  echo "❌ --week 必须为 2-365 的整数天数，收到: $WEEK_N"
+  exit 1
+fi
+# --webhook 校验：须为 http(s) URL，且推送时机=告警命中（需配合 --alert，否则没有触发点）
+if [ -n "$WEBHOOK_URL" ]; then
+  case "$WEBHOOK_URL" in
+    http://*|https://*) ;;
+    *) echo "❌ --webhook 必须为 http/https URL，收到: $WEBHOOK_URL"; exit 1 ;;
+  esac
+  if [ -z "$ALERT_N" ]; then
+    echo "❌ --webhook 需配合 --alert 使用（推送时机=告警命中；例: --alert 70 --webhook https://...）"
+    exit 1
+  fi
+fi
 
 # ---------- --cron 采集模式：先跑 compare 再聚合 ----------
 if [ "$CRON_MODE" = "1" ]; then
@@ -137,8 +172,31 @@ if [ "$CRON_MODE" = "1" ]; then
   echo "   采集完成，开始聚合..."
 fi
 
+# ---------- --archive：数据归档（两种用法，纯增量不动留存文件） ----------
+#   1) --archive --prune N : 被 --prune 清理的旧JSON先打包到 trends/archive/prune-<时间>.tar.gz 再删（防误删）
+#   2) --archive 单独用    : 全量打包当前 compare JSON 到 trends/archive/full-<时间>.tar.gz（备份/迁移/报障分享），不删任何文件
+# tar 用 -C 切目录 + 相对路径打包（BSD/GNU tar 均支持），归档包本身不自动清理（长期值守可定期删 trends/archive/）
+if [ "$ARCHIVE" = "1" ] && [ -z "$PRUNE_N" ]; then
+  AFULL=()
+  for _f in "$SRC_DIR"/compare-*.json; do
+    [ -e "$_f" ] && AFULL+=("$(basename "$_f")")
+  done
+  if [ ${#AFULL[@]} -eq 0 ]; then
+    echo "  🗄️  --archive: $SRC_DIR 暂无 compare-*.json，跳过归档"
+  else
+    mkdir -p "$OUT_DIR/archive"
+    A_TAR="$OUT_DIR/archive/full-$(date '+%Y%m%d-%H%M%S').tar.gz"
+    if tar -czf "$A_TAR" -C "$SRC_DIR" "${AFULL[@]}" 2>/dev/null; then
+      echo "  🗄️  --archive: 已全量归档 ${#AFULL[@]} 份 → $A_TAR（原文件保留不动）"
+    else
+      echo "  ⚠️  --archive: tar 打包失败（tar 不可用/磁盘满？），原文件未受影响"
+    fi
+  fi
+fi
+
 # ---------- --prune N：只保留最近 N 份 compare JSON（--watch/定时长期采集的磁盘配套清理） ----------
 # glob 字典序=时间序（时间戳文件名），删最老的 TOTAL-N 份；先清理再聚合，报告口径与留存一致
+# 带 --archive 时：先打包被删文件再删；打包失败则放弃本次清理（数据安全优先，聚合照常继续）
 if [ -n "$PRUNE_N" ]; then
   if ! [[ "$PRUNE_N" =~ ^[1-9][0-9]*$ ]]; then
     echo "❌ --prune 参数必须为正整数（保留份数），收到: $PRUNE_N"; exit 1
@@ -152,15 +210,33 @@ if [ -n "$PRUNE_N" ]; then
     echo "  ♻️  --prune: 共 ${PTOTAL} 份 ≤ 保留 ${PRUNE_N} 份，无需清理"
   else
     DELN=$((PTOTAL - PRUNE_N))
-    echo "  ♻️  --prune: 共 ${PTOTAL} 份，保留最近 ${PRUNE_N} 份，删除 ${DELN} 份:"
-    k=0
-    for _f in "${PFILES[@]}"; do
-      k=$((k+1))
-      if [ "$k" -le "$DELN" ]; then
-        echo "     🗑️  $(basename "$_f")"
-        rm -f "$_f"
+    ARCHIVE_OK=1
+    if [ "$ARCHIVE" = "1" ]; then
+      A_NAMES=(); k=0
+      for _f in "${PFILES[@]}"; do
+        k=$((k+1))
+        [ "$k" -le "$DELN" ] && A_NAMES+=("$(basename "$_f")")
+      done
+      mkdir -p "$OUT_DIR/archive"
+      A_TAR="$OUT_DIR/archive/prune-$(date '+%Y%m%d-%H%M%S').tar.gz"
+      if tar -czf "$A_TAR" -C "$SRC_DIR" "${A_NAMES[@]}" 2>/dev/null; then
+        echo "  🗄️  已归档待清理的 ${#A_NAMES[@]} 份 → $A_TAR"
+      else
+        echo "  ⚠️  --archive 归档失败，为数据安全本次跳过清理（排查 tar/磁盘后重试）"
+        ARCHIVE_OK=0
       fi
-    done
+    fi
+    if [ "$ARCHIVE_OK" = "1" ]; then
+      echo "  ♻️  --prune: 共 ${PTOTAL} 份，保留最近 ${PRUNE_N} 份，删除 ${DELN} 份:"
+      k=0
+      for _f in "${PFILES[@]}"; do
+        k=$((k+1))
+        if [ "$k" -le "$DELN" ]; then
+          echo "     🗑️  $(basename "$_f")"
+          rm -f "$_f"
+        fi
+      done
+    fi
   fi
 fi
 
@@ -283,6 +359,11 @@ if [ -n "$LAST_TS" ]; then
     else                             FRESHNESS="$(( _mins / 1440 )).$(( (_mins % 1440) * 10 / 1440 ))天前"
     fi
   fi
+fi
+
+# --json 模式：人类可读输出全部改走 stderr（fd 3 保留原 stdout），stdout 只留最终 JSON（管道/jq 友好）
+if [ "$GEN_JSON" = "1" ]; then
+  exec 3>&1 1>&2
 fi
 
 print_header "DNS趋势洞察 — ${N_FILES}次采集 | ${rec_total}条可达记录"
@@ -502,11 +583,16 @@ WEEK_ANALYSIS=""   # 周对比文本行（近7天 vs 前7天，两窗都有样�
 MUTATION_ANALYSIS="" # 突变检测文本行（延迟较上轮突增的轮次，有命中才计入）
 HTML_INSIGHTS=""   # HTML 洞察卡内容（时段+日级+周对比+突变，等宽对齐）
 MD_ROWS=""         # --md 总览表行（与 HTML_ROWS 同口径）
-# 周对比窗口：近7天（含今天）= 日期 >= W1；前7天 = W2 <= 日期 <= W2E（字符串字典序比较，零子进程开销）
-# date_days_ago 不可用（极端环境）时跳过该节，不阻断主流程
-W1=$(date_days_ago 6)
-W2=$(date_days_ago 13)
-W2E=$(date_days_ago 7)
+JSON_DNS=()        # --json 逐DNS对象（循环后拼装，下标与 RAW_ADDR 对齐）
+WK_JSON=()         # --json 周对比对象（有 Δ 才有值，否则 null）
+MUT_N=()           # --json 突变计数（按下标）
+# --json 数值字段兜底：空串/"-" 等非数字输出 null（JSON 语法要求）
+_num_or_null() { case "$1" in ''|*[!0-9.]*) echo "null" ;; *) echo "$1" ;; esac; }
+# 周对比窗口（--week N 可配，默认7）：近N天（含今天）= 日期 >= W1；前N天 = W2 <= 日期 <= W2E
+# 字符串字典序比较（零子进程开销）；date_days_ago 不可用（极端环境）时跳过该节，不阻断主流程
+W1=$(date_days_ago $((WEEK_N - 1)))
+W2=$(date_days_ago $((WEEK_N * 2 - 1)))
+W2E=$(date_days_ago "$WEEK_N")
 [ -z "$W1" ] && W2=""   # W1 失败则一并停用（W2 单独存在无意义）
 for k in "${!RAW_ADDR[@]}"; do
   addr="${RAW_ADDR[$k]}"
@@ -609,6 +695,8 @@ for k in "${!RAW_ADDR[@]}"; do
       WEEK_ANALYSIS="${WEEK_ANALYSIS}  ${addr_show}
     评分 ${wk_prev_s}%→${wk_cur_s}%（${wk_ds} ${wk_ds_mark}）｜ 延迟 ${wk_prev_d}ms→${wk_cur_d}ms（${wk_dd}ms ${wk_dd_mark}）｜ 样本 ${wk_prev_n}→${wk_cur_n}
 "
+      # --json 周对比对象（Δ 数值剥掉前导 + 号：JSON 数字不允许 +20.0 写法）
+      WK_JSON[$k]="{\"prev_score\": ${wk_prev_s}, \"cur_score\": ${wk_cur_s}, \"delta_score\": ${wk_ds#+}, \"prev_delay_ms\": ${wk_prev_d}, \"cur_delay_ms\": ${wk_cur_d}, \"delta_delay_ms\": ${wk_dd#+}, \"prev_n\": ${wk_prev_n}, \"cur_n\": ${wk_cur_n}}"
     fi
   fi
 
@@ -621,6 +709,7 @@ for k in "${!RAW_ADDR[@]}"; do
       { prev_d=$4 }')
     if [ -n "$mut_hits" ]; then
       mut_cnt=$(printf '%s\n' "$mut_hits" | grep -c .)
+      MUT_N[$k]=$mut_cnt
       MUTATION_ANALYSIS="${MUTATION_ANALYSIS}  ${addr_show}（${mut_cnt}次突增）
 ${mut_hits}
 "
@@ -672,6 +761,16 @@ ${mut_hits}
 "
     fi
   fi
+
+  # --json 逐DNS对象（与文本表同口径；均值/末值非数字时输出 null，P50/P95 同）
+  if [ "$GEN_JSON" = "1" ]; then
+    sm=$(_num_or_null "$score_mean"); dm=$(_num_or_null "$delay_mean")
+    sl=$(_num_or_null "$score_last"); dl=$(_num_or_null "$delay_last")
+    p5=$(_num_or_null "$p50"); p9=$(_num_or_null "$p95")
+    st=$(json_escape "$score_t"); dt=$(json_escape "$delay_t"); lb=$(json_escape "${plabel:-}")
+    wk_j="${WK_JSON[$k]:-null}"
+    JSON_DNS[${#JSON_DNS[@]}]="    {\"addr\": \"${addr}\", \"label\": \"${lb}\", \"n_ok\": ${n_ok:-0}, \"n_unreach\": ${n_un:-0}, \"score_mean\": ${sm}, \"score_last\": ${sl}, \"score_trend\": \"${st}\", \"delay_mean\": ${dm}, \"delay_last\": ${dl}, \"delay_trend\": \"${dt}\", \"delay_p50_ms\": ${p5}, \"delay_p95_ms\": ${p9}, \"mutation_count\": ${MUT_N[$k]:-0}, \"week\": ${wk_j}}"
+  fi
 done
 
 # ---------- 时段/日级分析小节（文本；有满足条件的DNS才输出） ----------
@@ -687,7 +786,7 @@ if [ -n "$DAILY_ANALYSIS" ]; then
 fi
 if [ -n "$WEEK_ANALYSIS" ]; then
   echo ""
-  echo "  ━━━ 周对比（近7天 vs 前7天，两窗都有样本才显示） ━━━"
+  echo "  ━━━ 周对比（近${WEEK_N}天 vs 前${WEEK_N}天，两窗都有样本才显示） ━━━"
   printf '%s' "$WEEK_ANALYSIS"
 fi
 if [ -n "$MUTATION_ANALYSIS" ]; then
@@ -753,7 +852,7 @@ ${DAILY_ANALYSIS}
 "
   fi
   if [ -n "$WEEK_ANALYSIS" ]; then
-    HTML_INSIGHTS="${HTML_INSIGHTS}📆 周对比（近7天 vs 前7天）
+    HTML_INSIGHTS="${HTML_INSIGHTS}📆 周对比（近${WEEK_N}天 vs 前${WEEK_N}天）
 ${WEEK_ANALYSIS}
 "
   fi
@@ -846,7 +945,7 @@ if [ "$GEN_MD" = "1" ]; then
     printf '%s' "$MD_ROWS"
     echo ""
     if [ -n "$WEEK_ANALYSIS" ]; then
-      echo "## 周对比（近7天 vs 前7天）"
+      echo "## 周对比（近${WEEK_N}天 vs 前${WEEK_N}天）"
       echo ""
       echo '```'
       printf '%s' "$WEEK_ANALYSIS"
@@ -894,22 +993,62 @@ fi
 
 # ---------- --alert 值守告警：评分均值低于阈值 或 全程不可达 → 列出并 exit 3 ----------
 # cron 场景按退出码分发（≠0 即触发通知通道）；文本模式同样输出，人肉跑也能看到
+ALERT_HITS=""
+ALERT_JSON_DNS=""
 if [ -n "$ALERT_N" ]; then
-  ALERT_HITS=""
   while IFS='|' read -r aname amean aok aun; do
     [ -z "$aname" ] && continue
     if [ "$aok" = "0" ]; then
       ALERT_HITS="${ALERT_HITS}  🚨 ${aname}: 全部 ${aun} 次采集均不可达
 "
+      ALERT_JSON_DNS="${ALERT_JSON_DNS}, {\"dns\": \"$(json_escape "$aname")\", \"reason\": \"all_unreachable\"}"
     elif awk "BEGIN{exit !($amean < $ALERT_N)}"; then
       ALERT_HITS="${ALERT_HITS}  🚨 ${aname}: 评分均值 ${amean}% 低于阈值 ${ALERT_N}%
 "
+      ALERT_JSON_DNS="${ALERT_JSON_DNS}, {\"dns\": \"$(json_escape "$aname")\", \"reason\": \"score_below_threshold\", \"score_mean\": ${amean:-null}}"
     fi
   done <<< "$ALERT_CAND"
+fi
+# 告警 JSON 子对象（--alert 未启用 = null；启用 = {threshold, hit, dns[]}）
+ALERT_JSON="null"
+if [ -n "$ALERT_N" ]; then
+  ALERT_JSON="{\"threshold\": ${ALERT_N}, \"hit\": $([ -n "$ALERT_HITS" ] && echo true || echo false), \"dns\": [${ALERT_JSON_DNS#, }]}"
+fi
+
+# ---------- --json 机器可读输出（stdout 独占；人类文本已在 fd 切换时转 stderr） ----------
+# 置于告警判定之后：JSON 内含告警命中结果；exit 3 前也能先吐完 JSON
+if [ "$GEN_JSON" = "1" ]; then
+  _gen_at=$(date '+%Y-%m-%d %H:%M:%S %z')
+  {
+    echo "{"
+    echo "  \"tool\": \"dns-test/trends.sh\","
+    echo "  \"version\": \"${VERSION}\","
+    echo "  \"generated_at\": \"${_gen_at}\","
+    echo "  \"files\": ${N_FILES},"
+    echo "  \"period\": {\"from\": \"${T0_TS}\", \"to\": \"${T1_TS}\"},"
+    echo "  \"freshness\": \"$(json_escape "${FRESHNESS:-}")\","
+    echo "  \"modes\": \"${MODE_SEEN# }\","  # 去前导空格（扫描期拼接产物）
+    echo "  \"week_window_days\": ${WEEK_N},"
+    echo "  \"dns\": ["
+    printf '%s\n' "$(printf '%s,\n' "${JSON_DNS[@]}" | sed '$ s/,$//')"
+    echo "  ],"
+    echo "  \"alert\": ${ALERT_JSON}"
+    echo "}"
+  } >&3
+fi
+
+# 告警文本输出 + webhook 推送（不改变 exit 3 语义；推送失败仅提示）
+if [ -n "$ALERT_N" ]; then
   if [ -n "$ALERT_HITS" ]; then
     echo ""
     echo "  ━━━ 🚨 告警（--alert ${ALERT_N}）━━━"
     printf '%s' "$ALERT_HITS"
+    if [ -n "$WEBHOOK_URL" ]; then
+      webhook_push "$WEBHOOK_URL" \
+        "🚨 dns-test 告警：评分阈值 ${ALERT_N} 命中（${VERSION}）" \
+        "期间: ${T0_TS} ~ ${T1_TS}${FRESHNESS:+（最新采集 ${FRESHNESS}）}
+${ALERT_HITS}处置: 检查网络/换DNS后跑 bash trends.sh 复核"
+    fi
     exit 3
   fi
   echo ""

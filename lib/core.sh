@@ -350,6 +350,74 @@ open_report_file() {
   fi
 }
 
+# URL 百分号编码（纯 awk 按字节处理，LC_ALL=C 保证多字节字符逐字节编码；Bark 路径/查询段用）
+urlencode() {
+  LC_ALL=C awk 'BEGIN{
+    safe="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~"
+    for(i=1;i<256;i++) ord[sprintf("%c",i)]=i
+    n=split(ARGV[1],b,"")
+    out=""
+    for(i=1;i<=n;i++){ c=b[i]; if(c=="")continue
+      if(index(safe,c)) out=out c; else out=out sprintf("%%%02X",ord[c]) }
+    print out
+  }' "$1" 2>/dev/null
+}
+
+# JSON 字符串转义（webhook 文本塞进 JSON payload 用）：反斜杠/引号/制表/回车/换行
+# 多行文本压成单行（\n 转义），输出不含首尾引号（调用方自行包裹）
+# 注意 awk gsub 替换串的转义层数：要输出 \\ 需写 "\\\\\\\\"（8层），要输出 \t 需 "\\\\t"
+json_escape() {
+  awk 'BEGIN{ORS=""} {
+    gsub(/\\/,"\\\\\\\\"); gsub(/"/,"\\\""); gsub(/\t/,"\\\\t"); gsub(/\r/,"\\\\r")
+    if(NR>1) printf "\\n"
+    printf "%s", $0
+  }' <<< "$1"
+}
+
+# webhook 推送（trends --webhook 告警用）：按 URL 自动识别通道，一次性纯 curl 实现
+#   飞书 open.feishu.cn｜钉钉 oapi.dingtalk.com｜企微 qyapi.weixin.qq.com → text 消息体
+#   Telegram api.telegram.org（URL 需自带 chat_id 查询参数）→ -G --data-urlencode
+#   Bark api.day.app/你的key → GET 路径（标题+?body=正文，百分号编码）
+#   其余 → 通用 JSON {"text":..,"content":..}（Slack/Discord/自建均兼容）
+# 推送失败只提示不阻断（本地告警文本已输出，退出码语义不变）；返回 0=发出 1=失败
+webhook_push() {
+  local url="$1" title="$2" body="$3" msg ej resp rc key
+  msg="${title}
+
+${body}"
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "  ⚠️  webhook 未推送: 系统无 curl（告警文本以上方本地输出为准）"
+    return 1
+  fi
+  ej=$(json_escape "$msg")
+  case "$url" in
+    *open.feishu.cn*)
+      # 飞书 text 消息体: {"msg_type":"text","content":{"text":"..."}}
+      resp=$(curl -sS -m 10 -H 'Content-Type: application/json' \
+        -d "{\"msg_type\":\"text\",\"content\":{\"text\":\"${ej}\"}}" "$url" 2>&1); rc=$? ;;
+    *oapi.dingtalk.com*|*qyapi.weixin.qq.com*)
+      # 钉钉/企微 text 消息体: {"msgtype":"text","text":{"content":"..."}}
+      resp=$(curl -sS -m 10 -H 'Content-Type: application/json' \
+        -d "{\"msgtype\":\"text\",\"text\":{\"content\":\"${ej}\"}}" "$url" 2>&1); rc=$? ;;
+    *api.telegram.org*)
+      # Telegram: URL 自带 bot token 与 chat_id（.../sendMessage?chat_id=X），-G 追加 text 参数
+      resp=$(curl -sS -m 10 -G "$url" --data-urlencode "text=$msg" 2>&1); rc=$? ;;
+    *api.day.app*)
+      # Bark: GET https://api.day.app/<key>/<标题>?body=<正文>（百分号编码）
+      resp=$(curl -sS -m 10 "${url%/}/$(urlencode "$title")?body=$(urlencode "$body")" 2>&1); rc=$? ;;
+    *)
+      # 通用 JSON（text 键 Slack 兼容、content 键 Discord 兼容，其余 webhook 至少认其一）
+      resp=$(curl -sS -m 10 -H 'Content-Type: application/json' \
+        -d "{\"text\":\"${ej}\",\"content\":\"${ej}\"}" "$url" 2>&1); rc=$? ;;
+  esac
+  if [ "$rc" = "0" ]; then
+    echo "  📡 webhook 已推送（响应: $(printf '%s' "$resp" | head -c 120)）"
+    return 0
+  fi
+  echo "  ⚠️  webhook 推送失败（curl rc=${rc}: $(printf '%s' "$resp" | head -c 120)）"
+  return 1
+}
+
 # ============================================================================
 # 辅助函数
 # ============================================================================

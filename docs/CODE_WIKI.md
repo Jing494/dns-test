@@ -1,7 +1,7 @@
 # DNS/网络测试工具集 — Code Wiki
 
 > 本文档是项目的结构化代码 Wiki，涵盖整体架构、模块职责、关键类与函数、依赖关系及运行方式。
-> 对应仓库：`dns-test`（MIT，当前版本 `v1.12 / v2026.08.19`）
+> 对应仓库：`dns-test`（MIT，当前版本 `v1.14 / v2026.08.21`）
 > 适用对象：开发者 / 二次维护者 / AI 助手
 
 > 🤖 **给 AI 的指引**：本工具集最重要的使用方是 AI 助手。需要**理解或修改本仓库代码**时，请先读本文档（代码结构与实现），再配合 [docs/AI_GUIDE.md](docs/AI_GUIDE.md)（操作流程）使用——两者分工互补：**AI_GUIDE 教你"怎么操作测试"**（初始化/流程/排障），**本文档教你"代码长什么样、想改哪里看哪里"**（架构/模块/函数/依赖）。修改代码后务必运行 `bash smoke_test.sh` + `bash verify.sh` 做回归验证，并同步更新 [docs/CHANGELOG.md](docs/CHANGELOG.md) 记录变更轮次。
@@ -20,6 +20,7 @@
 - [八、测试与 CI](#八测试与-ci)
 - [九、项目运行方式](#九项目运行方式)
 - [十、已知限制与设计取舍](#十已知限制与设计取舍)
+- [十一、数据产物 Schema](#十一数据产物-schema)
 
 ---
 
@@ -43,7 +44,7 @@
 
 - `vYYYY.MM.N`：日期式，N=当月发布序号（补丁级修复仅递增 N）
 - `vX.Y`：语义版本（X=主版本，重大重构才升；Y=次版本，功能更新）
-- 当前：`v1.12 = v2026.08.19`
+- 当前：`v1.13 = v2026.08.20`
 
 ---
 
@@ -104,13 +105,15 @@ dns-test/
 ├── full.sh / lite.sh             # 基础测试入口（完整版 16 项 / 精简版 10 项）
 ├── compare.sh                    # 多 DNS 对比（并行+延迟中位数+JSON/HTML/MD+预设组+定时采集）
 ├── trends.sh                     # DNS 趋势洞察（聚合 compare 历史）
+├── doctor.sh                     # 环境自检（依赖/平台兼容/目录可写/数据健康；--cron 打印值守 crontab 模板；刻意不 source core.sh）
 ├── verify.sh                     # 一键全面验证（语法+单测+冒烟+对比+趋势）
 ├── smoke_test.sh                 # 自动化冒烟测试（24 项）
 ├── install.sh                    # 依赖自动安装
 ├── release.sh                    # 打包发布
+├── completions/                  # shell 补全（bash/zsh，注册 6 个入口脚本）
 ├── lib/                          # 公共库
-│   ├── core.sh                   # 核心库（变量/函数/测试逻辑/评分）
-│   ├── compat.sh                 # 平台兼容层（timeout 兼容）
+│   ├── core.sh                   # 核心库（变量/函数/测试逻辑/评分/webhook推送）
+│   ├── compat.sh                 # 平台兼容层（timeout/时间运算）
 │   ├── plugins.sh                # 插件加载器
 │   └── DNSUtil.pm                # DNS 纯函数模块（可单测）
 ├── tests/                        # 单元测试
@@ -119,7 +122,8 @@ dns-test/
 │   ├── 03_dig_target.sh          # dig_target 4 用例（IPv6加方括号）
 │   ├── 04_core_functions.sh      # core 纯函数 18 用例（地址校验/响应判断/CDN/入口参数解析）
 │   ├── 05_run_common_tests.sh    # lite 计分口径/full 回归 12 用例（稳定性降轮/CONFIG_DOMAINS安全解析/dig @server回归/for t遮蔽回归/ECS_SUBNET注入拦截/par_run元字符禁令，mock dig/ping 离线）
-│   └── 06_compare_e2e.sh         # compare 端到端 88 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune/--until/--alert/周对比/突变检测/--vs头对头/--md，mock dig/ping 离线 + 用户 results 备份恢复）
+│   ├── 06_compare_e2e.sh         # compare 端到端 112 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune/--until/--alert/--vs/周对比/突变检测/--md/--json/--week/--webhook/--archive 归档，mock dig/ping 离线 + 用户 results 备份恢复）
+│   └── 07_doctor.sh              # doctor 自检+补全+新参数校验 35 用例（doctor正常/参数/--cron模板/PATH剥离FAIL路径 + bash补全语法/注册/模拟TAB + zsh头与内容）
 ├── tools/                        # 专项测试工具
 │   ├── manifest.sh               # 插件注册表
 │   ├── vowifi/                   # VoWiFi 专项（ePDG/路由器）
@@ -148,7 +152,7 @@ dns-test/
 | [full.sh](file:///workspace/full.sh) | 完整版基础测试（16 项，77~78 评分点） | `SAVE_LOG=1` 存日志；`trap` 清理临时目录 |
 | [lite.sh](file:///workspace/lite.sh) | 精简版基础测试（10 项，53~54 评分点） | 同上，输出更短 |
 | [compare.sh](file:///workspace/compare.sh) | 多 DNS 横向对比 | 延迟中位数 + 批量并发 + JSON/HTML/MD 报告 + 预设组展开 + 环比Δ + 切换命令 + 当前DNS标记 + `--watch` 定时采集 |
-| [trends.sh](file:///workspace/trends.sh) | 聚合 compare 历史 JSON 出趋势 | 线性回归 + SVG 折线图 + CSV/MD + `--vs A,B` 头对头 + 周对比/突变检测 + `--cron` 定时采集 + `--prune N` 留存清理 + `--alert N` 值守 |
+| [trends.sh](file:///workspace/trends.sh) | 聚合 compare 历史 JSON 出趋势 | 线性回归 + SVG 折线图 + CSV/MD/JSON + `--vs A,B` 头对头 + 周对比(`--week N` 可配)/突变检测 + `--cron` 定时采集 + `--prune N` 留存清理(`--archive` 删前归档/全量备份) + `--alert N` 值守 + `--webhook` IM 推送 |
 | [verify.sh](file:///workspace/verify.sh) | 一键全面自检 | 7 步：语法/shellcheck/单测/冒烟/compare/trends/专项 |
 | [smoke_test.sh](file:///workspace/smoke_test.sh) | 自动化冒烟（24 项） | CI 与改动后回归必跑 |
 | [install.sh](file:///workspace/install.sh) | 依赖检测与安装 | 自动识别 apt/yum/dnf/brew/apk/pacman/zypper |
@@ -380,7 +384,8 @@ dns-test.sh 选"专项测试"
 | [tests/03_dig_target.sh](file:///workspace/tests/03_dig_target.sh) | dig_target 4 用例（IPv4 原样/IPv6 加方括号/特殊 IPv6/空输入） | `bash tests/03_dig_target.sh` |
 | [tests/04_core_functions.sh](file:///workspace/tests/04_core_functions.sh) | core 纯函数 18 用例（valid_dns_addr 合法/非法+超范围/IPv6 畸形结构、is_valid_response 错误/纯 OPT、is_cdn_domain、parse_dns_args 入口参数） | `bash tests/04_core_functions.sh` |
 | [tests/05_run_common_tests.sh](file:///workspace/tests/05_run_common_tests.sh) | lite 计分口径/full 回归 12 用例（稳定性降轮 20→10、AAAA 空响应计分、综合评分 45/53、CONFIG_DOMAINS 注入不执行/非法 token 忽略、dig @server 前缀回归、full 模式 @server 遮蔽回归、ECS_SUBNET 注入拦截、par_run 元字符禁令；mock dig/ping 离线） | `bash tests/05_run_common_tests.sh` |
-| [tests/06_compare_e2e.sh](file:///workspace/tests/06_compare_e2e.sh) | compare 端到端 88 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、提供商标签+抖动三出口+JSON jitter_ms、预设组名展开含 IPv6、未知词报错、trends --prune/--until/--alert/--vs/周对比/突变检测/--md 报告；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
+| [tests/06_compare_e2e.sh](file:///workspace/tests/06_compare_e2e.sh) | compare 端到端 112 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、提供商标签+抖动三出口+JSON jitter_ms、预设组名展开含 IPv6、未知词报错、trends --prune/--until/--alert/--vs/周对比/突变检测/--md/--json/--week/--webhook（mock curl 抓 payload）/--archive 归档（全量/删前打包/空数据）；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
+| [tests/07_doctor.sh](file:///workspace/tests/07_doctor.sh) | doctor 自检 + 补全 + 新参数校验 35 用例（doctor 正常路径/参数/--cron 模板/PATH 剥离 FAIL 路径、bash 补全语法/注册/模拟 TAB 三场景、zsh compdef 头与内容、trends --json/--week/--webhook/--archive 参数校验） | `bash tests/07_doctor.sh` |
 
 `02/03/04/05/06_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
 
@@ -502,6 +507,60 @@ perl examples/04_reverse_dns.pl 222.172.200.68             # 反向解析
 - ✅ `par_run` 通用化（PARR_MAX 环境变量可调并发数 + 临时目录统一 TMPDIR_LIST 清理）
 - 🔜 `trends svg_chart` 模板化（HTML/SVG 内联字符串改 heredoc/独立模板）
 - 🔜 JSON 序列化增强（结构复杂化时引入 jq）
+
+---
+
+## 十一、数据产物 Schema
+
+> 供看板 / jq 管道 / AI 助手对接消费。三种产物：**compare 采集 JSON**（`results/compare-*.json`，原始数据）、**trends --json**（聚合汇总，stdout）、**trends.csv**（长表）。字段以实际输出为准，下列为 v1.14 口径。
+
+### 11.1 compare 采集 JSON（`results/compare-<YYYYmmdd-HHMMSS>.json`）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `tool` | string | 固定 `dns-test/compare.sh` |
+| `version` | string | 产生时的项目版本（如 `v2026.08.21`） |
+| `timestamp` | string | 采集时间 `%Y-%m-%d %H:%M:%S %z`（trends 以此排序/算新鲜度） |
+| `mode` | string | `lite` / `full`（评分口径不同，混采时 trends 会提示） |
+| `cost_s` | number | 本轮采集耗时（秒） |
+| `dns[]` | array | 逐 DNS 一条，顺序=命令行顺序 |
+| `dns[].addr` | string | DNS 地址（IPv4/IPv6 原样） |
+| `dns[].score` | string | 评分（百分制字符串；`"不可达"` 表示本轮全挂） |
+| `dns[].stab` | string | 稳定性（百分制字符串） |
+| `dns[].delay_ms` | number | 延迟中位数（ms，不可达为 0） |
+| `dns[].jitter_ms` | number | 延迟抖动 ±（ms） |
+| `dns[].reachable` | bool | 本轮是否可达 |
+
+### 11.2 trends --json（`bash trends.sh --json`，stdout 独占、人类文本转 stderr）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `tool` / `version` / `generated_at` | string | 工具标识 / 版本 / 生成时间 |
+| `files` | number | 聚合的 compare JSON 份数 |
+| `period` | object | `{from, to}` 数据时间范围（`YYYY-MM-DD HH:MM`） |
+| `freshness` | string | 最新采集距今（如 `22.5小时前`） |
+| `modes` | string | 出现过的采集模式（空格分隔，如 `lite full`） |
+| `week_window_days` | number | 周对比窗口天数（`--week N`，默认 7） |
+| `dns[]` | array | 逐 DNS 聚合 |
+| `dns[].addr` / `label` | string | 地址 / 提供商标签（预设内 DNS 才有名称） |
+| `dns[].n_ok` / `n_unreach` | number | 可达 / 不可达轮数 |
+| `dns[].score_mean` / `score_last` | number/null | 评分均值 / 末值（全不可达为 null） |
+| `dns[].score_trend` / `delay_trend` | string | 趋势判定（`↑ 变好` `↓ 变差` `→ 平稳` `↗ 微升` `↘ 微降`） |
+| `dns[].delay_mean` / `delay_last` | number/null | 延迟均值 / 末值（ms） |
+| `dns[].delay_p50_ms` / `delay_p95_ms` | number/null | 延迟 P50/P95（样本 ≥2 才有，否则 null） |
+| `dns[].mutation_count` | number | 突变轮数（Δ>+100ms 且 >2×前值） |
+| `dns[].week` | object/null | 周对比 `{score:{cur,prev,delta}, delay:{...}}`，两窗都有样本才有 |
+| `alert` | object | `{threshold, hit, dns[]}`：阈值 / 是否命中 / 命中明细（`reason` ∈ `score_below_threshold` `all_unreachable`） |
+
+注意：告警命中时 JSON 完整输出后才 `exit 3`（消费方按退出码判断告警，stdout 仍是合法 JSON）。
+
+### 11.3 trends.csv（`bash trends.sh --csv` → `trends/trends.csv`）
+
+长表：`timestamp,addr,score,stab,delay_ms`，每行=一轮×一个 DNS；`score`/`stab` 为数值或空（不可达），可直接喂给 pandas/Excel 透视。
+
+### 11.4 归档包（`trends/archive/*.tar.gz`）
+
+`--archive` 产物：`full-<时间>.tar.gz`（全量备份，不删源）/ `prune-<时间>.tar.gz`（`--prune` 删前打包的被清理文件）。包内为相对路径的 `compare-*.json`，解包回 `results/` 即可恢复历史：`tar -xzf full-*.tar.gz -C results/`。
 
 ---
 

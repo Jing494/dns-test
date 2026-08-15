@@ -129,8 +129,8 @@ bash dns-test.sh
 | DNS64 检测 | `perl examples/03_dns64_check.pl` |
 | 反向解析（v4/v6） | `perl examples/04_reverse_dns.pl 222.172.200.68` |
 | 多DNS横向对比 | `bash compare.sh 223.5.5.5 119.29.29.29`（`--html` 响应式报告 / `--md` Markdown 报告；预设组名可直接对比 `bash compare.sh ali tencent`；`--watch N` 每 N 分钟采集一轮；输出含切换命令建议/环比上次/当前DNS👤标记；`COMPARE_MAX_CONCURRENCY=1` 串行最稳） |
-| DNS历史趋势洞察 | `bash trends.sh --html --csv`（需先积累 compare 数据；`--cron DNS列表` 配 crontab 定时采集；`--prune N` 只保留最近 N 份 JSON 控磁盘） |
-| 单元测试 | `perl -Ilib tests/01_dnsutil.t`（DNSUtil 18 用例）+ `bash tests/02_plugins.sh`（插件系统 9 用例）+ `bash tests/03_dig_target.sh`（4 用例）+ `bash tests/04_core_functions.sh`（core 纯函数 18 用例）+ `bash tests/05_run_common_tests.sh`（lite 计分口径/full 回归 12 用例）+ `bash tests/06_compare_e2e.sh`（compare 端到端 59 用例，mock 离线），CI 已接入 |
+| DNS历史趋势洞察 | `bash trends.sh --html --csv`（需先积累 compare 数据；`--cron DNS列表` 配 crontab 定时采集；`--prune N` 只保留最近 N 份 JSON 控磁盘，配 `--archive` 删前先打包防误删；值守模板 `bash doctor.sh --cron` 一键打印） |
+| 单元测试 | `perl -Ilib tests/01_dnsutil.t`（DNSUtil 18 用例）+ `bash tests/02_plugins.sh`（插件系统 9 用例）+ `bash tests/03_dig_target.sh`（4 用例）+ `bash tests/04_core_functions.sh`（core 纯函数 18 用例）+ `bash tests/05_run_common_tests.sh`（lite 计分口径/full 回归 12 用例）+ `bash tests/06_compare_e2e.sh`（compare 端到端 112 用例，mock 离线）+ `bash tests/07_doctor.sh`（doctor/补全/新参数 35 用例），CI 已接入 |
 | 依赖安装/校验 | `bash install.sh`（缺失才装 dig/perl/curl + DoT 能力检测；`--all` 连可选依赖 shellcheck 一起装；`--smoke` 装完直接冒烟；`--help` 看用法） |
 | 专项插件 | `dns-test.sh` 专项菜单由 `tools/manifest.sh` 注册表驱动（`lib/plugins.sh` 加载）；新增专项=manifest 加一行+目录映射，菜单自动出现 |
 | 一键全面自检 | `bash verify.sh`（语法+shellcheck+单测+冒烟+compare+trends+专项，约5分钟，真机推荐；shellcheck 可选依赖未装则跳过，`--strict` 可强制要求，`--help` 看用法） |
@@ -342,13 +342,20 @@ bash lite.sh 192.0.2.1 0; echo $? # 2=全部不可达（192.0.2.1为TEST-NET保�
 bash trends.sh                    # 全部DNS趋势总览（文本，含均值/趋势箭头/时段/日级/周对比/突变检测）
 bash trends.sh --html --csv       # 生成 trends/report.html（SVG折线图）+ trends.csv
 bash trends.sh --md               # 生成 trends/report.md（GitHub/PR友好，含周对比/突变/头对头小节）
+bash trends.sh --json             # 趋势汇总JSON到stdout（文本转stderr，jq/Grafana友好）
 bash trends.sh 223.5.5.5          # 只看指定DNS
 bash trends.sh --detail --limit 5 # 每个DNS列最近5条明细
 bash trends.sh --vs 223.5.5.5,119.29.29.29  # 两DNS头对头：同轮对决胜负计数
 bash trends.sh --since 2026-08-01 --until 2026-08-07  # 时间窗口（含两端日期）
+bash trends.sh --week 14          # 周对比窗口改14天（默认7：近N天 vs 前N天）
 bash trends.sh --alert 70         # 值守告警：评分均值<70或全不可达 → exit 3（cron用）
+bash trends.sh --alert 70 --webhook https://open.feishu.cn/open-apis/bot/v2/hook/xxx  # 告警命中推送IM（飞书/钉钉/企微/TG/Bark/通用）
 bash trends.sh --prune 200        # 只保留最近200份JSON再聚合（长期采集控磁盘）
+bash trends.sh --prune 200 --archive  # 清理前先打包被删JSON到trends/archive/（防误删）
+bash trends.sh --archive           # 全量打包当前JSON（备份/迁移/报障分享，不删文件）
 bash trends.sh --cron 223.5.5.5 119.29.29.29  # 先采集(跑compare)再聚合，配crontab自动积累
+bash doctor.sh                    # 环境自检：依赖/平台兼容/目录可写/数据健康（--net 加真实连通）
+bash doctor.sh --cron             # 打印值守crontab模板（采集+prune归档/告警webhook/每周归档三件套）
 ```
 - 想前台定时采集（非 crontab）：`bash compare.sh 223.5.5.5 119.29.29.29 --watch 30`（每 30 分钟一轮，Ctrl-C 停止）
 - 环境变量：`TRENDS_DIR`（产物目录，默认 trends/）、`COMPARE_RESULTS_DIR`（数据源，默认 results/）
