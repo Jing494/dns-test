@@ -37,6 +37,7 @@
   - **verify.sh**：单测链补挂 tests/08，用例数标签同步 119→121（06 互链 +2）/+23（08）
   - **文档**：README.md 补 `--archive-keep`/`doctor --fix`/`--export --since`/互链说明与版本徽章 v1.16；README.en.md 同步 doctor/completions 条目与 trends 新参数全量示例（此前停在 v1.12 时代）；CODE_WIKI 目录树/测试清单/CI 描述同步 trends_lib 与 08
   - **回归**：全量单测 8 套（18+9+4+18+12+121+45+23 = 250 断言）通过；注入拦截/不可达预检/参数校验路径未动，兼容性与传参逻辑零破坏
+  - **修复（首上 CI 发现）**：tests/06 的"当前系统DNS"断言从本机 resolv.conf 自推期望值，而 compare.sh 检测优先级为 scutil(macOS) > resolvectl(systemd) > resolv.conf——ubuntu runner 的 resolv.conf 是 127.0.0.53 stub（真实 DNS 在 resolvectl）、macOS runner 走 scutil，两边来源漂移导致断言红。修法：tests/06 mock scutil/resolvectl 统一注入 10.99.99.99（PATH 前置遮蔽真货，双平台恒定），CUR 改用该 mock 值；任何 systemd-resolved 的 Linux 本机跑 tests/06 同样受益
 - 2026-08-22（第九十五轮）：**trends --export 一键报障包 + HTML 归档小节 + install --completions 幂等装补全（trends.sh / install.sh / completions/ / verify.sh / tests/06 / tests/07 / docs，发布 v1.15 = v2026.08.22）**
   - **`trends --export` 报障/迁移包**：`bash trends.sh --export --html --md --csv` 产出 `trends/export/dns-test-export-<时间>.tar.gz`——**数据 JSON + 本次报告 + doctor 自检输出**三合一（报障时整包附 issue，维护者拿到环境+数据+报告一次看全；迁移时解包到新机仓库根即续用历史 `tar -xzf 包名 -C /path/to/dns-test`）。置于告警判定**之前**：`--alert` 命中 exit 3 前包也已产出（报障场景往往正是告警时）。与 `--archive` 分工：archive 只包数据 JSON（留存治理），export 是三合一对外包
   - **HTML 报告新增"归档包"小节**：`trends/archive/` 下有 `prune-*/full-*.tar.gz` 时自动列出（包名/类型/大小，附 `tar -xzf` 恢复提示）；大小用 `wc -c` 计（不解析 `ls`，shellcheck 零告警），时间即文件名内嵌时间戳，无跨平台 stat 差异

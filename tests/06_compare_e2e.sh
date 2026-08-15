@@ -58,6 +58,16 @@ chmod +x "$STUB/dig"
 printf '#!/bin/bash\necho "rtt min/avg/max/mdev = 1.1/2.2/3.3/0.1 ms"\n' > "$STUB/ping"
 chmod +x "$STUB/ping"
 
+# --- mock 系统DNS检测源（scutil/resolvectl）：双平台统一到 10.99.99.99 ---
+# compare.sh 检测优先级 scutil(macOS) > resolvectl(systemd) > resolv.conf；
+# CI 的 ubuntu runner 有 resolvectl（resolv.conf=127.0.0.53 stub）、macOS 有 scutil，
+# 不 mock 时"当前系统DNS"随 runner 环境漂移，与断言期望地址对不上。mock 后全平台恒定。
+printf '#!/bin/bash\necho "  nameserver[0] : 10.99.99.99"\n' > "$STUB/scutil"
+chmod +x "$STUB/scutil"
+printf '#!/bin/bash\necho "Global: 10.99.99.99"\n' > "$STUB/resolvectl"
+chmod +x "$STUB/resolvectl"
+MOCK_CUR_DNS="10.99.99.99"
+
 # --- 用户 results/ 备份（compare.sh 硬编码 results/ 落盘，测完原样恢复） ---
 RESULTS_BAKED=0
 if [ -d results ]; then
@@ -97,12 +107,9 @@ cat > "results/compare-20260814-000000.json" <<'EOF'
   ]
 }
 EOF
-# 当前系统DNS取自本机 resolv.conf（mock dig 对任意 @server 均可达 → 必入推荐对比）
-CUR=$(sed -n 's/^nameserver \([0-9.]*\).*/\1/p' /etc/resolv.conf | head -1)
-if [ -z "$CUR" ]; then
-  CUR="10.96.138.37"
-  echo "  ⚠️  本机 resolv.conf 无 nameserver，用固定地址替代"
-fi
+# 当前系统DNS来自上方 mock 的 scutil/resolvectl（恒定 10.99.99.99，不随 runner 环境漂移；
+# mock dig 对任意 @server 均可达 → 必入推荐对比）
+CUR="$MOCK_CUR_DNS"
 OUT=$(bash compare.sh "$CUR" 119.29.29.29 --md --html 2>&1)
 echo "$OUT" | grep -q "👤 当前系统DNS:.*$CUR" && ok "头部列出当前系统DNS($CUR)" || notok "头部未列出当前DNS"
 echo "$OUT" | grep -q "当前正在使用，无需切换" && ok "推荐=当前DNS时提示无需切换" || notok "推荐行未提示"
