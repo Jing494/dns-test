@@ -6,7 +6,8 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
-| v2026.08.21 | v1.14（当前） |
+| v2026.08.22 | v1.15（当前） |
+| v2026.08.21 | v1.14 |
 | v2026.08.20 | v1.13 |
 | v2026.08.19 | v1.12 |
 | v2026.08.18 | v1.11 |
@@ -25,6 +26,12 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-22（第九十五轮）：**trends --export 一键报障包 + HTML 归档小节 + install --completions 幂等装补全（trends.sh / install.sh / completions/ / verify.sh / tests/06 / tests/07 / docs，发布 v1.15 = v2026.08.22）**
+  - **`trends --export` 报障/迁移包**：`bash trends.sh --export --html --md --csv` 产出 `trends/export/dns-test-export-<时间>.tar.gz`——**数据 JSON + 本次报告 + doctor 自检输出**三合一（报障时整包附 issue，维护者拿到环境+数据+报告一次看全；迁移时解包到新机仓库根即续用历史 `tar -xzf 包名 -C /path/to/dns-test`）。置于告警判定**之前**：`--alert` 命中 exit 3 前包也已产出（报障场景往往正是告警时）。与 `--archive` 分工：archive 只包数据 JSON（留存治理），export 是三合一对外包
+  - **HTML 报告新增"归档包"小节**：`trends/archive/` 下有 `prune-*/full-*.tar.gz` 时自动列出（包名/类型/大小，附 `tar -xzf` 恢复提示）；大小用 `wc -c` 计（不解析 `ls`，shellcheck 零告警），时间即文件名内嵌时间戳，无跨平台 stat 差异
+  - **`install.sh --completions` 幂等装补全**：bash 写 `~/.bashrc`（无则 `~/.bash_profile`，macOS bash 兼容）source 行；zsh 装到 `~/.zfunc/_dns-test` 并在 zshrc 追加 fpath+compinit（oh-my-zsh 共存不冲突）。统一标记行 `# dns-test completions (added by install.sh)` 防重复写入，重复运行只提示"已配置过"；无任何 rc 文件则提示手动方式。装完依赖的正常流程末尾也**顺手执行**（不想装可忽略/删标记段）
+  - **completions/**：bash/zsh 同步补 `--export`（trends）
+  - **测试**：tests/06 扩至 119 用例（+7：--export 生成提示/tar 生成/含数据JSON/含HTML报告/含doctor自检 + HTML 归档小节/列出归档文件）；tests/07 扩至 45 用例（+10：--export TAB 补全 + zsh --export + install 语法/写入提示/标记段/source行/.zfunc 安装/compinit/幂等唯一/无rc 提示）
 - 2026-08-21（第九十四轮）：**trends --archive 数据归档 + doctor --cron 值守模板 + 数据产物 Schema 文档（trends.sh / doctor.sh / completions/ / verify.sh / tests/06 / tests/07 / docs，发布 v1.14 = v2026.08.21）**
   - **`trends --archive`（与 `--prune` 配套 / 单独用，两种语义）**：① `--prune N --archive`：被清理的旧 JSON 先打包到 `trends/archive/prune-<时间>.tar.gz` 再删——长期值守 `--prune` 终于有了"防误删"安全网；tar 打包失败则**放弃本次清理**（数据安全优先，聚合照常），不会出现"包没打成、文件先没了"；② `--archive` 单独用：全量打包当前 `compare-*.json` 到 `trends/archive/full-<时间>.tar.gz`（备份/迁移/报障分享，不删任何文件）；tar 用 `-C` 相对路径（BSD/GNU 双兼容），空数据静默跳过；归档包不自动清理（积多自删）
   - **`doctor --cron`**：一键打印值守 crontab 模板（不跑体检、exit 0）——采集行（`trends --cron ... --prune 200 --archive`）+ 告警行（`--alert 70 --webhook 飞书示例`）+ 每周全量归档行，带 `PATH=` 首行避坑（cron 精简 PATH 是头号翻车点）与 crontab 存在性提示；路径自动取当前仓库绝对路径，改 DNS/阈值/webhook 即可粘贴

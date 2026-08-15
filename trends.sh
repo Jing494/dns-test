@@ -2,7 +2,7 @@
 # ============================================================================
 # DNS 趋势洞察：聚合 compare.sh 的历史 JSON 结果，输出趋势总览/CSV/HTML报告
 # 兼容性: bash 3.2+（无关联数组依赖，macOS 默认 bash 可直接运行）
-# 用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--json] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--prune N] [--archive] [--alert N] [--webhook URL] [--week N]
+# 用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--json] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--prune N] [--archive] [--export] [--alert N] [--webhook URL] [--week N]
 #   例: bash trends.sh                              # 全部DNS趋势总览（文本，含P95/时段/日级/周对比/突变检测）
 #       bash trends.sh 223.5.5.5                    # 只看223.5.5.5
 #       bash trends.sh --html --csv                 # 生成 trends/report.html + trends.csv
@@ -19,6 +19,7 @@
 #                                                  # 告警命中时推送（飞书/钉钉/企微/Telegram/Bark/通用JSON）
 #       bash trends.sh --prune 200 --archive        # 清理前先把被删JSON打包到 trends/archive/（防误删）
 #       bash trends.sh --archive                    # 全量打包当前JSON到 trends/archive/（备份/迁移/报障分享）
+#       bash trends.sh --export --html --md --csv   # 一键报障包：数据JSON+本次报告+doctor自检 → trends/export/
 # 环境变量:
 #   TRENDS_DIR              趋势产物目录（默认 trends/）
 #   COMPARE_RESULTS_DIR     compare JSON 数据源目录（默认 results/）
@@ -48,6 +49,7 @@ UNTIL=""
 ALERT_N=""
 PRUNE_N=""
 ARCHIVE=0
+EXPORT=0
 VS_ARG=""
 WEBHOOK_URL=""
 WEEK_N=7
@@ -75,11 +77,12 @@ while [ $i -lt ${#ARGS[@]} ]; do
     --alert)  i=$((i+1)); ALERT_N="${ARGS[$i]:-}"; [ -z "$ALERT_N" ] && { echo "❌ --alert 缺少阈值（1-100，例: --alert 70）"; exit 1; } ;;
     --prune)  i=$((i+1)); PRUNE_N="${ARGS[$i]:-}"; [ -z "$PRUNE_N" ] && { echo "❌ --prune 缺少值"; exit 1; } ;;
     --archive) ARCHIVE=1 ;;
+    --export)  EXPORT=1 ;;
     --version)
       echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
       exit 0 ;;
     --help|-h)
-      echo "用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--json] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since Y-M-D] [--until Y-M-D] [--prune N] [--archive] [--alert N] [--webhook URL] [--week N]"
+      echo "用法: bash trends.sh [DNS地址...] [--html] [--open] [--md] [--json] [--csv] [--vs A,B] [--cron] [--detail] [--limit N] [--since Y-M-D] [--until Y-M-D] [--prune N] [--archive] [--export] [--alert N] [--webhook URL] [--week N]"
       echo "  例: bash trends.sh --html --csv"
       echo "      bash trends.sh --html --open                    # 生成HTML并自动打开(隐含--html)"
       echo "      bash trends.sh --md                             # 生成 trends/report.md（GitHub/PR友好）"
@@ -93,6 +96,7 @@ while [ $i -lt ${#ARGS[@]} ]; do
       echo "      bash trends.sh --prune 200 --html              # 只保留最近200份JSON再聚合(--watch配套)"
       echo "      bash trends.sh --prune 200 --archive           # 被清理的JSON先打包trends/archive/再删(防误删)"
       echo "      bash trends.sh --archive                       # 全量打包当前JSON(备份/迁移/报障分享,不删文件)"
+      echo "      bash trends.sh --export --html --md --csv      # 一键报障包:数据+报告+doctor自检→trends/export/"
       echo "环境变量: TRENDS_DIR(默认trends/)  COMPARE_RESULTS_DIR(默认results/)"
       echo "退出码: 0=完成 1=参数错 2=无数据 3=--alert告警命中"
       exit 0 ;;
@@ -922,6 +926,24 @@ if [ "$GEN_HTML" = "1" ]; then
     echo "$(svg_multi_chart score)"
     echo "$(svg_multi_chart delay)"
     echo "$HTML_CHARTS"
+    # 归档包清单（--archive/--prune 产物；有才显示；时间取文件名内嵌时间戳，大小 wc -c 免解析 ls）
+    if ls "$OUT_DIR"/archive/*.tar.gz >/dev/null 2>&1; then
+      echo "<div class='card'><h2>🗄️ 归档包（${OUT_DIR}/archive/）</h2>"
+      echo "<div class='tbl-wrap'><table><thead><tr><th>包名</th><th>类型</th><th>大小</th></tr></thead><tbody>"
+      for _a in "$OUT_DIR"/archive/*.tar.gz; do
+        [ -e "$_a" ] || continue
+        case "$(basename "$_a")" in
+          prune-*) _at="清理前备份" ;;
+          full-*)  _at="全量快照" ;;
+          *)       _at="-" ;;
+        esac
+        _b=$(wc -c < "$_a" | tr -d ' ')
+        _sz=$(awk -v b="$_b" 'BEGIN{printf (b>=1048576)?"%.1f MB":((b>=1024)?"%.0f KB":"%d B"), (b>=1048576)?b/1048576:((b>=1024)?b/1024:b)}')
+        echo "<tr><td class='addr'>$(basename "$_a")</td><td>${_at}</td><td>${_sz}</td></tr>"
+      done
+      echo "</tbody></table></div>"
+      echo "<div class='meta'>恢复历史: tar -xzf 包名 -C ${SRC_DIR}/（prune-*=清理前备份，full-*=全量快照；积多可定期清理）</div></div>"
+    fi
     echo "</div></body></html>"
   } > "$HF"
   echo ""
@@ -1035,6 +1057,42 @@ if [ "$GEN_JSON" = "1" ]; then
     echo "  \"alert\": ${ALERT_JSON}"
     echo "}"
   } >&3
+fi
+
+# ---------- --export：一键报障/迁移包（数据JSON + 本次报告 + doctor 自检输出 → trends/export/） ----------
+# 与 --archive 的区别：archive 只包数据 JSON；export 是"数据+报告+环境自检"三合一报障包
+# 置于告警判定之前：--alert 命中 exit 3 前报障包也已产出（报障场景往往正是告警时）
+if [ "$EXPORT" = "1" ]; then
+  EXP_STAGE=$(mktemp -d 2>/dev/null)
+  if [ -z "$EXP_STAGE" ]; then
+    echo "  ⚠️  --export: mktemp 失败（临时目录不可写？），跳过打包"
+  else
+    mkdir -p "$EXP_STAGE/results" "$EXP_STAGE/trends"
+    EXP_N=0
+    for _f in "$SRC_DIR"/compare-*.json; do
+      [ -e "$_f" ] && { cp "$_f" "$EXP_STAGE/results/" 2>/dev/null; EXP_N=$((EXP_N+1)); }
+    done
+    EXP_R=0
+    for _r in report.html report.md trends.csv; do
+      [ -f "$OUT_DIR/$_r" ] && { cp "$OUT_DIR/$_r" "$EXP_STAGE/trends/" 2>/dev/null; EXP_R=$((EXP_R+1)); }
+    done
+    EXP_D=0
+    if [ -f "$SCRIPT_DIR/doctor.sh" ]; then
+      ( cd "$SCRIPT_DIR" && bash doctor.sh ) > "$EXP_STAGE/doctor.txt" 2>&1
+      EXP_D=1
+    fi
+    mkdir -p "$OUT_DIR/export"
+    EXP_TAR="$OUT_DIR/export/dns-test-export-$(date '+%Y%m%d-%H%M%S').tar.gz"
+    if tar -czf "$EXP_TAR" -C "$EXP_STAGE" . 2>/dev/null; then
+      echo "  📦 --export: 报障包已生成 → $EXP_TAR"
+      echo "     内含: results/ ${EXP_N}份JSON + trends/ ${EXP_R}份报告${EXP_D:+ + doctor.txt（环境自检）}"
+      echo "     报障: 整包附到 issue（含 doctor.txt 环境信息，维护者可快速定位）"
+      echo '     迁移: 解包到新机仓库根即可续用历史（tar -xzf <上面这个包> -C /path/to/dns-test）'
+    else
+      echo "  ⚠️  --export: tar 打包失败（磁盘满？），已跳过"
+    fi
+    rm -rf "$EXP_STAGE"
+  fi
 fi
 
 # 告警文本输出 + webhook 推送（不改变 exit 3 语义；推送失败仅提示）

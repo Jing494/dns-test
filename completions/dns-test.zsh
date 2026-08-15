@@ -22,7 +22,7 @@ _dns-test() {
         default ali tencent all "${dns_words[@]}" ;;
     trends.sh)
       _values 'option/DNS' \
-        --html --open --md --json --csv --vs --cron --detail --limit --since --until --prune --archive --alert --webhook --week --version --help \
+        --html --open --md --json --csv --vs --cron --detail --limit --since --until --prune --archive --export --alert --webhook --week --version --help \
         "${dns_words[@]}" ;;
     doctor.sh)
       _values 'option' --net --cron --help ;;

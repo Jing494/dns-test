@@ -397,6 +397,24 @@ AR2=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-arch-out bash trends.sh --a
 [ "$AR2" = "1" ] && ok "空数据归档跳过提示" || notok "空数据归档异常"
 rm -rf "$TRD" /tmp/t06-arch-out
 
+echo "═══ trends.sh: --export 报障包（数据+报告+doctor）与 HTML 归档小节 ═══"
+TRD=/tmp/t06-exp; rm -rf "$TRD" /tmp/t06-exp-out; mkdir -p "$TRD"
+printf '{"tool":"x","timestamp":"2026-08-14 08:00:00 +0800","mode":"lite","dns":[{"addr":"223.5.5.5","score":"90","stab":"100","delay_ms":20,"reachable":true}]}' > "$TRD/compare-20260814-080000.json"
+EX=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-exp-out bash trends.sh --export --html --csv 2>&1)
+echo "$EX" | grep -q "报障包已生成" && ok "--export 生成提示" || notok "--export 提示缺失"
+ls /tmp/t06-exp-out/export/dns-test-export-*.tar.gz >/dev/null 2>&1 && ok "export tar 生成" || notok "export tar 未生成"
+EXTAR=$(ls /tmp/t06-exp-out/export/dns-test-export-*.tar.gz 2>/dev/null | head -1)
+tar -tzf "$EXTAR" | grep -q "results/compare-" && ok "包含数据JSON" || notok "缺数据JSON"
+tar -tzf "$EXTAR" | grep -q "trends/report.html" && ok "包含HTML报告" || notok "缺HTML报告"
+tar -tzf "$EXTAR" | grep -q "doctor.txt" && ok "包含doctor自检" || notok "缺doctor自检"
+# HTML 归档小节：造一个归档包后重新生成 HTML 应列出
+mkdir -p /tmp/t06-exp-out/archive
+tar -czf /tmp/t06-exp-out/archive/full-20260814.tar.gz -C "$TRD" compare-20260814-080000.json
+COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-exp-out bash trends.sh --html >/dev/null 2>&1
+grep -q "归档包" /tmp/t06-exp-out/report.html && ok "HTML 含归档包小节" || notok "HTML 缺归档小节"
+grep -q "full-20260814.tar.gz" /tmp/t06-exp-out/report.html && ok "HTML 列出归档文件" || notok "HTML 未列出归档文件"
+rm -rf "$TRD" /tmp/t06-exp-out
+
 echo ""
 echo "═══ 结果: $PASS 通过 / $FAIL 失败 ═══"
 [ "$FAIL" = "0" ]

@@ -1,7 +1,7 @@
 # DNS/网络测试工具集 — Code Wiki
 
 > 本文档是项目的结构化代码 Wiki，涵盖整体架构、模块职责、关键类与函数、依赖关系及运行方式。
-> 对应仓库：`dns-test`（MIT，当前版本 `v1.14 / v2026.08.21`）
+> 对应仓库：`dns-test`（MIT，当前版本 `v1.15 / v2026.08.22`）
 > 适用对象：开发者 / 二次维护者 / AI 助手
 
 > 🤖 **给 AI 的指引**：本工具集最重要的使用方是 AI 助手。需要**理解或修改本仓库代码**时，请先读本文档（代码结构与实现），再配合 [docs/AI_GUIDE.md](docs/AI_GUIDE.md)（操作流程）使用——两者分工互补：**AI_GUIDE 教你"怎么操作测试"**（初始化/流程/排障），**本文档教你"代码长什么样、想改哪里看哪里"**（架构/模块/函数/依赖）。修改代码后务必运行 `bash smoke_test.sh` + `bash verify.sh` 做回归验证，并同步更新 [docs/CHANGELOG.md](docs/CHANGELOG.md) 记录变更轮次。
@@ -44,7 +44,7 @@
 
 - `vYYYY.MM.N`：日期式，N=当月发布序号（补丁级修复仅递增 N）
 - `vX.Y`：语义版本（X=主版本，重大重构才升；Y=次版本，功能更新）
-- 当前：`v1.13 = v2026.08.20`
+- 当前：`v1.15 = v2026.08.22`
 
 ---
 
@@ -122,8 +122,8 @@ dns-test/
 │   ├── 03_dig_target.sh          # dig_target 4 用例（IPv6加方括号）
 │   ├── 04_core_functions.sh      # core 纯函数 18 用例（地址校验/响应判断/CDN/入口参数解析）
 │   ├── 05_run_common_tests.sh    # lite 计分口径/full 回归 12 用例（稳定性降轮/CONFIG_DOMAINS安全解析/dig @server回归/for t遮蔽回归/ECS_SUBNET注入拦截/par_run元字符禁令，mock dig/ping 离线）
-│   ├── 06_compare_e2e.sh         # compare 端到端 112 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune/--until/--alert/--vs/周对比/突变检测/--md/--json/--week/--webhook/--archive 归档，mock dig/ping 离线 + 用户 results 备份恢复）
-│   └── 07_doctor.sh              # doctor 自检+补全+新参数校验 35 用例（doctor正常/参数/--cron模板/PATH剥离FAIL路径 + bash补全语法/注册/模拟TAB + zsh头与内容）
+│   ├── 06_compare_e2e.sh         # compare 端到端 119 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune/--until/--alert/--vs/周对比/突变检测/--md/--json/--week/--webhook/--archive 归档/--export 报障包/HTML归档小节，mock dig/ping 离线 + 用户 results 备份恢复）
+│   └── 07_doctor.sh              # doctor 自检+补全+install+新参数校验 45 用例（doctor正常/参数/--cron模板/PATH剥离FAIL路径 + bash补全语法/注册/模拟TAB + zsh头与内容 + install --completions幂等(假HOME)）
 ├── tools/                        # 专项测试工具
 │   ├── manifest.sh               # 插件注册表
 │   ├── vowifi/                   # VoWiFi 专项（ePDG/路由器）
@@ -152,10 +152,10 @@ dns-test/
 | [full.sh](file:///workspace/full.sh) | 完整版基础测试（16 项，77~78 评分点） | `SAVE_LOG=1` 存日志；`trap` 清理临时目录 |
 | [lite.sh](file:///workspace/lite.sh) | 精简版基础测试（10 项，53~54 评分点） | 同上，输出更短 |
 | [compare.sh](file:///workspace/compare.sh) | 多 DNS 横向对比 | 延迟中位数 + 批量并发 + JSON/HTML/MD 报告 + 预设组展开 + 环比Δ + 切换命令 + 当前DNS标记 + `--watch` 定时采集 |
-| [trends.sh](file:///workspace/trends.sh) | 聚合 compare 历史 JSON 出趋势 | 线性回归 + SVG 折线图 + CSV/MD/JSON + `--vs A,B` 头对头 + 周对比(`--week N` 可配)/突变检测 + `--cron` 定时采集 + `--prune N` 留存清理(`--archive` 删前归档/全量备份) + `--alert N` 值守 + `--webhook` IM 推送 |
+| [trends.sh](file:///workspace/trends.sh) | 聚合 compare 历史 JSON 出趋势 | 线性回归 + SVG 折线图 + CSV/MD/JSON + `--vs A,B` 头对头 + 周对比(`--week N` 可配)/突变检测 + `--cron` 定时采集 + `--prune N` 留存清理(`--archive` 删前归档/全量备份) + `--export` 报障包(数据+报告+doctor三合一) + `--alert N` 值守 + `--webhook` IM 推送 |
 | [verify.sh](file:///workspace/verify.sh) | 一键全面自检 | 7 步：语法/shellcheck/单测/冒烟/compare/trends/专项 |
 | [smoke_test.sh](file:///workspace/smoke_test.sh) | 自动化冒烟（24 项） | CI 与改动后回归必跑 |
-| [install.sh](file:///workspace/install.sh) | 依赖检测与安装 | 自动识别 apt/yum/dnf/brew/apk/pacman/zypper |
+| [install.sh](file:///workspace/install.sh) | 依赖检测与安装 | 自动识别 apt/yum/dnf/brew/apk/pacman/zypper；`--completions` 幂等装补全（装完依赖顺手执行） |
 | [release.sh](file:///workspace/release.sh) | 打包 tar.gz + 上传指引 | 排除 .git/results 内容 |
 
 ### 4.2 核心库 (lib/)
@@ -384,8 +384,8 @@ dns-test.sh 选"专项测试"
 | [tests/03_dig_target.sh](file:///workspace/tests/03_dig_target.sh) | dig_target 4 用例（IPv4 原样/IPv6 加方括号/特殊 IPv6/空输入） | `bash tests/03_dig_target.sh` |
 | [tests/04_core_functions.sh](file:///workspace/tests/04_core_functions.sh) | core 纯函数 18 用例（valid_dns_addr 合法/非法+超范围/IPv6 畸形结构、is_valid_response 错误/纯 OPT、is_cdn_domain、parse_dns_args 入口参数） | `bash tests/04_core_functions.sh` |
 | [tests/05_run_common_tests.sh](file:///workspace/tests/05_run_common_tests.sh) | lite 计分口径/full 回归 12 用例（稳定性降轮 20→10、AAAA 空响应计分、综合评分 45/53、CONFIG_DOMAINS 注入不执行/非法 token 忽略、dig @server 前缀回归、full 模式 @server 遮蔽回归、ECS_SUBNET 注入拦截、par_run 元字符禁令；mock dig/ping 离线） | `bash tests/05_run_common_tests.sh` |
-| [tests/06_compare_e2e.sh](file:///workspace/tests/06_compare_e2e.sh) | compare 端到端 112 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、提供商标签+抖动三出口+JSON jitter_ms、预设组名展开含 IPv6、未知词报错、trends --prune/--until/--alert/--vs/周对比/突变检测/--md/--json/--week/--webhook（mock curl 抓 payload）/--archive 归档（全量/删前打包/空数据）；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
-| [tests/07_doctor.sh](file:///workspace/tests/07_doctor.sh) | doctor 自检 + 补全 + 新参数校验 35 用例（doctor 正常路径/参数/--cron 模板/PATH 剥离 FAIL 路径、bash 补全语法/注册/模拟 TAB 三场景、zsh compdef 头与内容、trends --json/--week/--webhook/--archive 参数校验） | `bash tests/07_doctor.sh` |
+| [tests/06_compare_e2e.sh](file:///workspace/tests/06_compare_e2e.sh) | compare 端到端 119 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、提供商标签+抖动三出口+JSON jitter_ms、预设组名展开含 IPv6、未知词报错、trends --prune/--until/--alert/--vs/周对比/突变检测/--md/--json/--week/--webhook（mock curl 抓 payload）/--archive 归档（全量/删前打包/空数据）/--export 报障包（含数据/报告/doctor）/HTML 归档小节；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
+| [tests/07_doctor.sh](file:///workspace/tests/07_doctor.sh) | doctor 自检 + 补全 + install + 新参数校验 45 用例（doctor 正常路径/参数/--cron 模板/PATH 剥离 FAIL 路径、bash 补全语法/注册/模拟 TAB 三场景、zsh compdef 头与内容、install --completions 幂等安装（假HOME）、trends --json/--week/--webhook/--archive/--export 参数校验） | `bash tests/07_doctor.sh` |
 
 `02/03/04/05/06_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
 
@@ -558,9 +558,10 @@ perl examples/04_reverse_dns.pl 222.172.200.68             # 反向解析
 
 长表：`timestamp,addr,score,stab,delay_ms`，每行=一轮×一个 DNS；`score`/`stab` 为数值或空（不可达），可直接喂给 pandas/Excel 透视。
 
-### 11.4 归档包（`trends/archive/*.tar.gz`）
+### 11.4 归档包与报障包（`trends/archive/` 与 `trends/export/`）
 
-`--archive` 产物：`full-<时间>.tar.gz`（全量备份，不删源）/ `prune-<时间>.tar.gz`（`--prune` 删前打包的被清理文件）。包内为相对路径的 `compare-*.json`，解包回 `results/` 即可恢复历史：`tar -xzf full-*.tar.gz -C results/`。
+- **归档包**（`--archive` 产物，`trends/archive/`）：`full-<时间>.tar.gz`（全量备份，不删源）/ `prune-<时间>.tar.gz`（`--prune` 删前打包的被清理文件）。包内为相对路径的 `compare-*.json`，解包回 `results/` 即可恢复历史：`tar -xzf full-*.tar.gz -C results/`。HTML 报告（`report.html`）底部会自动列出已有归档包（包名/类型/大小）
+- **报障包**（`--export` 产物，`trends/export/`）：`dns-test-export-<时间>.tar.gz` 三合一——`results/compare-*.json`（数据）+ `trends/`（本次生成的 report.html/report.md/trends.csv，视 flags 而定）+ `doctor.txt`（doctor 自检输出）。报障整包附 issue；迁移解包到新机仓库根续用历史：`tar -xzf dns-test-export-*.tar.gz -C /path/to/dns-test`
 
 ---
 

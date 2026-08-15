@@ -1,25 +1,76 @@
 #!/bin/bash
 # ============================================================================
 # 自动安装依赖脚本（缺失才装，自动检测 apt/yum/dnf/brew）
-# 用法: bash install.sh [--smoke|--all|--help]
+# 用法: bash install.sh [--smoke|--all|--completions|--help]
 #   直接跑: 检测必需依赖 dig/perl/curl，缺失才安装，装完强制校验；校验时检测 dig 的 DoT 能力（bind 9.18+ 才支持 +tls）
 #           末尾检测可选依赖 shellcheck——终端下会询问"是否现在一并安装？"（y/N 默认不装），非交互/管道自动跳过
+#           依赖就绪后顺手安装 shell 补全（幂等，写 rc 文件带标记可重复运行）
 #   --smoke: 校验通过后直接跑冒烟测试（24项自动化验证）
 #   --all:   连同可选依赖 shellcheck 一起安装（verify.sh 的 shell 静态检查需要）
+#   --completions: 只装 shell 补全（不动依赖；检测 ~/.bashrc/.zshrc 幂等写入）
 #   --help:  打印用法说明；未知参数报错退出（退出码 1）
 # 必需安装: dig(bind-utils/dnsutils/bind) + perl + curl
 # 可选安装: shellcheck（shell 静态检查，verify.sh 使用；不装则 verify 跳过该项，CI 已兜底）
 # ============================================================================
+
+# shell 补全安装（幂等）：bash 写 ~/.bashrc（无则 ~/.bash_profile），zsh 装 ~/.zfunc/_dns-test 并在 zshrc 启用
+# 标记行防重复写入；未发现任何 rc 文件时只提示手动方式
+install_completions() {
+  local DIR_C MARK RC DID
+  DIR_C=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  MARK="# dns-test completions (added by install.sh)"
+  DID=0
+  echo "════ 安装 shell 补全 ════"
+  # bash：~/.bashrc 优先，无则 ~/.bash_profile（macOS bash 默认读后者）
+  for RC in "$HOME/.bashrc" "$HOME/.bash_profile"; do
+    [ -f "$RC" ] || continue
+    if grep -qF "$MARK" "$RC" 2>/dev/null; then
+      echo "  ✅ bash 补全已配置过（$RC 含标记，跳过）"
+    else
+      {
+        echo ""
+        echo "$MARK"
+        echo "[ -f \"$DIR_C/completions/dns-test.bash\" ] && source \"$DIR_C/completions/dns-test.bash\""
+      } >> "$RC"
+      echo "  ✅ bash 补全已写入 $RC（重开终端或 source $RC 生效）"
+    fi
+    DID=1
+    break
+  done
+  # zsh：装到 ~/.zfunc/_dns-test + rc 里启用（oh-my-zsh 用户已有 compinit 也不冲突，重复 compinit 仅稍慢）
+  if [ -f "$HOME/.zshrc" ]; then
+    mkdir -p "$HOME/.zfunc"
+    cp "$DIR_C/completions/dns-test.zsh" "$HOME/.zfunc/_dns-test" 2>/dev/null \
+      && echo "  ✅ zsh 补全已装到 ~/.zfunc/_dns-test" || echo "  ⚠️  zsh 补全拷贝失败（检查 ~/.zfunc 可写）"
+    if grep -qF "$MARK" "$HOME/.zshrc" 2>/dev/null; then
+      echo "  ✅ zshrc 已配置过（含标记，跳过）"
+    else
+      {
+        echo ""
+        echo "$MARK"
+        echo "fpath=(\$HOME/.zfunc \$fpath)"
+        echo "autoload -Uz compinit && compinit"
+      } >> "$HOME/.zshrc"
+      echo "  ✅ zshrc 已启用（fpath+compinit，重开终端生效）"
+    fi
+    DID=1
+  fi
+  [ "$DID" = "0" ] && echo "  ℹ️  未发现 ~/.bashrc / ~/.bash_profile / ~/.zshrc——手动启用见 completions/ 文件头注释"
+  echo "  （幂等，可重复运行；卸载=删 rc 内标记段与 ~/.zfunc/_dns-test）"
+}
+
 MODE="${1:-}"
 case "$MODE" in
   -h|--help|help)
-    echo "用法: bash install.sh [--smoke|--all]"
+    echo "用法: bash install.sh [--smoke|--all|--completions]"
     echo ""
     echo "  直接跑: 检测必需依赖 dig/perl/curl，缺失才安装（自动检测包管理器），装完强制校验"
     echo "           校验时检测 dig 的 DoT 能力（bind 9.18+ 才支持 +tls）"
     echo "           末尾检测可选依赖 shellcheck——终端下会询问是否一并安装（y/N 默认不装）"
-    echo "  --smoke: 校验通过后直接跑冒烟测试（24项自动化验证）"
-    echo "  --all  : 连同可选依赖 shellcheck 一起安装（verify.sh 的 shell 静态检查用）"
+    echo "           依赖就绪后顺手安装 shell 补全（幂等）"
+    echo "  --smoke      : 校验通过后直接跑冒烟测试（24项自动化验证）"
+    echo "  --all        : 连同可选依赖 shellcheck 一起安装（verify.sh 的 shell 静态检查用）"
+    echo "  --completions: 只装 shell 补全（不动依赖；bash 写 ~/.bashrc，zsh 装 ~/.zfunc 并启用）"
     echo ""
     echo "  手动安装（无包管理器时按系统选一条）:"
     echo "    Debian/Ubuntu/WSL:  sudo apt-get install -y dnsutils perl curl"
@@ -31,6 +82,11 @@ case "$MODE" in
   --version)
     source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/version.sh"
     echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
+    exit 0
+    ;;
+  --completions)
+    # 独立补全安装：不动依赖，装完即退（幂等，可重复运行）
+    install_completions
     exit 0
     ;;
   "") ;;
@@ -218,6 +274,10 @@ else
     echo "     · 不装也行：代码质量已由 CI 兜底（GitHub Actions 每轮自动 shellcheck）"
   fi
 fi
+
+echo ""
+# 依赖就绪后顺手装 shell 补全（幂等；不想装可忽略，或跑 bash install.sh --completions 单独补装）
+install_completions
 
 echo ""
 if [ "$MODE" = "--smoke" ]; then

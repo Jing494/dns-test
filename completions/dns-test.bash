@@ -24,7 +24,7 @@ _dns_test_complete() {
       flags="--html --md --open --full --no-save --json --watch --rounds --keep --version --help"
       COMPREPLY=( $(compgen -W "$flags $presets $dns_words" -- "$cur") ) ;;
     trends.sh)
-      flags="--html --open --md --json --csv --vs --cron --detail --limit --since --until --prune --archive --alert --webhook --week --version --help"
+      flags="--html --open --md --json --csv --vs --cron --detail --limit --since --until --prune --archive --export --alert --webhook --week --version --help"
       COMPREPLY=( $(compgen -W "$flags $dns_words" -- "$cur") ) ;;
     doctor.sh)
       COMPREPLY=( $(compgen -W "--net --cron --help" -- "$cur") ) ;;

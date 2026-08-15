@@ -1,8 +1,9 @@
 #!/bin/bash
 # ============================================================================
-# 纯 bash 轻量断言单测：doctor.sh 自检 + shell 补全 + trends 新参数错误路径（离线）
+# 纯 bash 轻量断言单测：doctor.sh 自检 + shell 补全 + install 补全安装 + trends 新参数错误路径（离线）
 # 覆盖: doctor 正常路径(exit 0/段落/汇总)、--help/坏参数、--cron 值守模板、缺 dig 时的 FAIL 路径(exit 1)、
-#       补全 bash 语法+注册+模拟调用、zsh 文件内容、trends --json/--week/--webhook/--archive 参数校验
+#       补全 bash 语法+注册+模拟调用、zsh 文件内容、install --completions 幂等安装（假HOME）、
+#       trends --json/--week/--webhook/--archive/--export 参数校验
 # 用法: bash tests/07_doctor.sh   （退出码 0=全过 1=有失败）
 # ============================================================================
 cd "$(dirname "$0")/.." || exit 1
@@ -73,13 +74,36 @@ SIM5=$(bash -c 'source completions/dns-test.bash
 COMP_WORDS=(doctor.sh --c); COMP_CWORD=1
 _dns_test_complete; echo "${COMPREPLY[@]}"')
 echo "$SIM5" | grep -q -- "--cron" && ok "doctor.sh --c<TAB> 补出 --cron" || notok "--cron 补全缺失: [$SIM5]"
+SIM6=$(bash -c 'source completions/dns-test.bash
+COMP_WORDS=(trends.sh --ex); COMP_CWORD=1
+_dns_test_complete; echo "${COMPREPLY[@]}"')
+echo "$SIM6" | grep -q -- "--export" && ok "trends.sh --ex<TAB> 补出 --export" || notok "--export 补全缺失: [$SIM6]"
 
 echo "═══ completions: zsh 补全 ═══"
 grep -q "#compdef compare.sh trends.sh doctor.sh" completions/dns-test.zsh \
   && ok "zsh compdef 头正确" || notok "zsh 缺 compdef 头"
 grep -q -- "--webhook" completions/dns-test.zsh && ok "zsh 含新 flag --webhook" || notok "zsh 缺 --webhook"
 grep -q -- "--archive" completions/dns-test.zsh && ok "zsh 含 --archive" || notok "zsh 缺 --archive"
+grep -q -- "--export" completions/dns-test.zsh && ok "zsh 含 --export" || notok "zsh 缺 --export"
 grep -q -- "--net --cron --help" completions/dns-test.zsh && ok "zsh doctor 含 --cron" || notok "zsh doctor 缺 --cron"
+
+echo "═══ install.sh: --completions 幂等安装（假 HOME，不动真实 rc） ═══"
+bash -n install.sh && ok "install.sh 语法 OK" || notok "install.sh 语法错误"
+FAKEHOME=$(mktemp -d)
+: > "$FAKEHOME/.bashrc"; : > "$FAKEHOME/.zshrc"
+IC=$(HOME="$FAKEHOME" bash install.sh --completions 2>&1)
+echo "$IC" | grep -q "bash 补全已写入" && ok "写入 .bashrc 提示" || notok "未写 .bashrc"
+grep -q "dns-test completions (added by install.sh)" "$FAKEHOME/.bashrc" && ok ".bashrc 含标记段" || notok ".bashrc 缺标记"
+grep -q "completions/dns-test.bash" "$FAKEHOME/.bashrc" && ok ".bashrc 含 source 行" || notok ".bashrc 缺 source 行"
+[ -f "$FAKEHOME/.zfunc/_dns-test" ] && ok "zsh 补全装到 .zfunc" || notok "zsh 补全未安装"
+grep -q "compinit" "$FAKEHOME/.zshrc" && ok ".zshrc 启用 compinit" || notok ".zshrc 缺 compinit"
+HOME="$FAKEHOME" bash install.sh --completions >/dev/null 2>&1
+[ "$(grep -c "dns-test completions (added by install.sh)" "$FAKEHOME/.bashrc")" = "1" ] \
+  && ok "重复运行幂等(标记唯一)" || notok "重复运行重复写入"
+EMPTYH=$(mktemp -d)
+HOME="$EMPTYH" bash install.sh --completions 2>&1 | grep -q "未发现" \
+  && ok "无rc文件提示手动启用" || notok "无rc未提示"
+rm -rf "$FAKEHOME" "$EMPTYH"
 
 echo "═══ trends.sh: 新参数错误路径（主链路在 tests/06） ═══"
 TRD=/tmp/t07-fixture; rm -rf "$TRD"; mkdir -p "$TRD"
