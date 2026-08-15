@@ -72,6 +72,11 @@ jobs:
           COMPARE_RESULTS_DIR=/tmp/probe-rs TRENDS_DIR=/tmp/probe-out bash trends.sh --html >/dev/null 2>&1
           echo "PROBE P5 总图标题行: [$(grep -o "综合评分对比[^<]*" /tmp/probe-out/report.html | head -1)]"
           echo "PROBE P6 轮次轴行: [$(grep -c polyline /tmp/probe-out/report.html)] 条折线"
+          # P7-P9 字节级取证：文件 vs 管道、中文 pattern、标题行实际字节
+          echo "PROBE P7 文件grep中文(h2行): [$(grep 综合评分 /tmp/probe-out/report.html | head -1)]"
+          echo "PROBE P8 管道grep中文: [$(cat /tmp/probe-out/report.html | grep -c 综合评分)]次 / 文件grep: [$(grep -c 综合评分 /tmp/probe-out/report.html)]次"
+          echo "PROBE P9 h2字节: [$(grep h2 /tmp/probe-out/report.html | head -1 | od -c | head -2 | tr '\n' ' ')]"
+          echo "PROBE P10 倒挂字节: [$(COMPARE_RESULTS_DIR=/tmp/probe-rs TRENDS_DIR=/tmp/probe-out bash trends.sh --since 2026-08-12 --until 2026-08-11 2>&1 | od -c | head -1)]"
           # 失败时打印输出尾部（断言名直接进日志，不再盲猜）
           UTLOG=$(mktemp)
           ut() { bash "tests/$1" >"$UTLOG" 2>&1 || { echo "❌ $1 失败断言（含上下文）:"; grep -n -B1 -A1 "❌" "$UTLOG" | head -80; cp "$UTLOG" "/tmp/utlog-$1.txt"; exit 1; }; }

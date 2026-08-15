@@ -402,13 +402,13 @@ done
 AR=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-arch-out bash trends.sh --archive 2>&1)
 echo "$AR" | grep -q "已全量归档 3 份" && ok "--archive 全量归档提示" || notok "全量归档提示缺失"
 ls /tmp/t06-arch-out/archive/full-*.tar.gz >/dev/null 2>&1 && ok "full-*.tar.gz 生成" || notok "full 包未生成"
-[ "$(ls "$TRD"/compare-*.json | wc -l | tr -d ' ')" = "3" ] && ok "全量归档不删原文件" || notok "全量归档误删原文件"
+[ "$(ls "$TRD"/compare-*.json | wc -l)" -eq 3 ] && ok "全量归档不删原文件" || notok "全量归档误删原文件"
 tar -tzf /tmp/t06-arch-out/archive/full-*.tar.gz | grep -q "compare-20260811" && ok "full 包内容正确" || notok "full 包内容异常"
 # --prune N --archive：被删文件先打包再删
 PR=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-arch-out bash trends.sh --prune 1 --archive 2>&1)
 echo "$PR" | grep -q "已归档待清理的 2 份" && ok "prune 删前归档提示" || notok "删前归档提示缺失"
 tar -tzf /tmp/t06-arch-out/archive/prune-*.tar.gz | grep -q "compare-20260812" && ok "prune 包含被删文件" || notok "prune 包缺被删文件"
-[ "$(ls "$TRD"/compare-*.json | wc -l | tr -d ' ')" = "1" ] && ok "prune 后仅存最近1份" || notok "prune 后留存数异常"
+[ "$(ls "$TRD"/compare-*.json | wc -l)" -eq 1 ] && ok "prune 后仅存最近1份" || notok "prune 后留存数异常"
 # 空数据 --archive：跳过归档不报错
 rm -f "$TRD"/*.json
 AR2=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-arch-out bash trends.sh --archive 2>&1 | grep -c "暂无 compare")
