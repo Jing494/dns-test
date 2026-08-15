@@ -520,6 +520,8 @@ run_common_tests() {
   echo ""
   echo "  ━━━ [2] AAAA记录批量测试（并行） ━━━"
   local aaaa_success=0; local aaaa_total=0
+  # AAAA 有意只测 DOMAINS_MAIN 前 8 个采样（A 记录全量 25 个）：AAAA 查询普遍更慢，
+  # 站点 IPv6 部署率本就偏低，采样足够反映 DNS 的 AAAA 解析能力，避免拉长批量测试耗时
   local aaaa_domains=("${DOMAINS_MAIN[@]:0:8}")
   PARR_CMDS=()
   for d in "${aaaa_domains[@]}"; do

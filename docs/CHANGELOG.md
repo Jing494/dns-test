@@ -35,6 +35,11 @@
   - **tests/06 归档计数**：改 `-eq` 整数比较（免疫 BSD wc 前导空格；并避开测试内 `tr()` 函数截获系统 `tr -d` 的坑）
   - **CI（smoke.yml）加固**：单测失败打印失败断言上下文（grep ❌ 前后各 1 行，不再盲猜）；失败时上传 UTLOG artifact；双平台矩阵（ubuntu/macos）实证 bash 3.2 兼容
   - **回归**：全量单测 8 套 250 断言双平台通过；参数解析/拦截/退出码语义零改动
+- 2026-08-24（第九十七轮-补充）：**审阅收尾：README 版本号全量同步 + AAAA 采样注释（README.md / lib/core.sh，不升版本）**
+  - **README 版本号漏更**（审阅模型发现 2 处，复核再揪出 1 处共 3 处）：L6 徽章 `Release-v1.13`→`v1.16`、L7 徽章 `Version-v2026.08.20`→`v2026.08.24`、L104 下载链接 `dns-test-v2026.08.20.tar.gz`→`v2026.08.24`；L17"最新版本"段与 version.sh 本已正确，仅这 3 处漏同步（CHANGELOG 中 v2026.08.20/v1.13 为历史记录，正确保留）
+  - **AAAA 采样注释**（审阅模型 🟡 项）：core.sh AAAA 批量测试只取 `DOMAINS_MAIN` 前 8 个属有意省时采样，非 bug；补注释说明取舍（AAAA 查询慢、站点 IPv6 部署率低，采样足够反映解析能力），不改行为
+  - **审阅 🟢 三项维持现状**：trends locale（上轮已拍板不动）、DNSUtil `inet_pton_ipv6` 宽松性、run_common_tests 体量（已认定可接受）
+  - **回归**：bash -n / shellcheck 全绿；版本号全仓 grep 无 v2026.08.20 残留（除历史记录）
 - 2026-08-23（第九十六轮）：**收官轮：--archive-keep 归档轮转 + doctor --fix 自愈 + --export 时间窗 + trends 纯函数下沉 + compare↔trends 互链 + CI/文档全量同步（trends.sh / doctor.sh / lib/trends_lib.sh / compare.sh / verify.sh / .github/workflows/smoke.yml / tests/06 / tests/08 / docs，发布 v1.16 = v2026.08.23）**
   - **`trends --archive-keep N` 归档包轮转**：`trends/archive/` 只留最近 N 个 tar.gz（删最老的总数−N 个，逐个报名）；≤N 提示无需轮转；正整数校验；与 `--prune N --archive` 长期值守配套（归档不再无限堆积，也不动数据 JSON）
   - **`trends --export --since/--until` 时间窗**：报障包按文件名内嵌日期段（`compare-YYYYMMDD-`）过滤，窗口外计数提示未打包；非标准命名的老文件不过滤保留（宁可多带不丢数据）；`--since/--until` 传参逻辑与主流程过滤零改动

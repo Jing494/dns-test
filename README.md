@@ -3,8 +3,8 @@
 > 🌐 **English**：[README.en.md](./README.en.md) ｜ **中文**：本文档
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Release: v1.13](https://img.shields.io/badge/Release-v1.13-blue.svg)
-![Version: v2026.08.20](https://img.shields.io/badge/Version-v2026.08.20-blue.svg)
+![Release: v1.16](https://img.shields.io/badge/Release-v1.16-blue.svg)
+![Version: v2026.08.24](https://img.shields.io/badge/Version-v2026.08.24-blue.svg)
 ![Platform: Linux/macOS/WSL](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20WSL-green.svg)
 ![Bash 3.2+](https://img.shields.io/badge/Bash-3.2%2B-blue.svg)
 ![Perl 5.10+](https://img.shields.io/badge/Perl-5.10%2B-blue.svg)
@@ -101,7 +101,7 @@ cd dns-test
 
 # 方式2: Releases 下载（免 git，直接拿成品包）
 #   前往 https://github.com/Jing494/dns-test/releases
-#   下载 dns-test-v2026.08.20.tar.gz 后解压即可
+#   下载 dns-test-v2026.08.24.tar.gz 后解压即可
 
 # 方式3: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
 ```
