@@ -26,6 +26,11 @@
   - ⑤ **两处小修**：`tools/vowifi/carrier_epdg.pl` DNS 选项先 `^\d+$` 再数值比较（消除非数字输入的 "isn't numeric" 警告噪音）；`install.sh` 无包管理器场景 `PKG_DIG/PKG_SC` 预置通用名（NEED 数组不再出现空包名导致"必需缺失: "显示为空）
   - ⑥ **回归防护**：`tests/05_run_common_tests.sh` 新增第 10~12 用例——full 模式 mock dig 断言 `@server` 恒为被测地址/[14]劫持对比基准（白名单 `@8.8.8.8`/`@[2400:3200::1]`/`@223.5.5.5`）、ECS_SUBNET 非法值回退默认且注入不执行、par_run 元字符命令整体拒执行；负向验证：用修复前 core.sh 跑三条新用例全部变红，修复后全绿；用例数 9→12，verify/CI/README/CODE_WIKI/AI_GUIDE 文案同步
   - ⑦ 回归：bash -n 全绿、perl -c 全绿、shellcheck 全库 0 告警、单测(18+9+4+18+12) 全绿、伪终端主菜单循环如常
+- 2026-08-15（第八十七轮-补充）：**分支清理 + trends 文件枚举去 ls 解析 + 第八十七轮兼容性核查（trends.sh，不升版本）**
+  - ① **分支清理**：删除环境自动提交产生的 `trae/agent-c3Ej6p` 分支（本地+远程，无文件改动）；trae 协作分支仅保留 `trae/agent-q7bDKm`，后续改动均在此分支进行
+  - ② **trends 数据扫描去 ls 解析**：`ls "$SRC_DIR"/compare-*.json | sort` 改为 glob 迭代构造文件列表（规避 SC2012 解析 ls 输出的技术债；glob 天然字典序=时间戳文件名的时间序，`head/tail/wc -l` 下游语义不变，空目录/无匹配仍正确 exit 2）
+  - ③ **第八十七轮兼容性核查（结论：无破坏）**：par_run 元字符禁令逐点核对 27 处调用（`${DIG_OPTS}`/`${t}`/`${d}` 双引号内先展开，数组内容不含 `$ ; & \``；compare 管道仅含 `\` 与 `|` 不在禁令内）；ECS_SUBNET 合法 v4/v6 CIDR 均保留仅非法回退；run_common_tests 函数签名未动（lite/full/dns-test 传参不变）；CI 按退出码判断不依赖输出文案，macOS 矩阵下新增用例语法/工具全兼容（mock 已覆盖 dig/ping/perl）；perl 专项抽查（02 对比/01 端口/04 反向）正常
+  - ④ 回归：bash -n/shellcheck 全绿；单测(18+9+4+18+12) 全绿；trends mock 数据聚合+产物生成 OK、空目录报错路径 exit 2 如常
 - 2026-08-14（第八十六轮）：**交互主菜单循环 + 退出选项（dns-test.sh，不升版本）**
   - ① **主菜单循环**：`dns-test.sh` 交互模式改为 `while` 主菜单循环——每次测试跑完自动返回主菜单，无需重复执行 `bash dns-test.sh`；菜单常驻显示"当前DNS/数量"
   - ② **退出选项**：主菜单新增 `0. 退出`；各子菜单（切换DNS组/基础版本/索引选择/专项选择/compare输入）均新增 `0. 返回主菜单`，可随时中途退出或返回

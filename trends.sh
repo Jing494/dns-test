@@ -75,7 +75,12 @@ fi
 
 # ---------- 数据扫描 ----------
 mkdir -p "$SRC_DIR" "$OUT_DIR"
-FILES=$(ls "$SRC_DIR"/compare-*.json 2>/dev/null | sort)
+# glob 展开天然按字典序（含时间戳文件名即时间序），不解析 ls 输出（规避 SC2012：文件名含空格/换字的解析风险）
+FILES=""
+for _f in "$SRC_DIR"/compare-*.json; do
+  [ -e "$_f" ] && FILES="$FILES$_f
+"
+done
 if [ -z "$FILES" ]; then
   echo "❌ 无数据: $SRC_DIR/compare-*.json 不存在"
   echo "  请先运行 compare.sh 至少一次，例如: bash compare.sh 223.5.5.5 119.29.29.29"
