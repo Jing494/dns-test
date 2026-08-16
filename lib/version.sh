@@ -7,5 +7,5 @@
 #   PROJECT_RELEASE = 语义式 vX.Y（X=主版本, Y=次版本）
 # 各脚本（core.sh/release.sh 等）统一 source 本文件，改版本只需改这一处。
 # ============================================================================
-PROJECT_VERSION="v2026.08.26"
+PROJECT_VERSION="v2026.08.27"
 PROJECT_RELEASE="v1.18"

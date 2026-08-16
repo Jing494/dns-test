@@ -1,7 +1,7 @@
 # DNS/网络测试工具集 — Code Wiki
 
 > 本文档是项目的结构化代码 Wiki，涵盖整体架构、模块职责、关键类与函数、依赖关系及运行方式。
-> 对应仓库：`dns-test`（MIT，当前版本 `v1.18 / v2026.08.26`）
+> 对应仓库：`dns-test`（MIT，当前版本 `v1.18 / v2026.08.27`）
 > 适用对象：开发者 / 二次维护者 / AI 助手
 
 > 🤖 **给 AI 的指引**：本工具集最重要的使用方是 AI 助手。需要**理解或修改本仓库代码**时，请先读本文档（代码结构与实现），再配合 [docs/AI_GUIDE.md](docs/AI_GUIDE.md)（操作流程）使用——两者分工互补：**AI_GUIDE 教你"怎么操作测试"**（初始化/流程/排障），**本文档教你"代码长什么样、想改哪里看哪里"**（架构/模块/函数/依赖）。修改代码后务必运行 `bash smoke_test.sh` + `bash verify.sh` 做回归验证，并同步更新 [docs/CHANGELOG.md](docs/CHANGELOG.md) 记录变更轮次。
@@ -44,7 +44,7 @@
 
 - `vYYYY.MM.N`：日期式，N=当月发布序号（补丁级修复仅递增 N）
 - `vX.Y`：语义版本（X=主版本，重大重构才升；Y=次版本，功能更新）
-- 当前：`v1.18 = v2026.08.26`
+- 当前：`v1.18 = v2026.08.27`
 
 ---
 
@@ -121,8 +121,8 @@ dns-test/
 │   ├── 01_dnsutil.t              # DNSUtil 18 用例（perl）
 │   ├── 02_plugins.sh             # 插件系统 9 用例（bash）
 │   ├── 03_dig_target.sh          # dig_target 4 用例（IPv6加方括号）
-│   ├── 04_core_functions.sh      # core 纯函数 18 用例（地址校验/响应判断/CDN/入口参数解析）
-│   ├── 05_run_common_tests.sh    # lite 计分口径/full 回归 12 用例（稳定性降轮/CONFIG_DOMAINS安全解析/dig @server回归/for t遮蔽回归/ECS_SUBNET注入拦截/par_run元字符禁令，mock dig/ping 离线）
+│   ├── 04_core_functions.sh      # core 纯函数 19 用例（地址校验/响应判断/CDN/入口参数解析）
+│   ├── 05_run_common_tests.sh    # lite 计分口径/full 回归 13 用例（稳定性降轮/CONFIG_DOMAINS安全解析/dig @server回归/for t遮蔽回归/ECS_SUBNET注入拦截/par_run元字符禁令，mock dig/ping 离线）
 │   ├── 06_compare_e2e.sh         # compare 端到端 124 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune/--until/--alert/--vs/周对比/突变检测(前值0ms边界)/--since当日边界/--md/--json/--week/--webhook/--archive 归档/--export 报障包/HTML归档小节/compare↔trends互链，mock dig/ping 离线 + 用户 results 备份恢复）
 │   ├── 07_doctor.sh              # doctor 自检+补全+install+新参数校验 49 用例（doctor正常/参数/--cron模板/PATH剥离FAIL路径 + bash补全语法/注册/模拟TAB(--fix/--archive-keep/值位不补) + zsh头与内容(--fix/--archive-keep) + install --completions幂等(假HOME)）
 │   └── 08_trends_lib.sh          # trends_lib 纯函数 23 用例（分位数空/单值/奇偶样本/P95取位/clamp + score/delay全10态趋势判定 + trends.sh端到端等价冒烟）
@@ -149,25 +149,25 @@ dns-test/
 
 | 脚本 | 职责 | 关键特性 |
 |------|------|---------|
-| [dns-test.sh](file:///workspace/dns-test.sh) | 统一交互入口，引导选 DNS 组/测试类型/专项 | 交互双模式（有/无终端）；非交互自动降级 lite+单 DNS |
-| [dns-preset.sh](file:///workspace/dns-preset.sh) | 预设快捷测试（default/ali/tencent/all） | 支持 `PRESET_DNS_CSV` 自定义；索引参数避免超时 |
-| [full.sh](file:///workspace/full.sh) | 完整版基础测试（16 项，77~78 评分点） | `SAVE_LOG=1` 存日志；`trap` 清理临时目录 |
-| [lite.sh](file:///workspace/lite.sh) | 精简版基础测试（10 项，53~54 评分点） | 同上，输出更短 |
-| [compare.sh](file:///workspace/compare.sh) | 多 DNS 横向对比 | 延迟中位数 + 批量并发 + JSON/HTML/MD 报告 + 预设组展开 + 环比Δ + 切换命令 + 当前DNS标记 + `--watch` 定时采集 |
-| [trends.sh](file:///workspace/trends.sh) | 聚合 compare 历史 JSON 出趋势 | 线性回归 + SVG 折线图 + CSV/MD/JSON + `--vs A,B` 头对头 + 周对比(`--week N` 可配)/突变检测 + `--cron` 定时采集 + `--prune N` 留存清理(`--archive` 删前归档/全量备份) + `--export` 报障包(数据+报告+doctor三合一) + `--alert N` 值守 + `--webhook` IM 推送 |
-| [verify.sh](file:///workspace/verify.sh) | 一键全面自检 | 7 步：语法/shellcheck/单测/冒烟/compare/trends/专项 |
-| [smoke_test.sh](file:///workspace/smoke_test.sh) | 自动化冒烟（24 项） | CI 与改动后回归必跑 |
-| [install.sh](file:///workspace/install.sh) | 依赖检测与安装 | 自动识别 apt/yum/dnf/brew/apk/pacman/zypper；`--completions` 幂等装补全（装完依赖顺手执行） |
-| [release.sh](file:///workspace/release.sh) | 打包 tar.gz + 上传指引 | 排除 .git/results 内容 |
+| [dns-test.sh](../dns-test.sh) | 统一交互入口，引导选 DNS 组/测试类型/专项 | 交互双模式（有/无终端）；非交互自动降级 lite+单 DNS |
+| [dns-preset.sh](../dns-preset.sh) | 预设快捷测试（default/ali/tencent/all） | 支持 `PRESET_DNS_CSV` 自定义；索引参数避免超时 |
+| [full.sh](../full.sh) | 完整版基础测试（16 项，77~78 评分点） | `SAVE_LOG=1` 存日志；`trap` 清理临时目录 |
+| [lite.sh](../lite.sh) | 精简版基础测试（10 项，53~54 评分点） | 同上，输出更短 |
+| [compare.sh](../compare.sh) | 多 DNS 横向对比 | 延迟中位数 + 批量并发 + JSON/HTML/MD 报告 + 预设组展开 + 环比Δ + 切换命令 + 当前DNS标记 + `--watch` 定时采集 |
+| [trends.sh](../trends.sh) | 聚合 compare 历史 JSON 出趋势 | 线性回归 + SVG 折线图 + CSV/MD/JSON + `--vs A,B` 头对头 + 周对比(`--week N` 可配)/突变检测 + `--cron` 定时采集 + `--prune N` 留存清理(`--archive` 删前归档/全量备份) + `--export` 报障包(数据+报告+doctor三合一) + `--alert N` 值守 + `--webhook` IM 推送 |
+| [verify.sh](../verify.sh) | 一键全面自检 | 7 步：语法/shellcheck/单测/冒烟/compare/trends/专项 |
+| [smoke_test.sh](../smoke_test.sh) | 自动化冒烟（24 项） | CI 与改动后回归必跑 |
+| [install.sh](../install.sh) | 依赖检测与安装 | 自动识别 apt/yum/dnf/brew/apk/pacman/zypper；`--completions` 幂等装补全（装完依赖顺手执行） |
+| [release.sh](../release.sh) | 打包 tar.gz + 上传指引 | 排除 .git/results 内容 |
 
 ### 4.2 核心库 (lib/)
 
 | 文件 | 职责 |
 |------|------|
-| [lib/core.sh](file:///workspace/lib/core.sh) | 公共变量（DNS 组/域名列表/超时参数）+ 辅助函数 + `run_common_tests` 统一测试逻辑（mode 区分 full/lite）+ `par_run` 并行引擎 + 综合评分 |
-| [lib/compat.sh](file:///workspace/lib/compat.sh) | 平台兼容层：macOS 无 `timeout` 命令时提供后台运行+到期 kill 的兼容实现 |
-| [lib/plugins.sh](file:///workspace/lib/plugins.sh) | 插件加载器：`plugin_list` 打印菜单、`plugin_run` 按编号执行，参数策略三态 |
-| [lib/DNSUtil.pm](file:///workspace/lib/DNSUtil.pm) | DNS 纯函数库：sockaddr 构建/IPv6 转换/报文构建与解析/PTR/反向名，无网络 IO 可单测 |
+| [lib/core.sh](../lib/core.sh) | 公共变量（DNS 组/域名列表/超时参数）+ 辅助函数 + `run_common_tests` 统一测试逻辑（mode 区分 full/lite）+ `par_run` 并行引擎 + 综合评分 |
+| [lib/compat.sh](../lib/compat.sh) | 平台兼容层：macOS 无 `timeout` 命令时提供后台运行+到期 kill 的兼容实现 |
+| [lib/plugins.sh](../lib/plugins.sh) | 插件加载器：`plugin_list` 打印菜单、`plugin_run` 按编号执行，参数策略三态 |
+| [lib/DNSUtil.pm](../lib/DNSUtil.pm) | DNS 纯函数库：sockaddr 构建/IPv6 转换/报文构建与解析/PTR/反向名，无网络 IO 可单测 |
 
 ### 4.3 专项工具 (tools/)
 
@@ -175,26 +175,26 @@ dns-test/
 
 | 脚本 | 职责 |
 |------|------|
-| [tools/vowifi/01_resolve_vowifi.pl](file:///workspace/tools/vowifi/01_resolve_vowifi.pl) | 测试所有 3GPP 标准 ePDG 域名（mnc000~015）的 A/AAAA 解析 |
-| [tools/vowifi/02_vowifi_verify.pl](file:///workspace/tools/vowifi/02_vowifi_verify.pl) | 多 DNS 交叉验证 VoWiFi 解析结果一致性（含 `check_ips` 历史对比） |
-| [tools/vowifi/03_test_router_dns.pl](file:///workspace/tools/vowifi/03_test_router_dns.pl) | 路由器 DNS 转发测试（对比省级 DNS 基准，`--` 或 `PROVINCE_DNS` 自定义基准） |
-| [tools/vowifi/carrier_epdg.pl](file:///workspace/tools/vowifi/carrier_epdg.pl) | 运营商 ePDG 部署检测（电信/移动/联通/广电，按 MNC 域名映射） |
+| [tools/vowifi/01_resolve_vowifi.pl](../tools/vowifi/01_resolve_vowifi.pl) | 测试所有 3GPP 标准 ePDG 域名（mnc000~015）的 A/AAAA 解析 |
+| [tools/vowifi/02_vowifi_verify.pl](../tools/vowifi/02_vowifi_verify.pl) | 多 DNS 交叉验证 VoWiFi 解析结果一致性（含 `check_ips` 历史对比） |
+| [tools/vowifi/03_test_router_dns.pl](../tools/vowifi/03_test_router_dns.pl) | 路由器 DNS 转发测试（对比省级 DNS 基准，`--` 或 `PROVINCE_DNS` 自定义基准） |
+| [tools/vowifi/carrier_epdg.pl](../tools/vowifi/carrier_epdg.pl) | 运营商 ePDG 部署检测（电信/移动/联通/广电，按 MNC 域名映射） |
 
 #### 网络专项 (tools/network/)
 
 | 脚本 | 职责 |
 |------|------|
-| [tools/network/01_port_test.pl](file:///workspace/tools/network/01_port_test.pl) | 端口连通性测试（UDP 空包探测 / TCP 非阻塞 connect） |
-| [tools/network/doh_dot_check.sh](file:///workspace/tools/network/doh_dot_check.sh) | DoH/DoT 支持检测（DoT=`dig +tls` 实测；DoH=有 curl 实测/无则端口级） |
+| [tools/network/01_port_test.pl](../tools/network/01_port_test.pl) | 端口连通性测试（UDP 空包探测 / TCP 非阻塞 connect） |
+| [tools/network/doh_dot_check.sh](../tools/network/doh_dot_check.sh) | DoH/DoT 支持检测（DoT=`dig +tls` 实测；DoH=有 curl 实测/无则端口级） |
 
 ### 4.4 示例脚本 (examples/)
 
 | 脚本 | 职责 |
 |------|------|
-| [examples/01_dns_query.pl](file:///workspace/examples/01_dns_query.pl) | 基础 DNS 查询（A/AAAA） |
-| [examples/02_multi_dns_compare.pl](file:///workspace/examples/02_multi_dns_compare.pl) | 多 DNS 对比 + 一致性检查 |
-| [examples/03_dns64_check.pl](file:///workspace/examples/03_dns64_check.pl) | DNS64 支持检测（识别 `64:ff9b::` 合成地址并提取嵌入 IPv4） |
-| [examples/04_reverse_dns.pl](file:///workspace/examples/04_reverse_dns.pl) | 反向 DNS 解析（v4 in-addr.arpa / v6 ip6.arpa） |
+| [examples/01_dns_query.pl](../examples/01_dns_query.pl) | 基础 DNS 查询（A/AAAA） |
+| [examples/02_multi_dns_compare.pl](../examples/02_multi_dns_compare.pl) | 多 DNS 对比 + 一致性检查 |
+| [examples/03_dns64_check.pl](../examples/03_dns64_check.pl) | DNS64 支持检测（识别 `64:ff9b::` 合成地址并提取嵌入 IPv4） |
+| [examples/04_reverse_dns.pl](../examples/04_reverse_dns.pl) | 反向 DNS 解析（v4 in-addr.arpa / v6 ip6.arpa） |
 
 所有示例均支持 `--help`/`-h` 打印用法，命令行参数 > 环境变量 > 默认值。
 
@@ -339,7 +339,7 @@ tools/network/doh_dot_check.sh ─► lib/compat.sh（相对定位 ../../lib/）
 
 ### 7.1 注册表（tools/manifest.sh）
 
-专项菜单由 [tools/manifest.sh](file:///workspace/tools/manifest.sh) 驱动。`PLUGIN_ITEMS` 数组每行格式：
+专项菜单由 [tools/manifest.sh](../tools/manifest.sh) 驱动。`PLUGIN_ITEMS` 数组每行格式：
 
 ```
 插件id | 脚本文件名 | 菜单显示名 | 执行器(perl/bash) | 引导提示(可空) | 透传DNS(1/0, 默认1)
@@ -381,14 +381,14 @@ dns-test.sh 选"专项测试"
 
 | 测试文件 | 覆盖 | 运行命令 |
 |---------|------|---------|
-| [tests/01_dnsutil.t](file:///workspace/tests/01_dnsutil.t) | DNSUtil 18 用例（dns_sockaddr/inet_pton_ipv6/build_dns_query/parse_dns_response/check_ips/PTR 系列 + 畸形包防崩） | `perl -Ilib tests/01_dnsutil.t` |
-| [tests/02_plugins.sh](file:///workspace/tests/02_plugins.sh) | 插件系统 9 用例（注册表加载/字段拆分/输出格式/无效编号拦截/未知执行器拦截/脚本缺失检测） | `bash tests/02_plugins.sh` |
-| [tests/03_dig_target.sh](file:///workspace/tests/03_dig_target.sh) | dig_target 4 用例（IPv4 原样/IPv6 加方括号/特殊 IPv6/空输入） | `bash tests/03_dig_target.sh` |
-| [tests/04_core_functions.sh](file:///workspace/tests/04_core_functions.sh) | core 纯函数 19 用例（valid_dns_addr 合法/非法+超范围/IPv6 畸形结构/`::` 全零地址、is_valid_response 错误/纯 OPT、is_cdn_domain、parse_dns_args 入口参数） | `bash tests/04_core_functions.sh` |
-| [tests/05_run_common_tests.sh](file:///workspace/tests/05_run_common_tests.sh) | lite 计分口径/full 回归 13 用例（稳定性降轮 20→10+STAB_ROUNDS 空串视为未设置、AAAA 空响应计分、综合评分 45/53、CONFIG_DOMAINS 注入不执行/非法 token 忽略、dig @server 前缀回归、full 模式 @server 遮蔽回归、ECS_SUBNET 注入拦截、par_run 元字符禁令；mock dig/ping 离线） | `bash tests/05_run_common_tests.sh` |
-| [tests/06_compare_e2e.sh](file:///workspace/tests/06_compare_e2e.sh) | compare 端到端 124 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、提供商标签+抖动三出口+JSON jitter_ms、预设组名展开含 IPv6、未知词报错、trends --prune/--until/--alert/--vs/周对比/突变检测（前值0ms边界）/--since 当日边界/--md/--json/--week/--webhook（mock curl 抓 payload）/--archive 归档（全量/删前打包/空数据）/--export 报障包（含数据/报告/doctor）/HTML 归档小节/compare↔trends 互链两形态；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
-| [tests/07_doctor.sh](file:///workspace/tests/07_doctor.sh) | doctor 自检 + 补全 + install + 新参数校验 49 用例（doctor 正常路径/参数/--cron 模板/PATH 剥离 FAIL 路径、bash 补全语法/注册/模拟 TAB 三场景（含 --fix/--archive-keep）、zsh compdef 头与内容、install --completions 幂等安装（假HOME）、trends --json/--week/--webhook/--archive/--export 参数校验） | `bash tests/07_doctor.sh` |
-| [tests/08_trends_lib.sh](file:///workspace/tests/08_trends_lib.sh) | trends_lib 纯函数 23 用例（trends_percentile 空/单值/奇偶样本 P50/P95 取位/边界 clamp；trends_slope_judge score/delay 全 10 态；trends.sh --json 端到端等价冒烟） | `bash tests/08_trends_lib.sh` |
+| [tests/01_dnsutil.t](../tests/01_dnsutil.t) | DNSUtil 18 用例（dns_sockaddr/inet_pton_ipv6/build_dns_query/parse_dns_response/check_ips/PTR 系列 + 畸形包防崩） | `perl -Ilib tests/01_dnsutil.t` |
+| [tests/02_plugins.sh](../tests/02_plugins.sh) | 插件系统 9 用例（注册表加载/字段拆分/输出格式/无效编号拦截/未知执行器拦截/脚本缺失检测） | `bash tests/02_plugins.sh` |
+| [tests/03_dig_target.sh](../tests/03_dig_target.sh) | dig_target 4 用例（IPv4 原样/IPv6 加方括号/特殊 IPv6/空输入） | `bash tests/03_dig_target.sh` |
+| [tests/04_core_functions.sh](../tests/04_core_functions.sh) | core 纯函数 19 用例（valid_dns_addr 合法/非法+超范围/IPv6 畸形结构/`::` 全零地址、is_valid_response 错误/纯 OPT、is_cdn_domain、parse_dns_args 入口参数） | `bash tests/04_core_functions.sh` |
+| [tests/05_run_common_tests.sh](../tests/05_run_common_tests.sh) | lite 计分口径/full 回归 13 用例（稳定性降轮 20→10+STAB_ROUNDS 空串视为未设置、AAAA 空响应计分、综合评分 45/53、CONFIG_DOMAINS 注入不执行/非法 token 忽略、dig @server 前缀回归、full 模式 @server 遮蔽回归、ECS_SUBNET 注入拦截、par_run 元字符禁令；mock dig/ping 离线） | `bash tests/05_run_common_tests.sh` |
+| [tests/06_compare_e2e.sh](../tests/06_compare_e2e.sh) | compare 端到端 124 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、提供商标签+抖动三出口+JSON jitter_ms、预设组名展开含 IPv6、未知词报错、trends --prune/--until/--alert/--vs/周对比/突变检测（前值0ms边界）/--since 当日边界/--md/--json/--week/--webhook（mock curl 抓 payload）/--archive 归档（全量/删前打包/空数据）/--export 报障包（含数据/报告/doctor）/HTML 归档小节/compare↔trends 互链两形态；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
+| [tests/07_doctor.sh](../tests/07_doctor.sh) | doctor 自检 + 补全 + install + 新参数校验 49 用例（doctor 正常路径/参数/--cron 模板/PATH 剥离 FAIL 路径、bash 补全语法/注册/模拟 TAB 三场景（含 --fix/--archive-keep）、zsh compdef 头与内容、install --completions 幂等安装（假HOME）、trends --json/--week/--webhook/--archive/--export 参数校验） | `bash tests/07_doctor.sh` |
+| [tests/08_trends_lib.sh](../tests/08_trends_lib.sh) | trends_lib 纯函数 23 用例（trends_percentile 空/单值/奇偶样本 P50/P95 取位/边界 clamp；trends_slope_judge score/delay 全 10 态；trends.sh --json 端到端等价冒烟） | `bash tests/08_trends_lib.sh` |
 
 `02~08_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
 
@@ -572,13 +572,13 @@ perl examples/04_reverse_dns.pl 222.172.200.68             # 反向解析
 
 | 文档 | 用途 |
 |------|------|
-| [README.md](file:///workspace/README.md) | 项目总说明（中文） |
-| [README.en.md](file:///workspace/README.en.md) | 英文精简简介 |
-| [docs/AI_GUIDE.md](file:///workspace/docs/AI_GUIDE.md) | AI 助手操作手册（12 章） |
-| [docs/TEST_METHOD.md](file:///workspace/docs/TEST_METHOD.md) | 测试方法论 / 评分标准 / 实测结果 |
-| [docs/CODE_WIKI.md](file:///workspace/docs/CODE_WIKI.md) | 本文档（架构/模块/函数/CI/插件） |
-| [docs/SANDBOX_GUIDE.md](file:///workspace/docs/SANDBOX_GUIDE.md) | 沙箱环境使用指南 |
-| [docs/FAQ.md](file:///workspace/docs/FAQ.md) | 常见问题 |
-| [docs/CHANGELOG.md](file:///workspace/docs/CHANGELOG.md) | 完整变更记录 |
-| [examples/README.md](file:///workspace/examples/README.md) | 示例脚本说明 |
-| [CONTRIBUTING.md](file:///workspace/CONTRIBUTING.md) | 贡献指南 |
+| [README.md](../README.md) | 项目总说明（中文） |
+| [README.en.md](../README.en.md) | 英文精简简介 |
+| [docs/AI_GUIDE.md](../docs/AI_GUIDE.md) | AI 助手操作手册（12 章） |
+| [docs/TEST_METHOD.md](../docs/TEST_METHOD.md) | 测试方法论 / 评分标准 / 实测结果 |
+| [docs/CODE_WIKI.md](../docs/CODE_WIKI.md) | 本文档（架构/模块/函数/CI/插件） |
+| [docs/SANDBOX_GUIDE.md](../docs/SANDBOX_GUIDE.md) | 沙箱环境使用指南 |
+| [docs/FAQ.md](../docs/FAQ.md) | 常见问题 |
+| [docs/CHANGELOG.md](../docs/CHANGELOG.md) | 完整变更记录 |
+| [examples/README.md](../examples/README.md) | 示例脚本说明 |
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | 贡献指南 |
