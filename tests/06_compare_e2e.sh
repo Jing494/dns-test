@@ -84,6 +84,13 @@ restore_results() {
 }
 trap restore_results EXIT INT TERM
 
+# 无 perl 的环境也兼容（compare.sh 会 source core.sh，其前置检查要求 dig+perl 都存在；
+# dig 已 mock 于 $STUB，perl 缺失则整体失败——补最小 stub，与 tests/04/05/08 同策略）
+if ! command -v perl >/dev/null 2>&1; then
+  printf '#!/bin/bash\nexit 0\n' > "$STUB/perl"
+  chmod +x "$STUB/perl"
+fi
+
 export PATH="$STUB:$PATH" TMPDIR="$STUB"
 
 PASS=0; FAIL=0
@@ -132,7 +139,7 @@ bash compare.sh 223.5.5.5 --html >/dev/null 2>&1
 grep -q "class='pname'>阿里DNS-v4-1" results/report.html && ok "HTML addr 带标签副行" || notok "HTML 缺标签副行"
 
 echo "═══ compare.sh e2e: 趋势报告互链（无→引导 / 有→链接） ═══"
-T_BAK=0; [ -f trends/report.html ] && { mv trends/report.html /tmp/t06-tr-bak.html; T_BAK=1; }
+T_BAK=0; [ -f trends/report.html ] && { mv trends/report.html ${TMPDIR:-/tmp}/t06-tr-bak.html; T_BAK=1; }
 bash compare.sh 223.5.5.5 --html >/dev/null 2>&1
 grep -q "积累多轮数据后可看趋势" results/report.html && ok "HTML 无趋势报告时显示引导" || notok "无趋势引导缺失"
 mkdir -p trends && echo '<html>fake</html>' > trends/report.html   # mkdir：上一轮 trap 会清掉 trends/，目录缺失则重定向失败致互链断言误红
@@ -140,7 +147,7 @@ DBG_OUT=$(bash compare.sh 223.5.5.5 --html 2>&1); DBG_RC=$?
 [ -n "$DNS_TEST_DEBUG" ] && { echo "DBG rc=$DBG_RC"; echo "$DBG_OUT" | tail -5; ls -la trends/report.html 2>&1; }
 grep -q "href='../trends/report.html'" results/report.html && ok "HTML 有趋势报告时带互链" || notok "趋势互链缺失"
 rm -f trends/report.html
-[ "$T_BAK" = "1" ] && mv /tmp/t06-tr-bak.html trends/report.html
+[ "$T_BAK" = "1" ] && mv ${TMPDIR:-/tmp}/t06-tr-bak.html trends/report.html
 grep -q "jitter_ms" results/compare-*.json 2>/dev/null && ok "JSON 含 jitter_ms 字段" || notok "JSON 缺 jitter_ms"
 
 echo "═══ compare.sh e2e: 预设组名展开 ═══"
@@ -259,7 +266,7 @@ rm -f results/.compare-watch-state
 echo "═══ trends.sh: --until 窗口 + --alert 值守 + 混采警告 + 数据新鲜度 ═══"
 # 用独立数据目录（前面 --watch/断点续采等 mock 采集轮已向默认 results/ 写入今天的 JSON，
 # 会污染窗口/均值断言；这里重建确定性夹具 08-11/12/13 各2份共6份）
-TRD=/tmp/t06-trends; rm -rf "$TRD" /tmp/t06-trends-out; mkdir -p "$TRD"
+TRD=${TMPDIR:-/tmp}/t06-trends; rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-trends-out; mkdir -p "$TRD"
 for i in 1 2 3; do
   cat > "$TRD/compare-2026081${i}-200000.json" <<EOF4
 {"tool":"dns-test/compare.sh","version":"t","timestamp":"2026-08-1${i} 20:0${i}:00 +0800","mode":"lite",
@@ -272,7 +279,7 @@ EOF4
         {"addr":"119.29.29.29","score":"8${i}","stab":"95","delay_ms":$((15+i)),"reachable":true}]}
 EOF4
 done
-tr() { COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-trends-out bash trends.sh "$@"; }
+tr() { COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-trends-out bash trends.sh "$@"; }
 # --until 08-12（含当日）→ 4次采集；期间改为入选数据口径（非全量文件名范围）
 UT=$(tr --until 2026-08-12 2>&1)
 echo "$UT" | grep -q "4次采集" && ok "--until 窗口过滤(含当日)" || notok "--until 过滤计数错误"
@@ -280,9 +287,9 @@ echo "$UT" | grep -q "期间: 2026-08-11 08:01 ~ 2026-08-12 20:02" && ok "期间
 tr --until 2026/08/12 2>&1 | grep -q "YYYY-MM-DD" && ok "--until 非法格式报错" || notok "--until 未校验格式"
 tr --since 2026-08-13 --until 2026-08-11 2>&1 | grep -q "倒挂" && ok "窗口倒挂报错" || notok "倒挂未报错"
 # --alert 值守：夹具 223 均值87.0 / 119 均值77.0（80阈值→119命中 exit 3；50阈值→全过 exit 0）
-tr --alert 80 >/tmp/t06a.out 2>&1; ARC=$?
+tr --alert 80 >${TMPDIR:-/tmp}/t06a.out 2>&1; ARC=$?
 [ "$ARC" = "3" ] && ok "--alert 80 命中退出码3" || notok "--alert 80 退出码=$ARC(应3)"
-grep -q "评分均值 77.0% 低于阈值 80%" /tmp/t06a.out && ok "告警列出低阈值DNS" || notok "告警未列出DNS"
+grep -q "评分均值 77.0% 低于阈值 80%" ${TMPDIR:-/tmp}/t06a.out && ok "告警列出低阈值DNS" || notok "告警未列出DNS"
 tr --alert 50 >/dev/null 2>&1; ARC2=$?
 [ "$ARC2" = "0" ] && ok "--alert 50 全过退出码0" || notok "--alert 50 退出码=$ARC2(应0)"
 tr --alert 0 2>&1 | grep -q "1-100" && ok "--alert 0 报错" || notok "--alert 0 未报错"
@@ -292,14 +299,14 @@ tr 2>&1 | grep -q "lite 与 full 两种采集模式混合" && ok "混采口径�
 sed -i.bak 's/"mode":"full"/"mode":"lite"/' "$TRD/compare-20260812-200000.json" && rm -f "$TRD/compare-20260812-200000.json.bak"
 # 数据新鲜度（夹具最新为 2026-08-13 → 应显示"最新采集: N.N天前"）
 tr 2>&1 | grep -qE "最新采集: [0-9]+\.[0-9]天前" && ok "数据新鲜度显示" || notok "新鲜度缺失"
-rm -rf "$TRD" /tmp/t06-trends-out
+rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-trends-out
 
 echo "═══ trends.sh: 周对比 + 突变检测 + --vs 头对头 + --md 报告 ═══"
 # 夹具用相对今天的动态日期（date_days_ago）保证周对比两窗恒有数据：前窗=10天前1轮，近窗=5天前2轮
 source lib/compat.sh
 D10=$(date_days_ago 10); D5=$(date_days_ago 5)
 D10F=${D10//-/}; D5F=${D5//-/}   # 原生替换：tr 已被本文件前段的 tr() 辅助函数覆盖
-TRD=/tmp/t06-trends2; rm -rf "$TRD" /tmp/t06-trends-out2; mkdir -p "$TRD"
+TRD=${TMPDIR:-/tmp}/t06-trends2; rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-trends-out2; mkdir -p "$TRD"
 # 前窗: 223=90分/20ms（该轮胜）；近窗r1: 223=72/22；近窗r2: 223=68/260（延迟突变，负）
 cat > "$TRD/compare-${D10F}-080000.json" <<EOF5
 {"tool":"x","timestamp":"$D10 08:00:00 +0800","mode":"lite","dns":[
@@ -316,7 +323,7 @@ cat > "$TRD/compare-${D5F}-090000.json" <<EOF5
  {"addr":"223.5.5.5","score":"68","stab":"90","delay_ms":260,"reachable":true},
  {"addr":"119.29.29.29","score":"80","stab":"95","delay_ms":29,"reachable":true}]}
 EOF5
-tr2() { COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-trends-out2 bash trends.sh "$@"; }
+tr2() { COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-trends-out2 bash trends.sh "$@"; }
 WV=$(tr2 2>&1)
 echo "$WV" | grep -qF "评分 90.0%→70.0%（-20.0 ↓）" && ok "周对比Δ评分正确(90→70)" || notok "周对比Δ评分错误"
 echo "$WV" | grep -qF "延迟 20.0ms→141.0ms（+121.0ms ↓）" && ok "周对比Δ延迟正确(20→141)" || notok "周对比Δ延迟错误"
@@ -333,7 +340,7 @@ tr2 --vs 8.8.8.8,1.1.1.1 2>&1 | grep -q "不在数据集中" && ok "--vs 数据�
 
 echo "═══ trends.sh: 突变检测边界(前值0ms) + --since 当日边界 ═══"
 # 前值 0ms（本机缓存 DNS 可真实打出）→ 不计突增也不出 inf 倍数；--since 前缀比较含当日
-TRD3=/tmp/t06-trends3; rm -rf "$TRD3" /tmp/t06-trends-out3; mkdir -p "$TRD3"
+TRD3=${TMPDIR:-/tmp}/t06-trends3; rm -rf "$TRD3" ${TMPDIR:-/tmp}/t06-trends-out3; mkdir -p "$TRD3"
 cat > "$TRD3/compare-${D5F}-100000.json" <<EOF5
 {"tool":"x","timestamp":"$D5 10:00:00 +0800","mode":"lite","dns":[
  {"addr":"223.5.5.5","score":"70","stab":"100","delay_ms":0,"reachable":true}]}
@@ -342,21 +349,21 @@ cat > "$TRD3/compare-${D5F}-110000.json" <<EOF5
 {"tool":"x","timestamp":"$D5 11:00:00 +0800","mode":"lite","dns":[
  {"addr":"223.5.5.5","score":"70","stab":"100","delay_ms":300,"reachable":true}]}
 EOF5
-tr3() { COMPARE_RESULTS_DIR="$TRD3" TRENDS_DIR=/tmp/t06-trends-out3 bash trends.sh "$@"; }
+tr3() { COMPARE_RESULTS_DIR="$TRD3" TRENDS_DIR=${TMPDIR:-/tmp}/t06-trends-out3 bash trends.sh "$@"; }
 WV0=$(tr3 2>&1)
 echo "$WV0" | grep -q "inf" && notok "前值0ms产生inf倍数" || ok "前值0ms不出inf倍数"
 echo "$WV0" | grep -qF "0ms→300ms" && notok "前值0ms误计突增" || ok "前值0ms不计突增(倍数无意义)"
 SB=$(tr3 --since "$D5" 2>&1)
 echo "$SB" | grep -q "2次采集" && ok "--since 当日边界含当日" || notok "--since 当日边界漏当日"
-rm -rf "$TRD3" /tmp/t06-trends-out3
+rm -rf "$TRD3" ${TMPDIR:-/tmp}/t06-trends-out3
 # --md 报告（表行 + 三小节 + 尾注）
 MDO=$(tr2 --md --vs 223.5.5.5,119.29.29.29 2>&1)
 echo "$MDO" | grep -q "Markdown趋势报告已生成" && ok "--md 生成提示" || notok "--md 无提示"
-grep -q "| \`223.5.5.5·阿里DNS-v4-1\` | 3 | 76.7%" /tmp/t06-trends-out2/report.md && ok "--md 总览表行正确" || notok "--md 表行错误"
-grep -q "## 周对比" /tmp/t06-trends-out2/report.md && ok "--md 含周对比小节" || notok "--md 缺周对比"
-grep -q "## 突变检测" /tmp/t06-trends-out2/report.md && ok "--md 含突变小节" || notok "--md 缺突变"
-grep -q "## 头对头" /tmp/t06-trends-out2/report.md && ok "--md 含头对头小节" || notok "--md 缺头对头"
-grep -q "bash compare.sh DNS1 DNS2 --watch 30" /tmp/t06-trends-out2/report.md && ok "--md 尾注含采集指引" || notok "--md 缺尾注"
+grep -q "| \`223.5.5.5·阿里DNS-v4-1\` | 3 | 76.7%" ${TMPDIR:-/tmp}/t06-trends-out2/report.md && ok "--md 总览表行正确" || notok "--md 表行错误"
+grep -q "## 周对比" ${TMPDIR:-/tmp}/t06-trends-out2/report.md && ok "--md 含周对比小节" || notok "--md 缺周对比"
+grep -q "## 突变检测" ${TMPDIR:-/tmp}/t06-trends-out2/report.md && ok "--md 含突变小节" || notok "--md 缺突变"
+grep -q "## 头对头" ${TMPDIR:-/tmp}/t06-trends-out2/report.md && ok "--md 含头对头小节" || notok "--md 缺头对头"
+grep -q "bash compare.sh DNS1 DNS2 --watch 30" ${TMPDIR:-/tmp}/t06-trends-out2/report.md && ok "--md 尾注含采集指引" || notok "--md 缺尾注"
 
 echo "═══ trends.sh: --json 机器可读输出 + --week 可配窗口 ═══"
 # --json：stdout 应为纯 JSON（文本全部转 stderr），关键字段齐全且语法合法
@@ -384,10 +391,10 @@ echo "$WV14" | grep -qF "评分 90.0%→76.7%" && ok "--week 14 前窗样本入�
 # 默认 --week 7 时 20 天前样本不在任何窗 → 该 DNS 无周对比行（窗口语义边界）
 WV7=$(tr2 2>&1)
 echo "$WV7" | grep -qF "评分 90.0%→70.0%" && ok "默认7天窗仍按旧语义" || notok "默认窗口被改动"
-rm -rf "$TRD" /tmp/t06-trends-out2
+rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-trends-out2
 
 echo "═══ trends.sh: --webhook 告警推送（mock curl 抓 payload） ═══"
-TRD=/tmp/t06-hook; rm -rf "$TRD" /tmp/t06-hook-out; mkdir -p "$TRD"
+TRD=${TMPDIR:-/tmp}/t06-hook; rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-hook-out; mkdir -p "$TRD"
 cat > "$TRD/compare-20260814-080000.json" <<'EOF6'
 {"tool":"x","timestamp":"2026-08-14 08:00:00 +0800","mode":"lite","dns":[
  {"addr":"223.5.5.5","score":"50","stab":"100","delay_ms":20,"reachable":true}]}
@@ -395,7 +402,7 @@ EOF6
 HOOKSTUB=$(mktemp -d)
 printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s/hook.log"\necho "{\\\"ok\\\":true}"\n' "$HOOKSTUB" "$HOOKSTUB" > "$HOOKSTUB/curl"
 chmod +x "$HOOKSTUB/curl"
-HW=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-hook-out PATH="$HOOKSTUB:$PATH" \
+HW=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-hook-out PATH="$HOOKSTUB:$PATH" \
   bash trends.sh --alert 70 --webhook https://open.feishu.cn/open-apis/bot/v2/hook/TESTKEY 2>&1)
 echo "$HW" | grep -q "📡 webhook 已推送" && ok "告警命中触发推送提示" || notok "推送提示缺失"
 grep -q '"msg_type":"text"' "$HOOKSTUB/hook.log" && ok "飞书 payload 形态正确" || notok "飞书 payload 错误"
@@ -403,54 +410,54 @@ grep -q "TESTKEY" "$HOOKSTUB/hook.log" && ok "推送到指定 URL" || notok "URL
 grep -q "低于阈值 70" "$HOOKSTUB/hook.log" && ok "payload 含告警详情" || notok "payload 缺详情"
 # 告警未命中 → 不推送（hook.log 不新增）
 BEFORE=$(wc -l < "$HOOKSTUB/hook.log")
-COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-hook-out PATH="$HOOKSTUB:$PATH" \
+COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-hook-out PATH="$HOOKSTUB:$PATH" \
   bash trends.sh --alert 40 --webhook https://open.feishu.cn/x >/dev/null 2>&1
 [ "$(wc -l < "$HOOKSTUB/hook.log")" = "$BEFORE" ] && ok "未命中不推送" || notok "未命中误推送"
 # 推送失败（连接拒绝）→ 仅提示不改变 exit 3
-HW2=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-hook-out bash trends.sh --alert 70 --webhook https://127.0.0.1:1/h 2>&1 | grep -c "webhook 未推送\|推送失败")
+HW2=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-hook-out bash trends.sh --alert 70 --webhook https://127.0.0.1:1/h 2>&1 | grep -c "webhook 未推送\|推送失败")
 [ "$HW2" -ge 1 ] && ok "推送失败时降级提示" || notok "推送失败时静默"
-rm -rf "$TRD" /tmp/t06-hook-out "$HOOKSTUB"
+rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-hook-out "$HOOKSTUB"
 
 echo "═══ trends.sh: --archive 归档（全量打包 / prune 删前归档） ═══"
-TRD=/tmp/t06-arch; rm -rf "$TRD" /tmp/t06-arch-out; mkdir -p "$TRD"
+TRD=${TMPDIR:-/tmp}/t06-arch; rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-arch-out; mkdir -p "$TRD"
 for i in 1 2 3; do
   printf '{"tool":"x","timestamp":"2026-08-1%s 08:00:00 +0800","mode":"lite","dns":[{"addr":"223.5.5.5","score":"90","stab":"100","delay_ms":20,"reachable":true}]}' "$i" \
     > "$TRD/compare-2026081$i-080000.json"
 done
 # 单独 --archive：全量打包且不删原文件
-AR=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-arch-out bash trends.sh --archive 2>&1)
+AR=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-arch-out bash trends.sh --archive 2>&1)
 echo "$AR" | grep -q "已全量归档 3 份" && ok "--archive 全量归档提示" || notok "全量归档提示缺失"
-ls /tmp/t06-arch-out/archive/full-*.tar.gz >/dev/null 2>&1 && ok "full-*.tar.gz 生成" || notok "full 包未生成"
+ls ${TMPDIR:-/tmp}/t06-arch-out/archive/full-*.tar.gz >/dev/null 2>&1 && ok "full-*.tar.gz 生成" || notok "full 包未生成"
 [ "$(ls "$TRD"/compare-*.json | wc -l)" -eq 3 ] && ok "全量归档不删原文件" || notok "全量归档误删原文件"
-tar -tzf /tmp/t06-arch-out/archive/full-*.tar.gz | grep -q "compare-20260811" && ok "full 包内容正确" || notok "full 包内容异常"
+tar -tzf ${TMPDIR:-/tmp}/t06-arch-out/archive/full-*.tar.gz | grep -q "compare-20260811" && ok "full 包内容正确" || notok "full 包内容异常"
 # --prune N --archive：被删文件先打包再删
-PR=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-arch-out bash trends.sh --prune 1 --archive 2>&1)
+PR=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-arch-out bash trends.sh --prune 1 --archive 2>&1)
 echo "$PR" | grep -q "已归档待清理的 2 份" && ok "prune 删前归档提示" || notok "删前归档提示缺失"
-tar -tzf /tmp/t06-arch-out/archive/prune-*.tar.gz | grep -q "compare-20260812" && ok "prune 包含被删文件" || notok "prune 包缺被删文件"
+tar -tzf ${TMPDIR:-/tmp}/t06-arch-out/archive/prune-*.tar.gz | grep -q "compare-20260812" && ok "prune 包含被删文件" || notok "prune 包缺被删文件"
 [ "$(ls "$TRD"/compare-*.json | wc -l)" -eq 1 ] && ok "prune 后仅存最近1份" || notok "prune 后留存数异常"
 # 空数据 --archive：跳过归档不报错
 rm -f "$TRD"/*.json
-AR2=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-arch-out bash trends.sh --archive 2>&1 | grep -c "暂无 compare")
+AR2=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-arch-out bash trends.sh --archive 2>&1 | grep -c "暂无 compare")
 [ "$AR2" = "1" ] && ok "空数据归档跳过提示" || notok "空数据归档异常"
-rm -rf "$TRD" /tmp/t06-arch-out
+rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-arch-out
 
 echo "═══ trends.sh: --export 报障包（数据+报告+doctor）与 HTML 归档小节 ═══"
-TRD=/tmp/t06-exp; rm -rf "$TRD" /tmp/t06-exp-out; mkdir -p "$TRD"
+TRD=${TMPDIR:-/tmp}/t06-exp; rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-exp-out; mkdir -p "$TRD"
 printf '{"tool":"x","timestamp":"2026-08-14 08:00:00 +0800","mode":"lite","dns":[{"addr":"223.5.5.5","score":"90","stab":"100","delay_ms":20,"reachable":true}]}' > "$TRD/compare-20260814-080000.json"
-EX=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-exp-out bash trends.sh --export --html --csv 2>&1)
+EX=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-exp-out bash trends.sh --export --html --csv 2>&1)
 echo "$EX" | grep -q "报障包已生成" && ok "--export 生成提示" || notok "--export 提示缺失"
-ls /tmp/t06-exp-out/export/dns-test-export-*.tar.gz >/dev/null 2>&1 && ok "export tar 生成" || notok "export tar 未生成"
-EXTAR=$(ls /tmp/t06-exp-out/export/dns-test-export-*.tar.gz 2>/dev/null | head -1)
+ls ${TMPDIR:-/tmp}/t06-exp-out/export/dns-test-export-*.tar.gz >/dev/null 2>&1 && ok "export tar 生成" || notok "export tar 未生成"
+EXTAR=$(ls ${TMPDIR:-/tmp}/t06-exp-out/export/dns-test-export-*.tar.gz 2>/dev/null | head -1)
 tar -tzf "$EXTAR" | grep -q "results/compare-" && ok "包含数据JSON" || notok "缺数据JSON"
 tar -tzf "$EXTAR" | grep -q "trends/report.html" && ok "包含HTML报告" || notok "缺HTML报告"
 tar -tzf "$EXTAR" | grep -q "doctor.txt" && ok "包含doctor自检" || notok "缺doctor自检"
 # HTML 归档小节：造一个归档包后重新生成 HTML 应列出
-mkdir -p /tmp/t06-exp-out/archive
-tar -czf /tmp/t06-exp-out/archive/full-20260814.tar.gz -C "$TRD" compare-20260814-080000.json
-COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t06-exp-out bash trends.sh --html >/dev/null 2>&1
-grep -q "归档包" /tmp/t06-exp-out/report.html && ok "HTML 含归档包小节" || notok "HTML 缺归档小节"
-grep -q "full-20260814.tar.gz" /tmp/t06-exp-out/report.html && ok "HTML 列出归档文件" || notok "HTML 未列出归档文件"
-rm -rf "$TRD" /tmp/t06-exp-out
+mkdir -p ${TMPDIR:-/tmp}/t06-exp-out/archive
+tar -czf ${TMPDIR:-/tmp}/t06-exp-out/archive/full-20260814.tar.gz -C "$TRD" compare-20260814-080000.json
+COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-exp-out bash trends.sh --html >/dev/null 2>&1
+grep -q "归档包" ${TMPDIR:-/tmp}/t06-exp-out/report.html && ok "HTML 含归档包小节" || notok "HTML 缺归档小节"
+grep -q "full-20260814.tar.gz" ${TMPDIR:-/tmp}/t06-exp-out/report.html && ok "HTML 列出归档文件" || notok "HTML 未列出归档文件"
+rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-exp-out
 
 echo ""
 echo "═══ 结果: $PASS 通过 / $FAIL 失败 ═══"

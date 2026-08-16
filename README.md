@@ -4,7 +4,7 @@
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Release: v1.18](https://img.shields.io/badge/Release-v1.18-blue.svg)
-![Version: v2026.08.27](https://img.shields.io/badge/Version-v2026.08.27-blue.svg)
+![Version: v2026.08.28](https://img.shields.io/badge/Version-v2026.08.28-blue.svg)
 ![Platform: Linux/macOS/WSL](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20WSL-green.svg)
 ![Bash 3.2+](https://img.shields.io/badge/Bash-3.2%2B-blue.svg)
 ![Perl 5.10+](https://img.shields.io/badge/Perl-5.10%2B-blue.svg)
@@ -14,7 +14,7 @@
 
 > 🏷️ **版本号规则（双轨制）**：`vYYYY.MM.N` 日期式（N=当月发布序号）↔ 语义 `vX.Y`（X=主版本，重大重构才升；Y=次版本，功能更新）。补丁级修复仅递增日期式 N。
 
-> 🔧 **最新版本**：**v1.18 = v2026.08.27**（文档修正轮：CODE_WIKI 43 处 `file:///workspace/...` 链接改相对路径（原链接指向沙箱绝对路径，GitHub 渲染后对任何查看者失效）+ §3 目录树用例数对齐（tests/04 18→19、tests/05 12→13）+ README.en 冒烟项数统一为 24。上一轮 v2026.08.26 加固轮：trends 突变检测前值 0ms 不再除零出 `inf` 倍数；`--since/--until` 改日期前缀比较不受 locale 影响；`inet_pton_ipv6` 补冒号形状预检——`:::`/两处 `::`/悬空单冒号等畸形写法不再被宽容解析，bash/perl 两侧校验口径对齐（`::` 全零地址双侧放行）；UDP 端口测试 0 字节发送误判修复；trends 补 EXIT trap 防临时目录泄漏 + 数据目录含空格不再分词断裂；compare JSON 原子落盘防并发读到半截；STAB_ROUNDS 空串按未设置处理；无 curl 时 IPv6 跳过 /dev/tcp 端口探测。注：v2026.08.26 原标 `v1.16A`，为避免 A 后缀被误解为不稳定版，正式定为 `v1.18`。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
+> 🔧 **最新版本**：**v1.18 = v2026.08.28**（补丁轮：install.sh 不再假设"非 root 必有 sudo"——有包管理器但无 sudo 的环境提前拦截，给 root 运行/先装 sudo/手动命令三种方案；tests/05 stub PATH 一次性赋值修复、tests/06/08 补 dig/perl stub 兜底、tests/06/07 硬编码 /tmp 改 `${TMPDIR:-/tmp}`——无 dig/perl 沙箱环境离线单测亦全绿。上一轮 v2026.08.27 文档修正轮：CODE_WIKI 43 处 file:// 链接改相对路径 + §3 用例数对齐 + README.en 冒烟项数统一。完整版本历程（每轮）见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
 > 🔒 **隐私说明**：本仓库涉及运营商基础设施 IP 的内容统一使用 **RFC 5737 文档保留地址（192.0.2.x）** 占位，**非真实地址**；**默认 DNS 列表为公开可测试的运营商公网 DNS**，示例仅使用公共 DNS 与私网地址，不含任何运营商内部信息。
 
@@ -101,7 +101,7 @@ cd dns-test
 
 # 方式2: Releases 下载（免 git，直接拿成品包）
 #   前往 https://github.com/Jing494/dns-test/releases
-#   下载 dns-test-v2026.08.27.tar.gz 后解压即可
+#   下载 dns-test-v2026.08.28.tar.gz 后解压即可
 
 # 方式3: 下载 ZIP（GitHub 页面 → Code → Download ZIP 后解压）
 ```

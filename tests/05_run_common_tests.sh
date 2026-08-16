@@ -78,7 +78,10 @@ for c in perl; do
 done
 
 export TMPDIR="$STUB"
-PATH="$STUB:$PATH" source lib/core.sh
+# 注意：PATH 必须独立一行赋值再 source（一次性前缀赋值在非 POSIX bash 下不持久化，
+# 后续子 shell 拿不到 stub PATH，无 dig/perl 环境会误报失败——与 tests/03/04 同款写法）
+PATH="$STUB:$PATH"
+source lib/core.sh
 
 PASS=0; FAIL=0
 ok()   { PASS=$((PASS+1)); echo "  ✅ $1"; }

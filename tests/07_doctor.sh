@@ -120,15 +120,15 @@ HOME="$EMPTYH" bash install.sh --completions 2>&1 | grep -q "未发现" \
 rm -rf "$FAKEHOME" "$EMPTYH"
 
 echo "═══ trends.sh: 新参数错误路径（主链路在 tests/06） ═══"
-TRD=/tmp/t07-fixture; rm -rf "$TRD"; mkdir -p "$TRD"
+TRD=${TMPDIR:-/tmp}/t07-fixture; rm -rf "$TRD"; mkdir -p "$TRD"
 printf '{"tool":"x","timestamp":"2026-08-14 08:00:00 +0800","mode":"lite","dns":[{"addr":"223.5.5.5","score":"90","stab":"100","delay_ms":20,"reachable":true}]}' > "$TRD/compare-20260814-080000.json"
-tr7() { COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=/tmp/t07-out bash trends.sh "$@"; }
+tr7() { COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t07-out bash trends.sh "$@"; }
 tr7 --week 2>&1 | grep -q "缺少天数" && ok "--week 缺值报错" || notok "--week 缺值未报错"
 tr7 --week 0 2>&1 | grep -q "2-365" && ok "--week 越界报错" || notok "--week 越界未报错"
 tr7 --webhook 2>&1 | grep -q "缺少 URL" && ok "--webhook 缺值报错" || notok "--webhook 缺值未报错"
 tr7 --webhook ftp://x.com 2>&1 | grep -q "http/https" && ok "--webhook 非http报错" || notok "--webhook 非http未报错"
 tr7 --webhook https://x.com/h 2>&1 | grep -q "需配合 --alert" && ok "--webhook 无--alert报错" || notok "--webhook 无--alert未报错"
-rm -rf "$TRD" /tmp/t07-out
+rm -rf "$TRD" ${TMPDIR:-/tmp}/t07-out
 
 echo ""
 echo "════════ tests/07 结果: ✅$PASS 通过  ❌$FAIL 失败 ════════"

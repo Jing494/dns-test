@@ -7,6 +7,19 @@
 # 用法: bash tests/08_trends_lib.sh   （退出码 0=全过 1=有失败）
 # ============================================================================
 cd "$(dirname "$0")/.." || exit 1
+
+# trends.sh 会 source lib/core.sh（含 dig/perl 前置检查，缺失直接退出）：
+# 无 dig/perl 的环境用最小 stub 兜底（与 tests/03/04 同策略），端到端冒烟仍可离线运行
+STUB=$(mktemp -d)
+trap 'rm -rf "$STUB"' EXIT
+for c in dig perl; do
+  if ! command -v "$c" >/dev/null 2>&1; then
+    printf '#!/bin/bash\nexit 0\n' > "$STUB/$c"
+    chmod +x "$STUB/$c"
+  fi
+done
+[ -d "$STUB" ] && PATH="$STUB:$PATH"
+
 source lib/trends_lib.sh
 
 PASS=0; FAIL=0

@@ -98,9 +98,11 @@ case "$MODE" in
 esac
 MODE_ALL=0
 [ "$MODE" = "--all" ] && MODE_ALL=1
-# root/容器无需 sudo；非 root 用 sudo 前缀（避免 root 环境因无 sudo 命令而安装失败）
+# root/容器无需 sudo；非 root 且存在 sudo 才加前缀（无 sudo 的环境由下方"非 root 且无 sudo"分支提前拦截给指引）
 SUDO=""
-[ "$(id -u)" -ne 0 ] && SUDO="sudo"
+if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+  SUDO="sudo"
+fi
 echo "════ 依赖检测 ════"
 
 # 先检测包管理器，决定 dig / shellcheck 的包名
@@ -164,6 +166,25 @@ else
   fi
   [ ${#NEED[@]} -eq 0 ] && [ ${#NEED_SC[@]} -gt 0 ] && echo "  必需依赖已齐，仅补装可选依赖 shellcheck"
   echo "  包管理器: $PM"
+  # 非 root 且无 sudo：自动安装必然失败，提前拦截并给明确指引（原假设"非 root 必有 sudo"，
+  # 有包管理器但无 sudo 的环境会先打一串 sudo: command not found 再报"可能需 sudo 权限"，误导排障）
+  if [ "$(id -u)" -ne 0 ] && ! command -v sudo >/dev/null 2>&1; then
+    _PKGS=("${NEED[@]}" "${NEED_SC[@]}")
+    case "$PM" in
+      apt)     _HINT="apt-get install -y ${_PKGS[*]}" ;;
+      dnf|yum) _HINT="${PM} install -y ${_PKGS[*]}" ;;
+      brew)    _HINT="brew install ${_PKGS[*]}" ;;
+      apk)     _HINT="apk add ${_PKGS[*]}" ;;
+      pacman)  _HINT="pacman -S ${_PKGS[*]}" ;;
+      zypper)  _HINT="zypper install -y ${_PKGS[*]}" ;;
+      *)       _HINT="用包管理器安装 ${_PKGS[*]}" ;;
+    esac
+    echo "  ❌ 非 root 且系统无 sudo 命令，无法自动提权安装。请任选其一："
+    echo "     ① 用 root 运行本脚本（如 su -c 'bash install.sh'）"
+    echo "     ② 先安装 sudo，再重新运行本脚本"
+    echo "     ③ 手动执行（需 root）: $_HINT"
+    exit 1
+  fi
   case "$PM" in
     apt)
       echo "════ 安装（apt-get） ════"

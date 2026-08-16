@@ -6,6 +6,7 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
+| v2026.08.28 | v1.18（补丁） |
 | v2026.08.27 | v1.18（补丁） |
 | v2026.08.26 | v1.18 |
 | v2026.08.25 | v1.16（补丁） |
@@ -31,6 +32,13 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-28（第一百零一轮）：**补丁轮：install.sh 无 sudo 环境健壮性 + 离线单测 stub/TMPDIR 修复（install.sh / tests/05 / tests/06 / tests/07 / tests/08，发布 v2026.08.28，语义版 v1.18 不变）**
+  - **install.sh sudo 健壮性**（外部审阅发现）：原 `[ "$(id -u)" -ne 0 ] && SUDO="sudo"` 假设"非 root 必有 sudo"——有包管理器但无 sudo 的环境（Android/proot/容器）会打一串 `sudo: command not found` 再以"可能需 sudo 权限"误导收场。修法：`command -v sudo` 存在才加前缀；非 root 无 sudo 且确需安装时提前拦截，按包管理器给全手动命令 + "root 运行/先装 sudo"三种方案
+  - **tests/05 stub PATH 一次性赋值修复**（外部审阅发现，无 dig/perl 环境实测复现）：`PATH="$STUB:$PATH" source lib/core.sh` 的赋值在非 POSIX bash 下不持久化，后续子 shell（STAB_ROUNDS 空串用例）拿不到 stub PATH，该用例必失败；改独立一行赋值（与 tests/03/04 同款）——无 dig/perl 环境 13/13 全绿
+  - **tests/08 端到端冒烟 stub 兜底**（同上实测复现）：`bash trends.sh --json` 会 source core.sh（dig/perl 前置检查），无 dig/perl 环境 4 项断言必失败；测试头部补最小 stub（同 tests/04 策略）——无依赖环境 23/23 全绿
+  - **tests/06 stub + TMPDIR 化**（同上实测复现）：compare.sh 会 source core.sh，缺 perl stub 时 124 用例全量失败，补最小 stub；另 20+ 处硬编码 `/tmp` 改 `${TMPDIR:-/tmp}`（沙箱/受限环境 /tmp 只读即挂，与 core.sh 自身 mktemp 惯例一致）——无依赖环境 114/124（余 10 项为本机无 python3（JSON 校验）且 tar→gzip 子进程受限（归档/export 断言），CI 双平台不受影响）
+  - **tests/07 TMPDIR 化**：硬编码 `/tmp` 改 `${TMPDIR:-/tmp}`（一致性；dig/ping 依赖为设计使然，CI 已装 dnsutils/iputils-ping）
+  - **回归**：本机（无 dig/perl/python3）单测 02/03/04/05/08 全绿 + 06 114/124；install.sh --help/--version/未知参数/无 sudo 拦截四路径实测正确；CI（ubuntu/macOS）行为零变化
 - 2026-08-27（第一百轮）：**文档修正轮：CODE_WIKI file:// 链接改相对路径 + §3 用例数对齐 + README.en 冒烟项数统一（docs/CODE_WIKI.md / README.en.md / README.md / lib/version.sh，发布 v2026.08.27，语义版 v1.18 不变）**
   - **CODE_WIKI 43 处 `file:///workspace/...` 链接改相对路径**（外部审阅发现）：原链接指向沙箱绝对路径，GitHub 渲染后任何查看者点击即失效（指向本机不存在的 /workspace）；统一改 `../xxx` 相对路径（CODE_WIKI 位于 docs/，`../` 即仓库根），与"目录可自由放置"的定位一致；全量校验 43 处目标均可解析
   - **CODE_WIKI §3 目录树用例数对齐**（自查发现）：tests/04 18→19、tests/05 12→13——与 §8.1 表格、求和行（共 259）及实际断言数一致；此前目录树漏同步 v1.18 轮次的两处计数，与"权威单一来源"宣言自相矛盾
