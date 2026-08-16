@@ -224,6 +224,7 @@ grep -q "class='legend'" trends/report.html && ok "总图图例存在" || notok 
 grep -q "class='pname'>阿里DNS-v4-1" trends/report.html && ok "HTML 总览表带标签副行" || notok "HTML 缺标签副行"
 grep -q "P95延迟" trends/report.html && ok "HTML 表含P95列" || notok "HTML 缺P95列"
 bash trends.sh --since 2026/08/01 2>&1 | grep -q "YYYY-MM-DD" && ok "--since 非法格式报错" || notok "--since 未校验格式"
+bash trends.sh --since 2026-13-99 2>&1 | grep -q "不是有效日期" && ok "--since 语义非法日期报错(13月)" || notok "--since 语义非法日期未报错"
 bash trends.sh --open 2>&1 | grep -q "已在浏览器打开\|手动打开" && ok "--open 输出打开/降级提示" || notok "--open 无提示"
 
 echo "═══ trends.sh: 日级分析 + 模板化图回归（chart_begin/chart_end 公共框架） ═══"

@@ -38,7 +38,9 @@ bash doctor.sh --cron 2>/dev/null | grep -q "自检" && notok "--cron 不应跑�
 
 echo "═══ doctor.sh: 缺 dig/ping 的 FAIL 路径（PATH 剥离，必需项缺失应 exit 1） ═══"
 NOPATH=$(mktemp -d)
-for c in uname date mkdir touch rm ls grep wc sort basename head tail awk sed cut tr bash sh; do
+# 注意：清单必须覆盖 doctor.sh 自身用到的全部外部命令（dirname/mv 曾缺失，
+# 导致脚本在第 13 行就 dirname: command not found 退出，'缺 dig/ping 被点名'用例实际测的是缺 dirname，目标失效）
+for c in uname date mkdir touch rm ls grep wc sort basename head tail awk sed cut tr dirname mv bash sh; do
   p=$(command -v "$c" 2>/dev/null) && ln -s "$p" "$NOPATH/$c"
 done
 DOC2=$(PATH="$NOPATH" bash doctor.sh 2>&1); DOC2_RC=$?
