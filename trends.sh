@@ -347,12 +347,21 @@ round_idx() {
 rec_total=0
 MODE_SEEN=""   # 已见采集模式（lite/full 混采则评分口径不一致，扫描后统一警告）
 LAST_TS=""     # 最新一条采集时间戳（数据新鲜度计算用）
+BAD_N=0        # 无法解析（缺 timestamp）的文件数——不静默跳过，否则会误报成"不可达/被过滤"
+BAD_LIST=""    # 前若干个坏文件名（告警里列出，便于直接定位）
 # while read 迭代（不用 for f in $FILES 的 IFS 分词）：数据目录含空格时文件名不被拆断；
 # 进程替换不开子 shell，循环内的数组累积（RAW_ADDR/RAW_VAL/ROUNDS_TS）在主 shell 生效
 while IFS= read -r f; do
   [ -z "$f" ] && continue
   ts=$(grep -oE '"timestamp": ?"[^"]+"' "$f" | head -1 | sed 's/"timestamp": *"//;s/"$//')
-  [ -z "$ts" ] && continue
+  if [ -z "$ts" ]; then
+    # 取不到 timestamp ⇒ 该文件无法解析（通常已损坏）。计数而非静默跳过：
+    # 全坏时会走到"无可用数据"，若不带这条线索会被误读成"DNS 全不可达"。
+    BAD_N=$((BAD_N+1))
+    [ "$BAD_N" -le 3 ] && BAD_LIST="$BAD_LIST$f
+"
+    continue
+  fi
   # --since/--until 均按 YYYY-MM-DD 日期前缀比较（含两端日期；纯 ASCII 前缀不受 locale 排序影响）
   if [ -n "$SINCE" ] && [[ "${ts:0:10}" < "$SINCE" ]]; then continue; fi
   if [ -n "$UNTIL" ] && [[ "${ts:0:10}" > "$UNTIL" ]]; then continue; fi
@@ -389,8 +398,22 @@ while IFS= read -r f; do
   done < <(grep -oE '"addr": ?"[^"]+", ?"score": ?"[^"]*", ?"stab": ?"[^"]*", ?"delay_ms": ?[0-9]+' "$f")
 done < <(printf '%s' "$FILES")
 
+if [ "$BAD_N" -gt 0 ]; then
+  # 显式 >&2：--json 模式的 stdout 是机器可读契约，且本段位于其重定向之前
+  {
+    echo "⚠️  跳过 $BAD_N 个无法解析的数据文件（缺 timestamp，通常表示文件已损坏）："
+    printf '%s' "$BAD_LIST" | while IFS= read -r _b; do [ -n "$_b" ] && echo "      $_b"; done
+    [ "$BAD_N" -gt 3 ] && echo "      ...（其余 $((BAD_N-3)) 个略）"
+    echo "    可用 bash doctor.sh --fix 隔离损坏 JSON（移至 results/quarantine/）后重跑"
+  } >&2
+fi
+
 if [ "$rec_total" -eq 0 ]; then
-  echo "❌ 无可用数据（所有记录均为不可达，或已被 --since/过滤条件排除）"
+  if [ "$BAD_N" -gt 0 ]; then
+    echo "❌ 无可用数据：其中 $BAD_N 个数据文件无法解析（见上方告警），其余记录不可达或已被 --since/过滤条件排除"
+  else
+    echo "❌ 无可用数据（所有记录均为不可达，或已被 --since/过滤条件排除）"
+  fi
   exit 2
 fi
 

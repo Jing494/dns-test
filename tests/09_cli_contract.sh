@@ -14,6 +14,7 @@
 #      - dns-preset.sh：显式预设组必须胜过 PRESET_DNS_CSV（mock dig，离线）
 #      - SAVE_LOG：compare/trends/doctor/verify/lite 均落盘；trends --json 跳过
 #      - dns-test.sh：--strict 不再被当 DNS 地址
+#      - trends.sh：损坏 JSON 不得静默跳过（须告警 + 给 doctor --fix 指引，且不污染 --json stdout）
 # 用法: bash tests/09_cli_contract.sh   （退出码 0=全过 1=有失败）
 # ============================================================================
 cd "$(dirname "$0")/.." || exit 1
@@ -114,6 +115,27 @@ out=$(timeout 60 bash dns-test.sh --strict 2>&1)
 echo "$out" | grep -q "非法DNS地址" && notok "dns-test.sh 仍把 --strict 当 DNS 地址" \
   || ok "dns-test.sh 未把 --strict 当 DNS 地址"
 echo "$out" | grep -q "不适用" && ok "dns-test.sh 明确提示选项不适用" || notok "dns-test.sh 缺少选项忽略提示"
+
+# ---------- C5. trends.sh 损坏 JSON 不得静默 ----------
+echo "═══ C5. trends.sh：损坏数据文件必须被告警 ═══"
+TD="$TMP/trd"; mkdir -p "$TD"
+printf 'BROKEN{{{' > "$TD/compare-20260810-090000.json"
+out=$(COMPARE_RESULTS_DIR="$TD" TRENDS_DIR="$TD/out" timeout 60 bash trends.sh 2>&1); rc=$?
+[ "$rc" -eq 2 ] && ok "全损坏时 exit 2" || notok "全损坏时 rc=$rc"
+echo "$out" | grep -q "无法解析" && ok "损坏文件被明确指出" || notok "损坏文件未被告警"
+echo "$out" | grep -q "doctor.sh --fix" && ok "给出修复指引" || notok "缺少修复指引"
+# 归因不得停留在"不可达/被过滤"（那是把排障引向错误方向）
+echo "$out" | grep -qE "无可用数据（所有记录均为不可达" && notok "仍按不可达/过滤归因" || ok "归因不再误导"
+# 一好一坏：应继续出报告，且 --json 的 stdout 仍是纯 JSON（告警走 stderr）
+printf '{"tool":"x","timestamp":"2026-08-11 09:00:00 +0800","mode":"lite","dns":[{"addr":"223.5.5.5","score":"90","stab":"100","delay_ms":20,"reachable":true}]}' > "$TD/compare-20260811-090000.json"
+outj=$(COMPARE_RESULTS_DIR="$TD" TRENDS_DIR="$TD/out" timeout 60 bash trends.sh --json 2>/dev/null)
+if printf '%s' "$outj" | grep -q "无法解析"; then
+  notok "损坏告警污染了 --json 的 stdout"
+else
+  printf '%s' "$outj" | head -c 1 | grep -q "{" && ok "损坏文件下 --json stdout 仍为纯 JSON" \
+    || notok "损坏文件下 --json stdout 异常"
+fi
+rm -rf "$TD"
 
 rm -rf "$TMP"
 echo ""

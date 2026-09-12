@@ -126,7 +126,7 @@ dns-test/
 │   ├── 06_compare_e2e.sh         # compare 端到端 125 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune/--until/--alert/--vs/周对比/突变检测(前值0ms边界)/--since当日边界/--md/--json/--week/--webhook/--archive 归档/--export 报障包/HTML归档小节/compare↔trends互链，mock dig/ping 离线 + 用户 results 备份恢复）
 │   ├── 07_doctor.sh              # doctor 自检+补全+install+新参数校验 60 用例（doctor正常/参数/--cron模板/PATH剥离FAIL路径 + bash补全语法/注册/模拟TAB(--fix/--archive-keep/值位不补) + zsh头与内容(--fix/--archive-keep) + install --completions幂等(假HOME)）
 │   ├── 08_trends_lib.sh          # trends_lib 纯函数 23 用例（分位数空/单值/奇偶样本/P95取位/clamp + score/delay全10态趋势判定 + trends.sh端到端等价冒烟）
-│   └── 09_cli_contract.sh        # CLI 契约与修复回归 83 用例（12 入口与 9 个 perl 脚本的 --help/--version/未知选项；release.sh 参数校验不产出垃圾包；dns-preset 命令行优先于 PRESET_DNS_CSV；SAVE_LOG 覆盖全部入口且 trends --json 跳过；dns-test --strict 不被当 DNS 地址）
+│   └── 09_cli_contract.sh        # CLI 契约与修复回归 88 用例（12 入口与 9 个 perl 脚本的 --help/--version/未知选项；release.sh 参数校验不产出垃圾包；dns-preset 命令行优先于 PRESET_DNS_CSV；SAVE_LOG 覆盖全部入口且 trends --json 跳过；dns-test --strict 不被当 DNS 地址）
 ├── tools/                        # 专项测试工具
 │   ├── manifest.sh               # 插件注册表
 │   ├── vowifi/                   # VoWiFi 专项（ePDG/路由器）
@@ -395,7 +395,7 @@ dns-test.sh 选"专项测试"
 | [tests/06_compare_e2e.sh](../tests/06_compare_e2e.sh) | compare 端到端 125 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、提供商标签+抖动三出口+JSON jitter_ms、预设组名展开含 IPv6、未知词报错、trends --prune/--until/--alert/--vs/周对比/突变检测（前值0ms边界）/--since 当日边界/--md/--json/--week/--webhook（mock curl 抓 payload）/--archive 归档（全量/删前打包/空数据）/--export 报障包（含数据/报告/doctor）/HTML 归档小节/compare↔trends 互链两形态；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
 | [tests/07_doctor.sh](../tests/07_doctor.sh) | doctor 自检 + 补全 + install + 新参数校验 60 用例（doctor 正常路径/参数/--cron 模板/PATH 剥离 FAIL 路径、bash 补全语法/注册/模拟 TAB 三场景（含 --fix/--archive-keep）、zsh compdef 头与内容、install --completions 幂等安装（假HOME）、trends --json/--week/--webhook/--archive/--export 参数校验） | `bash tests/07_doctor.sh` |
 | [tests/08_trends_lib.sh](../tests/08_trends_lib.sh) | trends_lib 纯函数 23 用例（trends_percentile 空/单值/奇偶样本 P50/P95 取位/边界 clamp；trends_slope_judge score/delay 全 10 态；trends.sh --json 端到端等价冒烟） | `bash tests/08_trends_lib.sh` |
-| [tests/09_cli_contract.sh](../tests/09_cli_contract.sh) | CLI 契约与修复回归 83 用例（12 入口 + 9 个 perl 脚本的 --help/--version/未知选项退出码；release.sh --help 不产出垃圾包、非法版本 exit 1；dns-preset.sh 显式预设胜过 PRESET_DNS_CSV（mock dig 离线）；SAVE_LOG 覆盖 compare/trends/doctor/verify/lite 且 trends --json 跳过；dns-test.sh --strict 不被当 DNS 地址） | `bash tests/09_cli_contract.sh` |
+| [tests/09_cli_contract.sh](../tests/09_cli_contract.sh) | CLI 契约与修复回归 88 用例（12 入口 + 9 个 perl 脚本的 --help/--version/未知选项退出码；release.sh --help 不产出垃圾包、非法版本 exit 1；dns-preset.sh 显式预设胜过 PRESET_DNS_CSV（mock dig 离线）；SAVE_LOG 覆盖 compare/trends/doctor/verify/lite 且 trends --json 跳过；dns-test.sh --strict 不被当 DNS 地址） | `bash tests/09_cli_contract.sh` |
 
 `02~08_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
 
@@ -411,7 +411,7 @@ dns-test.sh 选"专项测试"
 
 1. 语法检查（.sh + .pl）
 2. shellcheck（可选依赖，`--strict` 强制）
-3. 单元测试（18+9+4+19+13+125+60+23+83 用例）
+3. 单元测试（18+9+4+19+13+125+60+23+88 用例）
 4. 冒烟测试（24 项/25 检查点）
 5. compare 快测（2 DNS）
 6. trends 聚合（无数据/超时跳过）
