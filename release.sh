@@ -49,7 +49,9 @@ fi
 OUT="dns-test-${VERSION}.tar.gz"
 rm -f "$OUT"
 
-tar czf "$OUT" --exclude='.git' --exclude='results/*' --exclude='trends' --exclude='*.tar.gz' --exclude='.trae-html-share-packages' . 2>/dev/null
+# env.sh 是设备专用本地环境脚本（已 gitignore），不该随发行版分发
+tar czf "$OUT" --exclude='.git' --exclude='results/*' --exclude='trends' --exclude='*.tar.gz' \
+  --exclude='.trae-html-share-packages' --exclude='./env.sh' . 2>/dev/null
 
 echo "════ 打包完成 ════"
 echo "  文件: $OUT ($(du -h "$OUT" | cut -f1))"
