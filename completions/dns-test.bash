@@ -42,7 +42,7 @@ _dns_test_complete() {
       # 统一入口：预设/DNS + 可透传给专项的选项并集
       COMPREPLY=( $(compgen -W "$cmp_flags $trd_flags $ver_flags $presets $dns_words" -- "$cur") ) ;;
     doctor.sh)
-      COMPREPLY=( $(compgen -W "--net --cron --fix --help" -- "$cur") ) ;;
+      COMPREPLY=( $(compgen -W "--net --cron --fix --version --help" -- "$cur") ) ;;
     dns-preset.sh)
       # 位置参数：预设组 → lite|full → 索引
       COMPREPLY=( $(compgen -W "$presets lite full --version --help" -- "$cur") ) ;;
@@ -53,8 +53,8 @@ _dns_test_complete() {
     release.sh)
       COMPREPLY=( $(compgen -W "--version --help" -- "$cur") ) ;;
     lite.sh|full.sh)
-      # 基础测试：只吃 DNS 地址
-      COMPREPLY=( $(compgen -W "$dns_words" -- "$cur") ) ;;
+      # 基础测试：DNS 地址 + 自身的 --help/--version
+      COMPREPLY=( $(compgen -W "$dns_words --version --help" -- "$cur") ) ;;
     smoke_test.sh)
       # 无参数脚本：不补任何词
       COMPREPLY=() ;;

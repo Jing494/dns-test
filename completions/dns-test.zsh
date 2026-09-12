@@ -31,7 +31,7 @@ _dns-test() {
     dns-test.sh)
       _values 'option/预设/DNS' ${cmp_flags[@]} ${trd_flags[@]} ${ver_flags[@]} ${presets[@]} "${dns_words[@]}" ;;
     doctor.sh)
-      _values 'option' --net --cron --fix --help ;;
+      _values 'option' --net --cron --fix --version --help ;;
     dns-preset.sh)
       _values '预设/版本' ${presets[@]} lite full --version --help ;;
     install.sh)
@@ -41,7 +41,7 @@ _dns-test() {
     release.sh)
       _values 'option' --version --help ;;
     lite.sh|full.sh)
-      _values 'DNS' "${dns_words[@]}" ;;
+      _values 'DNS' "${dns_words[@]}" --version --help ;;
     *)
       ;;
   esac

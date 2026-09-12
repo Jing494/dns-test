@@ -116,16 +116,27 @@ SIM14=$(bash -c 'source completions/dns-test.bash
 COMP_WORDS=(./compare.sh --ht); COMP_CWORD=1
 _dns_test_complete; echo "${COMPREPLY[@]}"')
 echo "$SIM14" | grep -q -- "--html" && ok "./compare.sh 带路径调用补全生效" || notok "带路径补全失效: [$SIM14]"
+# 补全词表与脚本实际支持必须一致（曾漏 doctor --version / lite|full --help|--version）
+SIM15=$(bash -c 'source completions/dns-test.bash
+COMP_WORDS=(doctor.sh --v); COMP_CWORD=1
+_dns_test_complete; echo "${COMPREPLY[@]}"')
+echo "$SIM15" | grep -q -- "--version" && ok "doctor.sh --v<TAB> 补出 --version" || notok "doctor --version 补全缺失: [$SIM15]"
+SIM16=$(bash -c 'source completions/dns-test.bash
+COMP_WORDS=(lite.sh --h); COMP_CWORD=1
+_dns_test_complete; echo "${COMPREPLY[@]}"')
+echo "$SIM16" | grep -q -- "--help" && ok "lite.sh --h<TAB> 补出 --help" || notok "lite --help 补全缺失: [$SIM16]"
 
 echo "═══ completions: zsh 补全 ═══"
 grep -q "#compdef compare.sh trends.sh doctor.sh dns-test.sh lite.sh full.sh dns-preset.sh install.sh verify.sh release.sh smoke_test.sh" completions/dns-test.zsh \
   && ok "zsh compdef 头覆盖 11 脚本" || notok "zsh 缺 compdef 头/覆盖不全"
 grep -q -- "--strict" completions/dns-test.zsh && ok "zsh 含 verify --strict" || notok "zsh 缺 --strict"
 grep -q "install.sh" completions/dns-test.zsh && ok "zsh 含 install.sh 分支" || notok "zsh 缺 install.sh"
+grep -q -- "--net --cron --fix --version --help" completions/dns-test.zsh && ok "zsh doctor 含 --version" || notok "zsh doctor 缺 --version"
+grep -A1 -E "lite\.sh\|full\.sh\)" completions/dns-test.zsh | grep -q -- "--help" && ok "zsh lite/full 含 --help" || notok "zsh lite/full 缺 --help"
 grep -q -- "--webhook" completions/dns-test.zsh && ok "zsh 含新 flag --webhook" || notok "zsh 缺 --webhook"
 grep -q -- "--archive" completions/dns-test.zsh && ok "zsh 含 --archive" || notok "zsh 缺 --archive"
 grep -q -- "--export" completions/dns-test.zsh && ok "zsh 含 --export" || notok "zsh 缺 --export"
-grep -q -- "--net --cron --fix --help" completions/dns-test.zsh && ok "zsh doctor 含 --cron/--fix" || notok "zsh doctor 缺 --cron/--fix"
+grep -q -- "--net --cron --fix --version --help" completions/dns-test.zsh && ok "zsh doctor 含 --cron/--fix/--version" || notok "zsh doctor 缺 --cron/--fix/--version"
 grep -q -- "--archive-keep" completions/dns-test.zsh && ok "zsh 含 --archive-keep" || notok "zsh 缺 --archive-keep"
 
 echo "═══ install.sh: --completions 幂等安装（假 HOME，不动真实 rc） ═══"
