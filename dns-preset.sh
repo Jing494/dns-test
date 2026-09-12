@@ -21,6 +21,7 @@ case "$1" in
     echo "  预设组: default(默认) / ali / tencent / all"
     echo "  版本:   lite(默认) / full"
     echo "  索引:   只测第N个DNS（0=第1个）"
+  echo "  优先级: 命令行参数 > 环境变量 PRESET_DNS_CSV > 内置预设"
     echo "  示例:"
     echo "    bash dns-preset.sh                     # 默认+lite"
     echo "    bash dns-preset.sh ali                 # 阿里云+lite"
@@ -41,8 +42,11 @@ PRESET="${1:-default}"
 VERSION="${2:-lite}"
 IDX="${3:--1}"
 
-# 自定义预设优先（环境变量 PRESET_DNS_CSV，逗号分隔）
-if [ -n "$PRESET_DNS_CSV" ]; then
+# 优先级：命令行参数 > 环境变量 > 默认值（见 docs/CODE_WIKI.md「命令行参数 > 环境变量 > 默认值」）
+# PRESET_DNS_CSV 仅在【未显式给出预设组参数】时生效；显式参数永远优先。
+# 历史实现无条件让环境变量压过位置参数：
+#   PRESET_DNS_CSV=8.8.8.8 bash dns-preset.sh ali   → 静默忽略 ali，测了 8.8.8.8
+if { [ $# -lt 1 ] || [ -z "${1:-}" ]; } && [ -n "$PRESET_DNS_CSV" ]; then
   IFS=',' read -ra DNS_ADDR <<< "$PRESET_DNS_CSV"
   DNS_NAME=()
   for _a in "${DNS_ADDR[@]}"; do DNS_NAME+=("自定义DNS(${_a})"); done
