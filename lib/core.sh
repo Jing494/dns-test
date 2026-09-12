@@ -975,6 +975,10 @@ parse_dns_args() {
 print_dns_list() {
   local _a idx
   for _a in "${DNS_ADDR[@]}"; do
+    # - 开头是选项而非地址：分开报错，避免把选项误判成"非法DNS地址"误导排查
+    if [ "${_a#-}" != "$_a" ]; then
+      echo "❌ 未知选项: ${_a}（可用 --help 查看用法）"; exit 1
+    fi
     valid_dns_addr "$_a" || { echo "❌ 非法DNS地址: ${_a}（仅支持IPv4/IPv6格式）"; exit 1; }
   done
   print_header "$1"
