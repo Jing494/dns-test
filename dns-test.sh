@@ -215,6 +215,12 @@ run_prof() {
     ""|*[!0-9]*) echo "无效选项，返回主菜单..." ;;
     *)
       if [ "$professional_test" -le "$n_plugin" ]; then
+        # 专项插件同样不收命令行选项：明确提示忽略，避免"传了没生效"的静默困惑
+        if [ ${#PASS_ARGS[@]} -gt 0 ]; then
+          echo "⚠️  专项插件不接受命令行选项，${PASS_ARGS[*]} 将被忽略"
+          echo "    插件的参数由插件菜单内的引导输入决定"
+          echo ""
+        fi
         # 专项插件：DNS 数量保护（专项脚本收多 DNS 会慢/超时，最多4个）
         # 仅本次调用截断，不改动会话内 DNS_LIST/DNS_DISPLAY（避免副作用带到后续测试）
         if [ ${#DNS_LIST[@]} -gt 4 ]; then
