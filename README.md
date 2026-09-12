@@ -163,7 +163,7 @@ bash full.sh 8.8.8.8 114.114.114.114 0  # 测试多个DNS中的第1个（避免�
 bash full.sh 8.8.8.8 114.114.114.114 1  # 测试多个DNS中的第2个
 bash lite.sh            # 精简版基础测试
 
-# 专项测试
+# 专项测试（每个脚本都支持 -h/--help 查用法）
 perl tools/vowifi/01_resolve_vowifi.pl 8.8.8.8              # VoWiFi解析
 perl tools/vowifi/02_vowifi_verify.pl 8.8.8.8 114.114.114.114 # VoWiFi交叉验证
 perl tools/vowifi/03_test_router_dns.pl 192.168.1.1        # 路由器DNS测试

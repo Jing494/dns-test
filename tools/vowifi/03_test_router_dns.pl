@@ -11,6 +11,35 @@ use Socket qw(:DEFAULT IPPROTO_UDP IPPROTO_TCP);
 use FindBin;
 use lib "$FindBin::Bin/../../lib";
 use DNSUtil;
+
+# ---- CLI 契约：-h/--help 用法输出 + 未知选项拒绝 ----
+# 与 examples/*.pl 及 bash 入口保持一致；历史上 - 开头的参数会被当业务参数吞掉
+# （如 --help 被当 DNS 地址去解析），这里统一拦截。
+sub print_usage {
+    print <<"USAGE";
+用法: perl 03_test_router_dns.pl [路由器IP ...] [-- 省级DNS1,省级DNS2]
+  路由器 DNS 转发测试（对比省级基准）
+  例: perl tools/vowifi/03_test_router_dns.pl 192.168.1.1
+      perl tools/vowifi/03_test_router_dns.pl 192.168.1.1 -- 223.5.5.5
+  基准优先级: 命令行 `--` > 环境变量 PROVINCE_DNS > 内置默认
+  -h, --help  打印本说明
+USAGE
+}
+
+{
+    my $SEP_OK = 1;
+    my @unknown;
+    for my $a (@ARGV) {
+        if ($a =~ /^(-h|--help)$/) { print_usage(); exit 0; }
+        next if $SEP_OK && $a eq '--';   # 03: '--' 是"路由器IP / 省级基准"分隔符，不算选项
+        push @unknown, $a if $a =~ /^-/;
+    }
+    if (@unknown) {
+        print STDERR "❌ 未知选项: $unknown[0]（可用 --help 查看用法）\n";
+        exit 1;
+    }
+}
+
 $| = 1;  # 立即刷新输出（管道/CI 下防块缓冲导致输出丢失误判）
 
 my $TIMEOUT = 3;

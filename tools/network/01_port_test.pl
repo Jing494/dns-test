@@ -8,6 +8,36 @@ use DNSUtil;
 use POSIX qw(errno_h);
 use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
 
+# ---- CLI 契约：-h/--help 用法输出 + 未知选项拒绝 ----
+# 与 examples/*.pl 及 bash 入口保持一致；历史上 - 开头的参数会被当业务参数吞掉
+# （如 --help 被当 DNS 地址去解析），这里统一拦截。
+sub print_usage {
+    print <<"USAGE";
+用法: perl 01_port_test.pl [IP 端口 协议] ...
+  端口连通性测试（UDP 空包探测 / TCP 非阻塞 connect）
+  参数个数必须是 3 的倍数，一组为 IP 端口 协议（协议 tcp/udp）
+  例: perl tools/network/01_port_test.pl 223.5.5.5 53 udp
+      perl tools/network/01_port_test.pl 223.5.5.5 53 udp 1.1.1.1 443 tcp
+  省略参数则用内置默认目标
+  -h, --help  打印本说明
+USAGE
+}
+
+{
+    my $SEP_OK = 0;
+    my @unknown;
+    for my $a (@ARGV) {
+        if ($a =~ /^(-h|--help)$/) { print_usage(); exit 0; }
+        next if $SEP_OK && $a eq '--';   # 03: '--' 是"路由器IP / 省级基准"分隔符，不算选项
+        push @unknown, $a if $a =~ /^-/;
+    }
+    if (@unknown) {
+        print STDERR "❌ 未知选项: $unknown[0]（可用 --help 查看用法）\n";
+        exit 1;
+    }
+}
+
+
 my $TIMEOUT = 5;
 
 # 测试目标

@@ -10,11 +10,29 @@ use FindBin;
 use lib "$FindBin::Bin/../lib";
 use DNSUtil;
 
-# --help/-h 用法提示
-if (@ARGV && $ARGV[0] =~ /^(-h|--help)$/) {
-    print "用法: perl 03_dns64_check.pl [DNS1] [DNS2] ...\n";
-    print "  默认 Google/Cloudflare DNS64 + 运营商DNS对照；支持环境变量 DNS_LIST\n";
-    exit 0;
+# ---- CLI 契约：-h/--help 用法输出 + 未知选项拒绝 ----
+# 扫描全部参数而非只看首个：保证 --help/-h 出现在任意位置都生效；
+# 任何 - 开头的未知选项被明确拒绝（历史实现只查 $ARGV[0]，
+# 于是 `... 8.8.8.8 --help` 会把 --help 当成第 2 个 DNS 地址）。
+sub print_usage {
+    print <<"USAGE";
+用法: perl 03_dns64_check.pl [DNS1] [DNS2] ...
+  默认 Google/Cloudflare DNS64 + 运营商DNS对照；支持环境变量 DNS_LIST（逗号分隔）
+  例: perl examples/03_dns64_check.pl 223.5.5.5
+  -h, --help  打印本说明
+USAGE
+}
+
+{
+    my @unknown;
+    for my $a (@ARGV) {
+        if ($a =~ /^(-h|--help)$/) { print_usage(); exit 0; }
+        push @unknown, $a if $a =~ /^-/;
+    }
+    if (@unknown) {
+        print STDERR "❌ 未知选项: $unknown[0]（可用 --help 查看用法）\n";
+        exit 1;
+    }
 }
 
 # 配置: 待检测的DNS服务器

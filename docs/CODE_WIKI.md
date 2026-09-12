@@ -187,6 +187,8 @@ dns-test/
 | [tools/network/01_port_test.pl](../tools/network/01_port_test.pl) | 端口连通性测试（UDP 空包探测 / TCP 非阻塞 connect） |
 | [tools/network/doh_dot_check.sh](../tools/network/doh_dot_check.sh) | DoH/DoT 支持检测（DoT=`dig +tls` 实测；DoH=有 curl 实测/无则端口级） |
 
+**CLI 契约（专项工具与示例一致）**：所有专项工具与示例均支持 `-h`/`--help` 打印用法；`-` 开头的未知选项会被明确拒绝（退出码 1），不会被当作 DNS 地址/运营商代码吞掉。
+
 ### 4.4 示例脚本 (examples/)
 
 | 脚本 | 职责 |
@@ -196,7 +198,7 @@ dns-test/
 | [examples/03_dns64_check.pl](../examples/03_dns64_check.pl) | DNS64 支持检测（识别 `64:ff9b::` 合成地址并提取嵌入 IPv4） |
 | [examples/04_reverse_dns.pl](../examples/04_reverse_dns.pl) | 反向 DNS 解析（v4 in-addr.arpa / v6 ip6.arpa） |
 
-所有示例均支持 `--help`/`-h` 打印用法，命令行参数 > 环境变量 > 默认值。
+所有示例均支持 `--help`/`-h` 打印用法（扫描全部参数，出现在任意位置都生效），未知 `-` 开头选项被拒绝（退出码 1）；优先级为 命令行参数 > 环境变量 > 默认值。
 
 ---
 

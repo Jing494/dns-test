@@ -19,6 +19,36 @@ use FindBin;
 use lib "$FindBin::Bin/../../lib";
 use DNSUtil;
 
+# ---- CLI 契约：-h/--help 用法输出 + 未知选项拒绝 ----
+# 与 examples/*.pl 及 bash 入口保持一致；历史上 - 开头的参数会被当业务参数吞掉
+# （如 --help 被当 DNS 地址去解析），这里统一拦截。
+sub print_usage {
+    print <<"USAGE";
+用法: perl carrier_epdg.pl [运营商] [DNS或router]
+  检测各运营商 ePDG 域名解析情况（电信/移动/联通/广电）
+  运营商: ct(电信) / cmcc(移动) / cucc(联通) / cbn(广电) / all(全部)
+  省略参数则进入交互模式
+  例: perl tools/vowifi/carrier_epdg.pl all
+      perl tools/vowifi/carrier_epdg.pl ct 223.5.5.5
+  -h, --help  打印本说明
+USAGE
+}
+
+{
+    my $SEP_OK = 0;
+    my @unknown;
+    for my $a (@ARGV) {
+        if ($a =~ /^(-h|--help)$/) { print_usage(); exit 0; }
+        next if $SEP_OK && $a eq '--';   # 03: '--' 是"路由器IP / 省级基准"分隔符，不算选项
+        push @unknown, $a if $a =~ /^-/;
+    }
+    if (@unknown) {
+        print STDERR "❌ 未知选项: $unknown[0]（可用 --help 查看用法）\n";
+        exit 1;
+    }
+}
+
+
 my $TIMEOUT = 3;
 
 # ========== 运营商 ePDG 域名映射（MCC 460 中国，MNC归属经ITU/维基核实） ==========

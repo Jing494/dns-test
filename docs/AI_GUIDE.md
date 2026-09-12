@@ -137,6 +137,8 @@ bash dns-test.sh
 | 统一入口透传专项选项 | `bash dns-test.sh 223.5.5.5 119.29.29.29 --html`（`--` 开头的选项原样转发给所选专项脚本，由其自校验） |
 | 一键全面自检 | `bash verify.sh`（语法+shellcheck+单测+冒烟+compare+trends+专项，约5分钟，真机推荐；shellcheck 可选依赖未装则跳过，`--strict` 可强制要求，`--help` 看用法） |
 
+> 💡 **查用法**：全部入口脚本与 `tools/`、`examples/` 下的 perl 脚本均支持 `-h`/`--help` 打印用法；`-` 开头的未知选项一律报错退出（退出码 1），不会被当作 DNS 地址或运营商代码吞掉。
+
 ---
 
 ## 五、常见用户场景 → 推荐路径

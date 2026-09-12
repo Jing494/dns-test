@@ -6,6 +6,35 @@ use FindBin;
 use lib "$FindBin::Bin/../../lib";
 use DNSUtil;   # dns_sockaddr / inet_pton_ipv6 / build_dns_query / parse_dns_response
 
+# ---- CLI 契约：-h/--help 用法输出 + 未知选项拒绝 ----
+# 与 examples/*.pl 及 bash 入口保持一致；历史上 - 开头的参数会被当业务参数吞掉
+# （如 --help 被当 DNS 地址去解析），这里统一拦截。
+sub print_usage {
+    print <<"USAGE";
+用法: perl 01_resolve_vowifi.pl [DNS地址 ...]
+  测试所有 3GPP 标准 ePDG 域名（mnc000~015）的 A/AAAA 解析
+  DNS地址: 可传多个（v4/v6 混合）；省略则用内置默认组
+  例: perl tools/vowifi/01_resolve_vowifi.pl 223.5.5.5
+      perl tools/vowifi/01_resolve_vowifi.pl 240e:52:4800::8888 8.8.8.8
+  -h, --help  打印本说明
+USAGE
+}
+
+{
+    my $SEP_OK = 0;
+    my @unknown;
+    for my $a (@ARGV) {
+        if ($a =~ /^(-h|--help)$/) { print_usage(); exit 0; }
+        next if $SEP_OK && $a eq '--';   # 03: '--' 是"路由器IP / 省级基准"分隔符，不算选项
+        push @unknown, $a if $a =~ /^-/;
+    }
+    if (@unknown) {
+        print STDERR "❌ 未知选项: $unknown[0]（可用 --help 查看用法）\n";
+        exit 1;
+    }
+}
+
+
 
 # 设置超时（秒）
 my $TIMEOUT = 2;
