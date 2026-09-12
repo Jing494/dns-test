@@ -19,6 +19,11 @@
 # ============================================================================
 cd "$(dirname "$0")/.." || exit 1
 
+# macOS 默认无 timeout 命令（coreutils 才有 gtimeout）——本文件大量使用 timeout，
+# 必须接兼容层，否则在 macOS 上 timeout 返回 127（command not found）。
+# 注：CI 曾因此在 macos-latest 上红，而 ubuntu 绿（那边有真 timeout）。
+source lib/compat.sh
+
 PASS=0; FAIL=0
 ok()   { PASS=$((PASS+1)); echo "  ✅ $1"; }
 notok(){ FAIL=$((FAIL+1)); echo "  ❌ $1"; }
