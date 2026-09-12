@@ -6,3 +6,4 @@
 trends/
 .trae-html-share-packages/
 .preview/
+/env.sh
