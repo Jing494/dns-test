@@ -45,6 +45,10 @@ command -v curl >/dev/null 2>&1 && HAS_CURL=1
 IFS=',' read -ra DNS_ARR <<< "$DNS_LIST"
 for DNS in "${DNS_ARR[@]}"; do
   DNS="$(echo "$DNS" | tr -d ' ')"
+  # - 开头是选项而非地址：分开报错，避免把选项误判成"非法DNS地址"
+  if [ "${DNS#-}" != "$DNS" ]; then
+    echo "❌ 未知选项: $DNS（可用 bash tools/network/doh_dot_check.sh --help 查看用法）"; exit 1
+  fi
   # 合法地址校验（v4/v6）：IPv4 每段 0-255（与 core.sh valid_dns_addr 同规格，拒绝 999.x 超范围，审阅#2）
 if [[ "$DNS" =~ ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ ]] || ( [[ "$DNS" =~ ^[0-9a-fA-F:]+$ ]] && [[ "$DNS" == *":"* ]] ); then
     echo "════ DoH/DoT 检测: $DNS ════"

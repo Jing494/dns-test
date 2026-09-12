@@ -127,6 +127,10 @@ done
 SEEN_LIST=()
 UNIQ=()
 for d in "${DNS_ARGS[@]}"; do
+  # - 开头是选项而非地址：分开报错，避免把选项误判成"非法DNS地址"误导排查
+  if [ "${d#-}" != "$d" ]; then
+    echo "❌ 未知选项: $d（可用 bash compare.sh --help 查看用法）"; exit 1
+  fi
   if ! valid_dns_addr "$d"; then
     echo "❌ 非法DNS地址: $d"; exit 1
   fi
