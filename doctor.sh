@@ -51,10 +51,15 @@ for _a in "$@"; do
       echo "  --net  追加真实网络连通检查（dig @223.5.5.5；离线环境省略则跳过该节）"
       echo "  --fix  体检后自动修复可自愈项（建缺失目录/隔离损坏JSON，不动正常数据）"
       echo "  --cron 打印值守 crontab 模板（采集+告警+归档三件套，不执行体检）"
+      echo "  -h, --help   打印本说明"
+      echo "  --version    打印版本号"
       echo "退出码: 0=全部通过 1=存在 FAIL"
       exit 0 ;;
+    --version)
+      echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"
+      exit 0 ;;
     "") ;;
-    *) echo "❌ 未知参数: ${_a}（仅支持 --net / --fix / --cron）"; exit 1 ;;
+    *) echo "❌ 未知参数: ${_a}（仅支持 --net / --fix / --cron / --help / --version）"; exit 1 ;;
   esac
 done
 

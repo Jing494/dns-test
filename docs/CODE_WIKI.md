@@ -160,6 +160,9 @@ dns-test/
 | [install.sh](../install.sh) | 依赖检测与安装 | 自动识别 apt/yum/dnf/brew/apk/pacman/zypper；`--completions` 幂等装补全（装完依赖顺手执行） |
 | [release.sh](../release.sh) | 打包 tar.gz + 上传指引 | 排除 .git/results 内容；版本号按双轨制白名单校验（非法参数 exit 1，不再打出垃圾包） |
 
+**统一入口约定**：上述全部入口脚本均支持 `-h`/`--help`（打印用法）与 `--version`（打印版本号）；
+`-` 开头的未知选项一律报错退出（退出码 1）。
+
 ### 4.2 核心库 (lib/)
 
 | 文件 | 职责 |
