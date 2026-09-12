@@ -23,32 +23,50 @@ fi
 
 # 帮助输出（与其余入口脚本一致）
 if [ "$1" = "-h" ] || [ "$1" = "--help" ] || [ "$1" = "help" ]; then
-  echo "用法: bash dns-test.sh [DNS...]"
+  echo "用法: bash dns-test.sh [DNS...] [专项选项...]"
   echo "  DNS列表: 一个或多个DNS地址（默认 4 个默认运营商DNS，v4/v6 各 2 个），支持v4/v6混合"
+  echo "  专项选项: 原样转发给选中的专项脚本（含带值的选项），由子脚本自校验——未知选项会报错退出"
+  echo "            compare.sh → --html --md --json --open --no-save --rounds N ..."
+  echo "            trends.sh  → --html --md --json --csv --detail --since D --until D ..."
+  echo "            verify.sh  → --strict"
+  echo "            基础测试（精简版/完整版）不接受选项，传入会提示忽略"
   echo "  交互: 测完自动返回主菜单，可继续测试或输入 0 退出；全程 30 秒输入超时保护"
   echo "  示例:"
-  echo "    bash dns-test.sh                       # 默认DNS组（交互选版本/专项）"
-  echo "    bash dns-test.sh 8.8.8.8               # 自定义DNS"
-  echo "    bash dns-test.sh 8.8.8.8 114.114.114.114  # 多个自定义DNS"
+  echo "    bash dns-test.sh                              # 默认DNS组（交互选版本/专项）"
+  echo "    bash dns-test.sh 8.8.8.8                      # 自定义DNS"
+  echo "    bash dns-test.sh 8.8.8.8 114.114.114.114      # 多个自定义DNS"
+  echo "    bash dns-test.sh 223.5.5.5 119.29.29.29 --html   # 专项透传 --html 生成报告"
   echo "  环境变量: DEFAULT_DNS_CSV=... 自定义默认DNS组；SAVE_LOG=1 保存日志"
   exit 0
 fi
 
-# 处理DNS参数
+# 处理参数：DNS 地址进 DNS_LIST，其余（选项及其取值）进 PASS_ARGS 原样转发给专项脚本
+# 判定依据是项目自带的 valid_dns_addr —— 用"是不是合法DNS地址"来切分，
+# 从而不必维护"哪些选项带值"的路由表（那种表会随子脚本演进而漂移）。
 DNS_LIST=()
+PASS_ARGS=()
 DNS_FROM_ARG=0
-if [ $# -ge 1 ]; then
-  DNS_LIST=("$@")
-  DNS_DISPLAY="自定义DNS: $*"
+for _arg in "$@"; do
+  if valid_dns_addr "$_arg"; then
+    DNS_LIST+=("$_arg")
+  else
+    PASS_ARGS+=("$_arg")
+  fi
+done
+if [ ${#DNS_LIST[@]} -gt 0 ]; then
+  DNS_DISPLAY="自定义DNS: ${DNS_LIST[*]}"
   DNS_FROM_ARG=1
 else
-  DNS_LIST=()
   DNS_DISPLAY="默认运营商DNS 4个"
 fi
 
 # 非交互模式（无终端）：为避免超时，默认只跑精简版+第1个DNS，一次跑完退出
 if [ ! -t 0 ]; then
   echo "非交互模式，为避免超时，默认运行精简版测试（仅第1个DNS）..."
+  if [ ${#PASS_ARGS[@]} -gt 0 ]; then
+    echo "  ⚠️  非交互模式只跑基础测试（lite），选项 ${PASS_ARGS[*]} 不适用已忽略"
+    echo "      需要这些选项请直接调用 bash compare.sh / bash trends.sh / bash verify.sh"
+  fi
   if [ ${#DNS_LIST[@]} -ge 2 ]; then
     echo "  💡 检测到 ${#DNS_LIST[@]} 个DNS：横向对比可用 bash compare.sh ${DNS_LIST[*]}"
   fi
@@ -110,6 +128,13 @@ run_basic() {
       else
         script=full.sh
         echo "开始完整版测试..."
+      fi
+
+      # 基础测试（lite/full）不收选项：传入即明确提示忽略，避免"传了没生效"的静默困惑
+      if [ ${#PASS_ARGS[@]} -gt 0 ]; then
+        echo "⚠️  基础测试不接受选项，${PASS_ARGS[*]} 将被忽略"
+        echo "    这些选项属于专项测试（主菜单 2），需要请走专项"
+        echo ""
       fi
 
       # 多DNS时询问是否指定某一个
@@ -202,7 +227,8 @@ run_prof() {
         echo "开始多DNS对比（compare.sh，lite精简版53项/DNS，并行）..."
         if [ ${#DNS_LIST[@]} -ge 2 ]; then
           echo "  使用当前DNS列表: ${DNS_LIST[*]}"
-          bash compare.sh "${DNS_LIST[@]}"
+          [ ${#PASS_ARGS[@]} -gt 0 ] && echo "  透传选项: ${PASS_ARGS[*]}"
+          bash compare.sh "${DNS_LIST[@]}" "${PASS_ARGS[@]}"
         else
           echo "  对比至少需要2个DNS（当前: ${DNS_LIST[*]:-无}）"
           if ! prompt cmp_input "  请输入要对比的DNS（逗号分隔，回车默认 223.5.5.5,119.29.29.29；也可输预设组名如 ali,tencent）: "; then
@@ -213,20 +239,31 @@ run_prof() {
           if [ -n "$cmp_input" ]; then
             # 逗号/空格分隔都兼容（read -ra 防分词问题）
             IFS=", " read -ra cmp_list <<< "$cmp_input"
-            bash compare.sh "${cmp_list[@]}"
+            bash compare.sh "${cmp_list[@]}" "${PASS_ARGS[@]}"
           else
             echo "  未输入，默认对比 223.5.5.5 与 119.29.29.29"
-            bash compare.sh 223.5.5.5 119.29.29.29
+            bash compare.sh 223.5.5.5 119.29.29.29 "${PASS_ARGS[@]}"
           fi
         fi
       elif [ "$professional_test" = "$trd_n" ]; then
         echo "开始DNS趋势洞察（trends.sh，聚合 results/compare-*.json）..."
         echo "  提示: 需先积累compare数据（跑过compare即自动保存）"
-        bash trends.sh --html
+        if [ ${#PASS_ARGS[@]} -gt 0 ]; then
+          echo "  透传选项: ${PASS_ARGS[*]}"
+          bash trends.sh "${PASS_ARGS[@]}"
+        else
+          echo "  未指定报告选项，默认 --html（可用 bash dns-test.sh --csv 等自定义）"
+          bash trends.sh --html
+        fi
       elif [ "$professional_test" = "$ver_n" ]; then
         echo "开始一键全面验证（verify.sh，含语法/单测/冒烟/compare/trends/专项）..."
         echo "  提示: 网络项（compare/专项）在海外/受限网络可能超时，会友好提示"
-        bash verify.sh
+        if [ ${#PASS_ARGS[@]} -gt 0 ]; then
+          echo "  透传选项: ${PASS_ARGS[*]}"
+          bash verify.sh "${PASS_ARGS[@]}"
+        else
+          bash verify.sh
+        fi
       else
         echo "无效选项，返回主菜单..."
       fi
