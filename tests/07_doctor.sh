@@ -51,8 +51,9 @@ rm -rf "$NOPATH"
 
 echo "═══ completions: bash 补全 ═══"
 bash -n completions/dns-test.bash && ok "bash 补全语法 OK" || notok "bash 补全语法错误"
-bash -c 'source completions/dns-test.bash && complete -p compare.sh trends.sh doctor.sh >/dev/null 2>&1' \
-  && ok "补全已注册(6脚本)" || notok "补全未注册"
+# 覆盖全部 11 个入口脚本（曾只注册 6 个：dns-preset/install/verify/release/smoke 手打参数）
+bash -c 'source completions/dns-test.bash && complete -p compare.sh trends.sh doctor.sh dns-test.sh lite.sh full.sh dns-preset.sh install.sh verify.sh release.sh smoke_test.sh >/dev/null 2>&1' \
+  && ok "补全已注册(11脚本)" || notok "补全未注册"
 # 模拟 <TAB>：./trends.sh --we<TAB> 应补出 --webhook/--week
 SIM=$(bash -c 'source completions/dns-test.bash
 COMP_WORDS=(trends.sh --we); COMP_CWORD=1
@@ -93,10 +94,34 @@ SIM9=$(bash -c 'source completions/dns-test.bash
 COMP_WORDS=(trends.sh --archive-keep); COMP_CWORD=2
 _dns_test_complete; echo "n=${#COMPREPLY[@]}"')
 [ "$SIM9" = "n=0" ] && ok "--archive-keep 值位不补 flag" || notok "--archive-keep 值位误补: [$SIM9]"
+# 新增覆盖脚本：verify / install / dns-preset / release
+SIM10=$(bash -c 'source completions/dns-test.bash
+COMP_WORDS=(verify.sh --str); COMP_CWORD=1
+_dns_test_complete; echo "${COMPREPLY[@]}"')
+echo "$SIM10" | grep -q -- "--strict" && ok "verify.sh --str<TAB> 补出 --strict" || notok "--strict 补全缺失: [$SIM10]"
+SIM11=$(bash -c 'source completions/dns-test.bash
+COMP_WORDS=(install.sh --sm); COMP_CWORD=1
+_dns_test_complete; echo "${COMPREPLY[@]}"')
+echo "$SIM11" | grep -q -- "--smoke" && ok "install.sh --sm<TAB> 补出 --smoke" || notok "--smoke 补全缺失: [$SIM11]"
+SIM12=$(bash -c 'source completions/dns-test.bash
+COMP_WORDS=(dns-preset.sh al); COMP_CWORD=1
+_dns_test_complete; echo "${COMPREPLY[@]}"')
+echo "$SIM12" | grep -q "ali" && ok "dns-preset.sh al<TAB> 补出预设 ali" || notok "dns-preset 预设补全缺失: [$SIM12]"
+SIM13=$(bash -c 'source completions/dns-test.bash
+COMP_WORDS=(release.sh --h); COMP_CWORD=1
+_dns_test_complete; echo "${COMPREPLY[@]}"')
+echo "$SIM13" | grep -q -- "--help" && ok "release.sh --h<TAB> 补出 --help" || notok "--help 补全缺失: [$SIM13]"
+# 带路径调用：原实现直接取 COMP_WORDS[0] 匹配 case，./x.sh 会静默失效
+SIM14=$(bash -c 'source completions/dns-test.bash
+COMP_WORDS=(./compare.sh --ht); COMP_CWORD=1
+_dns_test_complete; echo "${COMPREPLY[@]}"')
+echo "$SIM14" | grep -q -- "--html" && ok "./compare.sh 带路径调用补全生效" || notok "带路径补全失效: [$SIM14]"
 
 echo "═══ completions: zsh 补全 ═══"
-grep -q "#compdef compare.sh trends.sh doctor.sh" completions/dns-test.zsh \
-  && ok "zsh compdef 头正确" || notok "zsh 缺 compdef 头"
+grep -q "#compdef compare.sh trends.sh doctor.sh dns-test.sh lite.sh full.sh dns-preset.sh install.sh verify.sh release.sh smoke_test.sh" completions/dns-test.zsh \
+  && ok "zsh compdef 头覆盖 11 脚本" || notok "zsh 缺 compdef 头/覆盖不全"
+grep -q -- "--strict" completions/dns-test.zsh && ok "zsh 含 verify --strict" || notok "zsh 缺 --strict"
+grep -q "install.sh" completions/dns-test.zsh && ok "zsh 含 install.sh 分支" || notok "zsh 缺 install.sh"
 grep -q -- "--webhook" completions/dns-test.zsh && ok "zsh 含新 flag --webhook" || notok "zsh 缺 --webhook"
 grep -q -- "--archive" completions/dns-test.zsh && ok "zsh 含 --archive" || notok "zsh 缺 --archive"
 grep -q -- "--export" completions/dns-test.zsh && ok "zsh 含 --export" || notok "zsh 缺 --export"
