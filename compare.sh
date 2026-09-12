@@ -33,6 +33,9 @@ source lib/core.sh
 # 空数组/空值时避免 macOS 的 rm 收到空串参数而报错（审阅#1）
 trap '[ "${#TMPDIR_LIST[@]}" -gt 0 ] && rm -rf "${TMPDIR_LIST[@]}"' EXIT INT TERM
 
+# SAVE_LOG：输出落盘（实现见 lib/compat.sh 的 save_log_init）
+save_log_init "$0"
+
 VERSION="${PROJECT_VERSION}"
 GEN_HTML=0
 GEN_MD=0

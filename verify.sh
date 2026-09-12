@@ -12,6 +12,9 @@
 cd "$(dirname "$0")" || exit 1
 # 平台兼容层（macOS 默认无 timeout 命令，步骤4-7 的超时保护依赖它）
 source lib/compat.sh
+
+# SAVE_LOG：整轮自检输出落盘
+save_log_init "$0"
 STRICT=0
 case "$1" in
   --strict) STRICT=1 ;;

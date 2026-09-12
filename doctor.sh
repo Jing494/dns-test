@@ -15,6 +15,9 @@ cd "$SCRIPT_DIR" || exit 1
 source lib/compat.sh
 source lib/version.sh
 
+# SAVE_LOG：输出落盘（doctor 刻意不 source core.sh，实现因此在 compat.sh）
+save_log_init "$0"
+
 NET_MODE=0
 FIX_MODE=0
 for _a in "$@"; do

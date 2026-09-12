@@ -30,17 +30,9 @@ source "${SCRIPT_DIR}/lib/core.sh"
 # ${VAR:+...} 空值时展开为空串参数仍会让 macOS 的 rm 报错，改用条件判断（审阅#1）
 trap '[ -n "${PARR_TMPDIR:-}" ] && rm -rf "$PARR_TMPDIR"; [ "${#TMPDIR_LIST[@]}" -gt 0 ] && rm -rf "${TMPDIR_LIST[@]}"' EXIT INT TERM
 
-# 自动保存日志（SAVE_LOG=1 时写入 results/，Linux tee到终端+文件 / macOS写文件）
-if [ -n "$SAVE_LOG" ]; then
-  mkdir -p "${SCRIPT_DIR}/results"
-  LOG_FILE="${SCRIPT_DIR}/results/$(basename "$0" .sh)-$(date +%Y%m%d-%H%M%S).log"
-  if [ "$(uname)" = "Darwin" ]; then
-    exec > "$LOG_FILE" 2>&1
-  else
-    exec > >(tee "$LOG_FILE") 2>&1
-  fi
-  echo "📄 日志保存: $LOG_FILE"
-fi
+# 自动保存日志（SAVE_LOG=1 时写入 results/）
+# 实现统一在 lib/compat.sh 的 save_log_init —— 各入口共用一份，避免多处副本漂移
+save_log_init "$0"
 
 # 处理参数 + 打印列表 + 逐个测试（公共逻辑在 core.sh：parse_dns_args/print_dns_list/run_all_dns_tests/finish_dns_tests）
 # 支持 [DNS...] [索引]，索引越界自动忽略改测全部；DNS 地址格式校验在 print_dns_list 内

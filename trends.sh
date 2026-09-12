@@ -36,6 +36,13 @@ cd "$SCRIPT_DIR" || exit 1
 source lib/core.sh
 source lib/trends_lib.sh
 
+# SAVE_LOG：--json 模式下 stdout 是机器可读契约（供 jq/Grafana 消费），
+# 而 save_log_init 会把 stderr 并入 stdout 破坏该契约 —— 该模式跳过日志保存
+case " $* " in
+  *" --json "*) : ;;
+  *) save_log_init "$0" ;;
+esac
+
 # 异常退出时统一清理 mktemp 临时目录（--export 的 EXP_STAGE 等；与 lite/compare 同款 trap 延迟求值）
 trap '[ "${#TMPDIR_LIST[@]}" -gt 0 ] && rm -rf "${TMPDIR_LIST[@]}" 2>/dev/null; true' EXIT INT TERM
 
