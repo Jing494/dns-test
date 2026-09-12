@@ -62,7 +62,7 @@ install_completions() {
 MODE="${1:-}"
 case "$MODE" in
   -h|--help|help)
-    echo "用法: bash install.sh [--smoke|--all|--completions]"
+    echo "用法: bash install.sh [--smoke|--all|--completions] [--help|--version]"
     echo ""
     echo "  直接跑: 检测必需依赖 dig/perl/curl，缺失才安装（自动检测包管理器），装完强制校验"
     echo "           校验时检测 dig 的 DoT 能力（bind 9.18+ 才支持 +tls）"

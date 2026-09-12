@@ -6,6 +6,7 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
+| v2026.08.31 | v1.18（修复） |
 | v2026.08.30 | v1.18（修复） |
 | v2026.08.29 | v1.18（补丁） |
 | v2026.08.28 | v1.18（补丁） |
@@ -34,6 +35,16 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-31（第一百零四轮）：**修复轮：perl 脚本 CLI 契约统一 + DNSUtil IPv4 严格校验 + 新增 CLI 契约回归测试（tools/×5 / examples/×4 / lib/DNSUtil.pm / lib/core.sh / compare.sh / doctor.sh / dns-test.sh / doh_dot_check.sh / tests/01 / tests/09 / verify.sh / smoke.yml / 文档，发布 v2026.08.31，语义版 v1.18 不变）**
+  - **perl 脚本 CLI 契约统一**（逐脚本实测发现）：`tools/` 下 5 个脚本（vowifi×4 + network×1）**完全没有** `-h/--help` 处理且不拒绝未知选项——`perl tools/vowifi/01_resolve_vowifi.pl --help` 会把 `--help` 当 DNS 地址去解析，`carrier_epdg.pl --help` 报「未知运营商: --help」；`examples/` 下 4 个虽有 `--help` 但**只看 `$ARGV[0]`**，`perl examples/01_dns_query.pl 8.8.8.8 --help` 会把 `--help` 当第 2 个 DNS 静默吞掉。修法：9 个脚本统一为「扫描全部参数 → `-h/--help` 任意位置打印用法 exit 0；其余 `-` 开头明确拒绝 exit 1」，并保留 `03_test_router_dns.pl` 的 `--` 语义分隔符
+  - **DNSUtil IPv4 校验不再委托 inet_aton**（本机实测发现，**CI 不可见**）：`dns_sockaddr` 的 IPv4 分支只做形状检查，范围校验交给 `inet_aton`；而该函数在 bionic(Android) 等 libc 上沿用经典 BSD 宽松语义，本机实测接受 `999.999.999.999` / `256.1.1.1` / `1.2.3` / `1.2.3.4.5` / `0x7f.1` 并全部返回 4 字节——非法地址被当合法地址用，`tests/01` 的「非法 IPv4」子用例长期在本机红（进而 smoke 第 22 项红），而 CI 的 glibc/macOS 上 `inet_aton` 恰好严格故恒绿。修法：改与 bash 侧 `valid_dns_addr` 同规格的严格 0-255 正则，形似 IPv4 即按 IPv4 报错口径处理（不再落到 IPv6 分支报误导信息）；`tests/01` 现有子用例内补 6 组畸形写法断言
+  - **lite/full 未知选项误报**（由新测试当场抓出）：`lib/core.sh` 的 `print_dns_list` 把 `-` 开头的选项送进地址校验，`bash lite.sh --zzz-bogus` 报「❌ 非法DNS地址」。修法：校验前先判别 `-` 开头并报「未知选项」（一处修复覆盖 lite/full）
+  - **doctor.sh 补 `--version`**：它是 12 个入口里唯一不支持的（项目约定为「统一入口约定」，且本就 source 了 `lib/version.sh`）；用法与未知参数提示一并补全
+  - **compare/doh_dot 未知选项误报**：`bash compare.sh --bogus` 报「❌ 非法DNS地址: --bogus」，把选项误判为地址。修法：先判别 `-` 开头报「未知选项」，真实非法地址仍报「非法DNS地址」
+  - **dns-test.sh 插件分支补忽略提示**：v2026.08.30 给基础测试分支加了提示但漏了插件分支，选专项插件时命令选项被无声丢弃
+  - **新增 `tests/09_cli_contract.sh`（83 用例）**：把 v2026.08.30 的 4 个修复固化为**行为级断言**——12 入口与 9 个 perl 脚本的 `--help`/`--version`/未知选项退出码、`release.sh --help` 不产出垃圾包、`dns-preset` 显式预设胜过 `PRESET_DNS_CSV`（mock dig 离线）、`SAVE_LOG` 覆盖 compare/trends/doctor/verify/lite 且 `trends --json` 跳过、`dns-test --strict` 不被当 DNS 地址；接入 `verify.sh` 第 3 步与 CI 第 6 步。**该文件首轮运行即抓出上面那条 `core.sh` 漏项**
+  - **文档**：9 个 perl 脚本用法输出；CODE_WIKI §4.1 补「统一入口约定」、§4.3 补 perl CLI 契约、§4.4 补未知选项拒绝、目录树与测试表补 tests/09；AI_GUIDE 命令表补「查用法」提示 + §8.7 退出码约定**明确适用范围**（仅 bash 测试入口；perl 诊断脚本恒返回 0，成败看文本）；README/README.en/SANDBOX_GUIDE/verify.sh/smoke.yml 单测计数 267→350；install.sh 用法行补 `--help|--version`
+  - **回归**：本机 shellcheck 0.11.0 全仓 **0 告警**；单测 01(18)/02(9)/03(4)/04(19)/05(13)/07(56)/08(23)/09(83) 全绿 + 06 在沙箱 116/125（归档 9 项受 GNU tar 缺陷限制，CI 不受影响）+ smoke 25/25
 - 2026-08-30（第一百零三轮）：**修复轮：release.sh 参数校验 + dns-test.sh 选项透传 + dns-preset.sh 优先级倒置 + SAVE_LOG 统一 + shell 补全 6→11（release.sh / dns-test.sh / dns-preset.sh / lib/compat.sh / lite.sh / full.sh / compare.sh / trends.sh / doctor.sh / verify.sh / completions×2 / tests/07 / 全量文档，发布 v2026.08.30，语义版 v1.18 不变）**
   - **release.sh 参数校验**（实测发现）：任何参数都被无条件当版本号，`bash release.sh --help` 会打出 `dns-test---help.tar.gz`（0 字节）并报 `gzip: not gzip` / tar 错误——误敲一个参数即污染发布产物。修法：补 `-h/--help/--version` 与参数个数校验，版本号按双轨制白名单（`vYYYY.MM.N` / `vX.Y`）校验，不符即 exit 1
   - **dns-test.sh 选项透传**（代码审查发现）：`run_prof` 内三处调用硬编码（`trends.sh --html` / `verify.sh` / `compare.sh` 不含 `--html`），交互路径永远拿不到报告类选项，用户只能退出菜单手敲完整命令；且未知 flag 被当 DNS 地址报「非法DNS地址: --strict」，误导性强。修法：按 `valid_dns_addr` 把参数切分为 DNS 与透传选项（不维护路由表，避免子脚本演进时漂移），三处专项调用均转发；未识别选项改为明确提示
