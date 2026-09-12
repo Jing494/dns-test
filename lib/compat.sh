@@ -41,7 +41,10 @@ if ! command -v timeout >/dev/null 2>&1; then
     local sec="$1"; shift
     "$@" &
     local pid=$!
-    ( sleep "$sec"; kill "$pid" 2>/dev/null ) &
+    # 关键: watcher 的 stdio 必须重定向掉。否则它继承调用方的 stdout——
+    # 在 out=$(timeout N cmd) 形式下，命令替换要等所有持有该管道的进程退出，
+    # 于是 sleep N 会把每次捕获拖满 N 秒（CI 实测把 macos-latest 从 46s 拖到 >596s）。
+    ( sleep "$sec"; kill "$pid" 2>/dev/null ) >/dev/null 2>&1 &
     local wp=$!
     wait "$pid" 2>/dev/null
     local rc=$?
