@@ -4,12 +4,47 @@
 # 用法: bash release.sh [版本号]    默认取 lib/version.sh 的 PROJECT_VERSION
 # 自动: 排除 .git / results内容 / 其他tar.gz，保留 results 空目录
 # 提示: 上传 Release 的命令会打印出来（需 GitHub 令牌）
+# 退出码: 0=打包成功  1=参数错误或打包自检未达标
 # ============================================================================
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
 cd "$SCRIPT_DIR" || exit 1
 # 版本号单一来源
 source "$SCRIPT_DIR/lib/version.sh"
+
+usage() {
+  cat <<'EOF'
+用法: bash release.sh [版本号]
+  版本号       省略时取 lib/version.sh 的 PROJECT_VERSION
+  合法格式     vYYYY.MM.N（日期式，如 v2026.08.30）或 vX.Y（语义式，如 v1.18）
+  -h, --help   打印本说明
+  --version    打印当前版本号
+说明: 打包 tar.gz，排除 .git / results 内容 / 其他 tar.gz，保留 results 空目录；
+      包内混入日志/报告或缺少 results 目录时拦截发布（退出码 1）。
+EOF
+}
+
+# ---- 参数解析（先于一切副作用：未知参数不再被当版本号打出垃圾包）----
+case "${1:-}" in
+  -h|--help|help) usage; exit 0 ;;
+  --version)      echo "dns-test ${PROJECT_VERSION} (${PROJECT_RELEASE})"; exit 0 ;;
+esac
+
+if [ $# -gt 1 ]; then
+  echo "❌ 参数过多：只接受 1 个版本号，实际收到 $# 个：$*"
+  echo ""
+  usage
+  exit 1
+fi
+
 VERSION="${1:-$PROJECT_VERSION}"
+
+# 双轨制版本号白名单：vYYYY.MM.N 或 vX.Y（v 可省略）
+# 不符合即退出——历史教训：曾把 --help 当版本号打包出 dns-test---help.tar.gz(0字节)
+if ! printf '%s' "$VERSION" | grep -qE '^v?[0-9]{4}\.[0-9]{1,2}\.[0-9]+$|^v?[0-9]+\.[0-9]+$'; then
+  echo "❌ 非法版本号: $VERSION"
+  echo "  合法格式: vYYYY.MM.N（日期式，如 v2026.08.30）或 vX.Y（语义式，如 v1.18）"
+  exit 1
+fi
 
 OUT="dns-test-${VERSION}.tar.gz"
 rm -f "$OUT"
