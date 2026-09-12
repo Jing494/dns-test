@@ -5,7 +5,7 @@
 #   直接跑: 检测必需依赖 dig/perl/curl，缺失才安装，装完强制校验；校验时检测 dig 的 DoT 能力（bind 9.18+ 才支持 +tls）
 #           末尾检测可选依赖 shellcheck——终端下会询问"是否现在一并安装？"（y/N 默认不装），非交互/管道自动跳过
 #           依赖就绪后顺手安装 shell 补全（幂等，写 rc 文件带标记可重复运行）
-#   --smoke: 校验通过后直接跑冒烟测试（24项自动化验证）
+#   --smoke: 校验通过后直接跑冒烟测试（24项/25检查点自动化验证）
 #   --all:   连同可选依赖 shellcheck 一起安装（verify.sh 的 shell 静态检查需要）
 #   --completions: 只装 shell 补全（不动依赖；检测 ~/.bashrc/.zshrc 幂等写入）
 #   --help:  打印用法说明；未知参数报错退出（退出码 1）
@@ -68,7 +68,7 @@ case "$MODE" in
     echo "           校验时检测 dig 的 DoT 能力（bind 9.18+ 才支持 +tls）"
     echo "           末尾检测可选依赖 shellcheck——终端下会询问是否一并安装（y/N 默认不装）"
     echo "           依赖就绪后顺手安装 shell 补全（幂等）"
-    echo "  --smoke      : 校验通过后直接跑冒烟测试（24项自动化验证）"
+    echo "  --smoke      : 校验通过后直接跑冒烟测试（24项/25检查点自动化验证）"
     echo "  --all        : 连同可选依赖 shellcheck 一起安装（verify.sh 的 shell 静态检查用）"
     echo "  --completions: 只装 shell 补全（不动依赖；bash 写 ~/.bashrc，zsh 装 ~/.zfunc 并启用）"
     echo ""

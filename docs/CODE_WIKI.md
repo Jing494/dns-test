@@ -1,7 +1,7 @@
 # DNS/网络测试工具集 — Code Wiki
 
 > 本文档是项目的结构化代码 Wiki，涵盖整体架构、模块职责、关键类与函数、依赖关系及运行方式。
-> 对应仓库：`dns-test`（MIT，当前版本 `v1.18 / v2026.08.29`）
+> 对应仓库：`dns-test`（MIT，当前版本 `v1.18 / v2026.08.30`）
 > 适用对象：开发者 / 二次维护者 / AI 助手
 
 > 🤖 **给 AI 的指引**：本工具集最重要的使用方是 AI 助手。需要**理解或修改本仓库代码**时，请先读本文档（代码结构与实现），再配合 [docs/AI_GUIDE.md](docs/AI_GUIDE.md)（操作流程）使用——两者分工互补：**AI_GUIDE 教你"怎么操作测试"**（初始化/流程/排障），**本文档教你"代码长什么样、想改哪里看哪里"**（架构/模块/函数/依赖）。修改代码后务必运行 `bash smoke_test.sh` + `bash verify.sh` 做回归验证，并同步更新 [docs/CHANGELOG.md](docs/CHANGELOG.md) 记录变更轮次。
@@ -44,7 +44,7 @@
 
 - `vYYYY.MM.N`：日期式，N=当月发布序号（补丁级修复仅递增 N）
 - `vX.Y`：语义版本（X=主版本，重大重构才升；Y=次版本，功能更新）
-- 当前：`v1.18 = v2026.08.29`
+- 当前：`v1.18 = v2026.08.30`
 
 ---
 
@@ -107,10 +107,10 @@ dns-test/
 ├── trends.sh                     # DNS 趋势洞察（聚合 compare 历史）
 ├── doctor.sh                     # 环境自检（依赖/平台兼容/目录可写/数据健康；--fix 自动修可自愈项；--cron 打印值守 crontab 模板；刻意不 source core.sh）
 ├── verify.sh                     # 一键全面验证（语法+单测+冒烟+对比+趋势）
-├── smoke_test.sh                 # 自动化冒烟测试（24 项）
+├── smoke_test.sh                 # 自动化冒烟测试（24 项/25 检查点）
 ├── install.sh                    # 依赖自动安装
 ├── release.sh                    # 打包发布
-├── completions/                  # shell 补全（bash/zsh，注册 6 个入口脚本）
+├── completions/                  # shell 补全（bash/zsh，覆盖全部 11 个入口脚本）
 ├── lib/                          # 公共库
 │   ├── core.sh                   # 核心库（变量/函数/测试逻辑/评分/webhook推送）
 │   ├── compat.sh                 # 平台兼容层（timeout/时间运算）
@@ -124,7 +124,7 @@ dns-test/
 │   ├── 04_core_functions.sh      # core 纯函数 19 用例（地址校验/响应判断/CDN/入口参数解析）
 │   ├── 05_run_common_tests.sh    # lite 计分口径/full 回归 13 用例（稳定性降轮/CONFIG_DOMAINS安全解析/dig @server回归/for t遮蔽回归/ECS_SUBNET注入拦截/par_run元字符禁令，mock dig/ping 离线）
 │   ├── 06_compare_e2e.sh         # compare 端到端 125 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune/--until/--alert/--vs/周对比/突变检测(前值0ms边界)/--since当日边界/--md/--json/--week/--webhook/--archive 归档/--export 报障包/HTML归档小节/compare↔trends互链，mock dig/ping 离线 + 用户 results 备份恢复）
-│   ├── 07_doctor.sh              # doctor 自检+补全+install+新参数校验 49 用例（doctor正常/参数/--cron模板/PATH剥离FAIL路径 + bash补全语法/注册/模拟TAB(--fix/--archive-keep/值位不补) + zsh头与内容(--fix/--archive-keep) + install --completions幂等(假HOME)）
+│   ├── 07_doctor.sh              # doctor 自检+补全+install+新参数校验 56 用例（doctor正常/参数/--cron模板/PATH剥离FAIL路径 + bash补全语法/注册/模拟TAB(--fix/--archive-keep/值位不补) + zsh头与内容(--fix/--archive-keep) + install --completions幂等(假HOME)）
 │   └── 08_trends_lib.sh          # trends_lib 纯函数 23 用例（分位数空/单值/奇偶样本/P95取位/clamp + score/delay全10态趋势判定 + trends.sh端到端等价冒烟）
 ├── tools/                        # 专项测试工具
 │   ├── manifest.sh               # 插件注册表
@@ -149,16 +149,16 @@ dns-test/
 
 | 脚本 | 职责 | 关键特性 |
 |------|------|---------|
-| [dns-test.sh](../dns-test.sh) | 统一交互入口，引导选 DNS 组/测试类型/专项 | 交互双模式（有/无终端）；非交互自动降级 lite+单 DNS |
-| [dns-preset.sh](../dns-preset.sh) | 预设快捷测试（default/ali/tencent/all） | 支持 `PRESET_DNS_CSV` 自定义；索引参数避免超时 |
+| [dns-test.sh](../dns-test.sh) | 统一交互入口，引导选 DNS 组/测试类型/专项 | 交互双模式（有/无终端）；非交互自动降级 lite+单 DNS；**支持专项选项透传**（按 `valid_dns_addr` 切分 DNS 与选项，原样转发给所选专项脚本由其自校验） |
+| [dns-preset.sh](../dns-preset.sh) | 预设快捷测试（default/ali/tencent/all） | 支持 `PRESET_DNS_CSV` 自定义（命令行参数优先）；索引参数避免超时 |
 | [full.sh](../full.sh) | 完整版基础测试（16 项，77~78 评分点） | `SAVE_LOG=1` 存日志；`trap` 清理临时目录 |
 | [lite.sh](../lite.sh) | 精简版基础测试（10 项，53~54 评分点） | 同上，输出更短 |
 | [compare.sh](../compare.sh) | 多 DNS 横向对比 | 延迟中位数 + 批量并发 + JSON/HTML/MD 报告 + 预设组展开 + 环比Δ + 切换命令 + 当前DNS标记 + `--watch` 定时采集 |
 | [trends.sh](../trends.sh) | 聚合 compare 历史 JSON 出趋势 | 线性回归 + SVG 折线图 + CSV/MD/JSON + `--vs A,B` 头对头 + 周对比(`--week N` 可配)/突变检测 + `--cron` 定时采集 + `--prune N` 留存清理(`--archive` 删前归档/全量备份) + `--export` 报障包(数据+报告+doctor三合一) + `--alert N` 值守 + `--webhook` IM 推送 |
 | [verify.sh](../verify.sh) | 一键全面自检 | 7 步：语法/shellcheck/单测/冒烟/compare/trends/专项 |
-| [smoke_test.sh](../smoke_test.sh) | 自动化冒烟（24 项） | CI 与改动后回归必跑 |
+| [smoke_test.sh](../smoke_test.sh) | 自动化冒烟（24 项/25 检查点） | CI 与改动后回归必跑 |
 | [install.sh](../install.sh) | 依赖检测与安装 | 自动识别 apt/yum/dnf/brew/apk/pacman/zypper；`--completions` 幂等装补全（装完依赖顺手执行） |
-| [release.sh](../release.sh) | 打包 tar.gz + 上传指引 | 排除 .git/results 内容 |
+| [release.sh](../release.sh) | 打包 tar.gz + 上传指引 | 排除 .git/results 内容；版本号按双轨制白名单校验（非法参数 exit 1，不再打出垃圾包） |
 
 ### 4.2 核心库 (lib/)
 
@@ -324,10 +324,10 @@ tools/network/doh_dot_check.sh ─► lib/compat.sh（相对定位 ../../lib/）
 | `ECS_SUBNET` | ECS 测试 subnet | `240e:52:4800::/48` |
 | `CONFIG_DOMAINS` | 域名列表外置配置文件（**不 source**，仅解析 `DOMAINS_MAIN/GLOBAL=("a" "b")` 双引号数组，注入特征行忽略） | — |
 | `PROVINCE_DNS` | 路由器/ePDG 测试的省级基准 | 默认省级DNS（示例为运营商DNS） |
-| `PRESET_DNS_CSV` | `dns-preset.sh` 自定义预设组 | — |
+| `PRESET_DNS_CSV` | `dns-preset.sh` 自定义预设组（**优先级低于命令行参数**：显式给了预设组即忽略本变量） | — |
 | `DNS_SERVER` / `DNS_LIST` | examples 默认 DNS | 默认（示例为运营商DNS） |
 | `COMPARE_MAX_CONCURRENCY` | compare 并行数 | 3 |
-| `SAVE_LOG` | 保存日志到 results/ | 关闭 |
+| `SAVE_LOG` | 保存日志到 results/（`lib/compat.sh` 的 `save_log_init`，覆盖全部入口脚本；`trends.sh --json` 跳过以保护 stdout 机器可读契约） | 关闭 |
 | `DNS_PAUSE` | full/lite 多 DNS 测试间隔秒数（请求间隔，设 0 可关掉提速） | 3 |
 | `PARR_MAX` | par_run 并行并发上限（正整数，调小可降低负载） | 8 |
 | `TRENDS_DIR` / `COMPARE_RESULTS_DIR` | 趋势产物/数据源目录 | `trends/` / `results/` |
@@ -387,14 +387,14 @@ dns-test.sh 选"专项测试"
 | [tests/04_core_functions.sh](../tests/04_core_functions.sh) | core 纯函数 19 用例（valid_dns_addr 合法/非法+超范围/IPv6 畸形结构/`::` 全零地址、is_valid_response 错误/纯 OPT、is_cdn_domain、parse_dns_args 入口参数） | `bash tests/04_core_functions.sh` |
 | [tests/05_run_common_tests.sh](../tests/05_run_common_tests.sh) | lite 计分口径/full 回归 13 用例（稳定性降轮 20→10+STAB_ROUNDS 空串视为未设置、AAAA 空响应计分、综合评分 45/53、CONFIG_DOMAINS 注入不执行/非法 token 忽略、dig @server 前缀回归、full 模式 @server 遮蔽回归、ECS_SUBNET 注入拦截、par_run 元字符禁令；mock dig/ping 离线） | `bash tests/05_run_common_tests.sh` |
 | [tests/06_compare_e2e.sh](../tests/06_compare_e2e.sh) | compare 端到端 125 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、提供商标签+抖动三出口+JSON jitter_ms、预设组名展开含 IPv6、未知词报错、trends --prune/--until/--alert/--vs/周对比/突变检测（前值0ms边界）/--since 当日边界/--md/--json/--week/--webhook（mock curl 抓 payload）/--archive 归档（全量/删前打包/空数据）/--export 报障包（含数据/报告/doctor）/HTML 归档小节/compare↔trends 互链两形态；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
-| [tests/07_doctor.sh](../tests/07_doctor.sh) | doctor 自检 + 补全 + install + 新参数校验 49 用例（doctor 正常路径/参数/--cron 模板/PATH 剥离 FAIL 路径、bash 补全语法/注册/模拟 TAB 三场景（含 --fix/--archive-keep）、zsh compdef 头与内容、install --completions 幂等安装（假HOME）、trends --json/--week/--webhook/--archive/--export 参数校验） | `bash tests/07_doctor.sh` |
+| [tests/07_doctor.sh](../tests/07_doctor.sh) | doctor 自检 + 补全 + install + 新参数校验 56 用例（doctor 正常路径/参数/--cron 模板/PATH 剥离 FAIL 路径、bash 补全语法/注册/模拟 TAB 三场景（含 --fix/--archive-keep）、zsh compdef 头与内容、install --completions 幂等安装（假HOME）、trends --json/--week/--webhook/--archive/--export 参数校验） | `bash tests/07_doctor.sh` |
 | [tests/08_trends_lib.sh](../tests/08_trends_lib.sh) | trends_lib 纯函数 23 用例（trends_percentile 空/单值/奇偶样本 P50/P95 取位/边界 clamp；trends_slope_judge score/delay 全 10 态；trends.sh --json 端到端等价冒烟） | `bash tests/08_trends_lib.sh` |
 
 `02~08_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
 
 ### 8.2 冒烟测试（smoke_test.sh）
 
-24 项自动化验证，覆盖：全量语法、lite/full 功能、不可达预检、注入拦截、入口非交互、预设、环境变量自定义、carrier_epdg、路由器转发、反向解析、DoH/DoT、SAVE_LOG、VoWiFi 解析/交叉验证、端口测试、示例 01/02、trends 聚合/产物、compare 多 DNS、单测、verify --help、插件注册表。
+24 项（编号 1-24，含 full 子项共 25 个检查点）自动化验证，覆盖：全量语法、lite/full 功能、不可达预检、注入拦截、入口非交互、预设、环境变量自定义、carrier_epdg、路由器转发、反向解析、DoH/DoT、SAVE_LOG、VoWiFi 解析/交叉验证、端口测试、示例 01/02、trends 聚合/产物、compare 多 DNS、单测、verify --help、插件注册表。
 
 网络敏感项（路由器/省级 DNS）会做可达性预检，不可达自动跳过不算失败。
 
@@ -404,8 +404,8 @@ dns-test.sh 选"专项测试"
 
 1. 语法检查（.sh + .pl）
 2. shellcheck（可选依赖，`--strict` 强制）
-3. 单元测试（18+9+4+19+13+125+49+23 用例）
-4. 冒烟测试（24 项）
+3. 单元测试（18+9+4+19+13+125+56+23 用例）
+4. 冒烟测试（24 项/25 检查点）
 5. compare 快测（2 DNS）
 6. trends 聚合（无数据/超时跳过）
 7. 专项抽查（示例 02 / DoH）
@@ -428,7 +428,7 @@ dns-test.sh 选"专项测试"
 ```bash
 git clone https://github.com/Jing494/dns-test.git && cd dns-test
 bash install.sh            # 缺失才装 dig/perl/curl（--all 连 shellcheck）
-bash smoke_test.sh         # 24 项自动化验证环境
+bash smoke_test.sh         # 自动化冒烟（24 项/25 检查点）
 bash verify.sh             # 一键全量深度自检（约 5 分钟）
 ```
 

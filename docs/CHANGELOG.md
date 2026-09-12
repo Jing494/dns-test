@@ -6,6 +6,7 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
+| v2026.08.30 | v1.18（修复） |
 | v2026.08.29 | v1.18（补丁） |
 | v2026.08.28 | v1.18（补丁） |
 | v2026.08.27 | v1.18（补丁） |
@@ -33,6 +34,15 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-08-30（第一百零三轮）：**修复轮：release.sh 参数校验 + dns-test.sh 选项透传 + dns-preset.sh 优先级倒置 + SAVE_LOG 统一 + shell 补全 6→11（release.sh / dns-test.sh / dns-preset.sh / lib/compat.sh / lite.sh / full.sh / compare.sh / trends.sh / doctor.sh / verify.sh / completions×2 / tests/07 / 全量文档，发布 v2026.08.30，语义版 v1.18 不变）**
+  - **release.sh 参数校验**（实测发现）：任何参数都被无条件当版本号，`bash release.sh --help` 会打出 `dns-test---help.tar.gz`（0 字节）并报 `gzip: not gzip` / tar 错误——误敲一个参数即污染发布产物。修法：补 `-h/--help/--version` 与参数个数校验，版本号按双轨制白名单（`vYYYY.MM.N` / `vX.Y`）校验，不符即 exit 1
+  - **dns-test.sh 选项透传**（代码审查发现）：`run_prof` 内三处调用硬编码（`trends.sh --html` / `verify.sh` / `compare.sh` 不含 `--html`），交互路径永远拿不到报告类选项，用户只能退出菜单手敲完整命令；且未知 flag 被当 DNS 地址报「非法DNS地址: --strict」，误导性强。修法：按 `valid_dns_addr` 把参数切分为 DNS 与透传选项（不维护路由表，避免子脚本演进时漂移），三处专项调用均转发；未识别选项改为明确提示
+  - **dns-preset.sh 优先级倒置**（实测发现）：CODE_WIKI 明确声明「命令行参数 > 环境变量 > 默认值」，但 `PRESET_DNS_CSV` 无条件压过位置参数——`PRESET_DNS_CSV=8.8.8.8 bash dns-preset.sh ali lite 0` 实测测的是 8.8.8.8，`ali` 被静默忽略。修法：环境变量仅在未显式给出预设组时生效（空串视为未给出）
+  - **SAVE_LOG 覆盖不全**（实测发现）：此前只在 lite.sh / full.sh 各写一份内联实现（两份副本），compare/trends/doctor/verify 完全不认，而 CODE_WIKI §6.3 将其列为全局环境变量。修法：收敛为 `lib/compat.sh` 的 `save_log_init`，7 个入口统一调用；落点选 compat.sh 而非 core.sh，因 doctor.sh 刻意不 source core.sh（core.sh 缺 dig/perl 会 exit 1，正是 doctor 要诊断的场景）；`trends.sh --json` 显式跳过——该实现会把 stderr 并入 stdout，会破坏 jq/Grafana 消费的 stdout 契约
+  - **shell 补全 6→11**（实测发现）：补全只注册 compare/trends/doctor/dns-test/lite/full 六个，而 verify.sh（`--strict`）、install.sh（`--smoke/--all/--completions`）、dns-preset.sh（预设组/lite|full/索引）、release.sh、smoke_test.sh 都是正经入口，无补全只能手打参数。修法：bash+zsh 双份补齐 11 脚本，各 flag 集抽成变量集中定义（dns-test.sh 并集直接复用）；顺修 `script` 取值未去目录前缀导致 `./compare.sh` 补全静默失效（zsh 侧原本已正确）
+  - **测试**：tests/07 49→56 用例（注册断言由「只查 3 个脚本」加强为全 11 个，新增 verify/install/dns-preset/release/带路径 5 组模拟 TAB）；总单测数 260→267
+  - **文档同步**：README（版本徽章/最新版本段/冒烟项数/单测计数 260→267）、CODE_WIKI（版本、completions 6→11、smoke 24 项→24 项/25 检查点、tests/07 56、§6.3 SAVE_LOG 与 PRESET_DNS_CSV 说明、4.1 表 dns-test/release/dns-preset 行）、AI_GUIDE（冒烟口径、06 124→125、07 49→56、命令映射表补 release.sh 与选项透传）、FAQ / SANDBOX_GUIDE / CONTRIBUTING / README.en.md / install.sh / verify.sh 冒烟口径统一
+  - **回归**：单测 01(18)/02(9)/03(4)/04(19)/05(13)/06(125)/07(56)/08(23) 全绿（06 在无 python3 且 tar→gzip 受限沙箱下 9 项已知环境性失败，与 CI 无关）+ smoke 25 检查点全绿
 - 2026-08-29（第一百零二轮）：**补丁轮：verify.sh 冒烟判定硬编码修复 + tests/07 PATH 剥离清单补齐 + trends --since/--until 日期语义校验（verify.sh / tests/07_doctor.sh / trends.sh / tests/06，发布 v2026.08.29，语义版 v1.18 不变）**
   - **verify.sh 冒烟判定硬编码修复**（真实环境实测发现）：smoke 结果行是 `N 通过 / 0 失败`（N=25：24 编号项+2.5 full 子项），verify.sh 却 grep 死 `"24 通过 / 0 失败"`——smoke 项数从 24→25 时未同步，**冒烟永远误报红**；且 CI（smoke.yml）不跑 verify.sh，问题一直未暴露。修法：改 grep `"通过 / 0 失败"` 不硬编码数字（附注释说明历史教训），根治此类漂移
   - **tests/07 PATH 剥离清单补齐**（无 dig/perl 沙箱实测复现）：NOPATH 清单缺 `dirname`/`mv`，doctor.sh 第 13 行就 `dirname: command not found` 退出——"缺 dig/ping 被点名"两个用例实际测的是"缺 dirname"，测试目标失效（47/49 失败暴露）。补入后 49/49 全绿
