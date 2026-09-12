@@ -24,6 +24,12 @@ subtest 'dns_sockaddr 非法 IPv4' => sub {
     my ($sa, $fam, $err) = dns_sockaddr("999.1.1.1", 53);
     ok(!defined $sa, "非法IPv4 sockaddr undef");
     ok(defined $err, "返回错误信息");
+    # 以下写法在宽松 libc 的 inet_aton 下会被误接受（bionic），必须仍被拒
+    for my $bad ("999.999.999.999", "256.1.1.1", "1.2.3", "1.2.3.4.5", "0x7f.1", "1.2.3.256") {
+        my ($b_sa, undef, $b_err) = dns_sockaddr($bad, 53);
+        ok(!defined $b_sa, "拒绝非法IPv4: $bad");
+        ok(defined $b_err, "  ...且给出错误信息");
+    }
 };
 
 subtest 'dns_sockaddr IPv6' => sub {

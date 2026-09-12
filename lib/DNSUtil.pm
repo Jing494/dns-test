@@ -14,9 +14,18 @@ our @EXPORT = qw(dns_sockaddr inet_pton_ipv6 build_dns_query parse_dns_response 
                  build_ptr_query parse_ptr_response_simple build_reverse_name expand_ipv6);
 
 # 自动识别IPv4/IPv6地址，返回 (sockaddr, family, error)
+# IPv4 严格校验：四段且每段 0-255（与 bash 侧 valid_dns_addr 的口径一致）
+# 注意：不能把校验委托给 inet_aton —— 该函数在 bionic(Android) 等 libc 上
+# 沿用经典 BSD 宽松语义，会接受 999.999.999.999 / 1.2.3 / 0x7f.1 / 1.2.3.4.5
+# 等非法写法并返回 4 字节，导致非法地址被当合法地址使用。
+# （CI 的 glibc/macOS 上 inet_aton 恰好严格，故此缺陷在 CI 不可见。）
+my $IPV4_RE = qr/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+
 sub dns_sockaddr {
     my ($addr, $port) = @_;
-    if ($addr =~ /^\d{1,3}(?:\.\d{1,3}){3}$/) {
+    # 形似 IPv4（仅数字与点）即按 IPv4 报错口径处理，不再依赖 inet_aton 的宽严
+    if ($addr =~ /^[0-9.]+$/) {
+        return (undef, undef, "IPv4地址格式无效: $addr") unless $addr =~ $IPV4_RE;
         my $ip = inet_aton($addr);
         return (undef, undef, "IPv4地址格式无效: $addr") unless defined $ip;
         return (pack_sockaddr_in($port, $ip), AF_INET, undef);
