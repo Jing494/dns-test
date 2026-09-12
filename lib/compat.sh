@@ -74,7 +74,8 @@ save_log_init() {
   local _self="${1:-$0}"
   local _dir="${SCRIPT_DIR:-$(cd "$(dirname "$_self")" && pwd)}"
   mkdir -p "$_dir/results" 2>/dev/null || return 1
-  local _log="$_dir/results/$(basename "$_self" .sh)-$(date +%Y%m%d-%H%M%S).log"
+  local _log
+  _log="$_dir/results/$(basename "$_self" .sh)-$(date +%Y%m%d-%H%M%S).log"
   if [ "$(uname)" = "Darwin" ]; then
     exec > "$_log" 2>&1
   else
