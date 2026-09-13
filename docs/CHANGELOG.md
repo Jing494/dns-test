@@ -6,6 +6,7 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
+| v2026.09.1 | v1.19（数据安全 + 解析健壮性） |
 | v2026.08.31 | v1.18（修复） |
 | v2026.08.30 | v1.18（修复） |
 | v2026.08.29 | v1.18（补丁） |
@@ -35,7 +36,22 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-09-13（第一百零五轮）：**数据安全 + 解析健壮性轮：tests/06 不再破坏用户数据、中断语义修正、trends 数据入口换真解析、HTML/JSON 转义收紧（tests/06 / lib/core.sh / lib/trends_lib.sh / compare.sh / trends.sh / tests/10 / verify.sh / smoke.yml / 文档，发布 v2026.09.1，语义版 v1.19）**
+  - **两处真实数据丢失**（本轮起点，实测丢过 `results/` 5 份采集 JSON）：
+    - `tests/06_compare_e2e.sh` 用 `mv results → 临时目录` 当备份，且 restore 里**无条件 `rm -rf trends`**（`trends/` 从未被备份）。进程被 SIGKILL 时 EXIT/TERM 两个 trap 都不执行 → 唯一副本留在临时目录、`trends/` 被直接删除。修法：改为 `cp -a` 备份（`results/` 与 `trends/` 都备一份），备份目录**不登记 `TMPDIR_LIST`**（否则会被清理逻辑连带删除），restore 先摘 trap 再恢复。
+    - 四个入口脚本（`compare.sh`/`trends.sh`/`full.sh`/`lite.sh`）的 `trap '...cleanup...' EXIT INT TERM` **缺 `exit`**。bash 执行完 INT/TERM 的 trap handler 后会**继续执行后续语句**：临时目录已被清理，后续 `cat "$TMP_PARR/N.out"` 全空 → 该轮结果被记成「不可达」并落盘污染 `results/` 历史数据；Ctrl-C 也停不下来。修法：统一收敛到 `lib/core.sh` 的 `cleanup_tmpdirs` + `install_exit_traps`（INT→130 / TERM→143，先 `trap - EXIT` 防重复清理）。
+  - **trends 数据入口「正则当解析器」→ 真解析**：原实现 `grep -oE '"addr": ?"...", ?"score": ?"...", ?"stab": ?"...", ?"delay_ms": ?[0-9]+'` 要求 4 个字段**紧邻、顺序固定、字段间最多一个空格**，于是「字段换行 / 顺序调整 / 中间插入新字段（jitter_ms、loss）」任一都会让整条记录被**静默丢弃**且零告警。实测：三种常见变体下旧解析器解析出 **0 条**，却报「❌ 无可用数据（所有记录均为不可达，或已被 --since/过滤条件排除）」——把解析失败伪装成数据结论。修法：新增 `parse_dns_records`（awk 按键值对扫描，对象边界以 `{` 判定，对顺序/空白/换行/额外字段均不敏感），并新增**解析完整性核对**（文件里 `"addr"` 键数 > 解析记录数即告警并点名文件）。顺带把每记录约 9 个子进程降到 1 个 awk。
+  - **HTML 注入**：`trends.sh` 从 JSON 取出的 `addr` **从未校验也从未转义**，直通总览表/单图标题/多DNS图例；供应商标签又可由 `DEFAULT_DNS_NAME_CSV` 控制。实测 `"addr":"<img src=x onerror=alert(1)>"` 原样出现在 `report.html`。修法：`lib/core.sh` 新增 `html_escape`，四处内插统一转义（含 svg 图例）。
+  - **`--json` 可输出非法 JSON**：`_num_or_null` 判据是「字符都属于 `[0-9.]`」，放行 `1.2.3`/`.` 并原样当数字发出 → jq/json.loads 失败。修法：收紧为完整数字正则；`period`/`modes`/`addr` 也补 `json_escape`（原先同行 label/trend 转了而它们没转）。
+  - **`trends_lib` 首尾差算术**：非数值样本（`85.5`/`1.2.3`/`-`）触发 `arithmetic syntax error` 并让趋势字段变空。修法：两端均为纯整数才算差，否则回落纯斜率判定。
+  - **参数校验**：`--week 08` 因 `$((WEEK_N-1))` 八进制解析报错、周对比静默失效 → 改用 `^[1-9][0-9]*$`（与 `--prune`/`--archive-keep`/`--alert` 同口径）；`--limit abc` 让 `tail` 报错、明细静默为空却仍 exit 0 → 补正整数校验。
+  - **产物一致性**：`--archive`/`--prune --archive` 打包失败时残留 **0 字节包**（被 `--archive-keep` 计入配额、被 HTML 归档清单当有效包）→ 失败分支补 `rm -f`；`--archive-keep` 按整名排序导致 `full-*`/`prune-*` 前缀先于时间戳比较，实测**保留最老的包、删掉较新的包** → 改按包名内嵌时间戳排序；`--export` 按文件名日期过滤而主扫描按 JSON 内部 timestamp 过滤（实测 `--since` 下报告统计了某份数据、报障包却不含它）→ 改为复用主扫描已过滤的文件清单；`--vs` 地址存在性校验提前到任何产物生成之前，不再留「CSV 已写、报告未写」的半套产物。
+  - **compare.sh 健壮性**：`--watch` 子轮 `bash "$0"` 在「带目录的相对路径」调用下（`bash dns-test/compare.sh … --watch`）解析成 `<项目>/dns-test/compare.sh` 而每轮失败，`|| true` 又吞掉失败 → **零数据却报「✅ 已完成 N 轮采集」**（实测旧版 0 份 JSON，新版 1 份）→ 改 `SCRIPT_DIR`+basename 绝对路径，并按退出码区分「2=全部不可达」与「真失败（不计完成）」；`--rounds` 到限区分「采满」与「只跑了次数」（后者 exit 1）；results JSON `.tmp` 半成品登记清理清单、HTML/MD 改原子写；同秒同名 JSON 冲突时才追加 PID；`json_enc` 在 python3 不可用时回退；`source`/`mktemp` 失败即退出；子进程无输出/评分解析失败时打印输出尾部（原先失败信息被封在临时目录又被删，现场只剩「不可达」）。
+  - **新增 `tests/10_trends_parse.sh`（12 用例）**：把上述解析容错（顺序调换/插字段/多空格/跨行/同行多对象）、失败可见（告警点名 + 不污染 `--json` stdout）、中断语义（TERM→143 且不继续执行）、`tests/06` 以 `cp` 备份用户数据固化为行为级断言；接入 `verify.sh` 第 3 步与 CI 第 6 步
+  - **tests/06 归档段环境自适应**：本机（Termux）`tar` 压缩通道不可用时该段 9 条断言必然误红，现先做 tar 可用性预检，不可用则**整体跳过并打印跳过提示**（CI 上 tar 正常，照常执行）
+  - **文档**：README/README.en/SANDBOX_GUIDE/AI_GUIDE/verify.sh/smoke.yml 单测计数 360→372；CODE_WIKI 目录树与测试表补 `tests/10`、§5.2 补 `cleanup_tmpdirs`/`install_exit_traps`/`html_escape` 与 trends 解析器说明；版本升 `v2026.09.1 = v1.19`
 - 2026-08-31（第一百零四轮）：**修复轮：perl 脚本 CLI 契约统一 + DNSUtil IPv4 严格校验 + 新增 CLI 契约回归测试（tools/×5 / examples/×4 / lib/DNSUtil.pm / lib/core.sh / compare.sh / doctor.sh / dns-test.sh / doh_dot_check.sh / tests/01 / tests/09 / verify.sh / smoke.yml / 文档，发布 v2026.08.31，语义版 v1.18 不变）**
+
   - **perl 脚本 CLI 契约统一**（逐脚本实测发现）：`tools/` 下 5 个脚本（vowifi×4 + network×1）**完全没有** `-h/--help` 处理且不拒绝未知选项——`perl tools/vowifi/01_resolve_vowifi.pl --help` 会把 `--help` 当 DNS 地址去解析，`carrier_epdg.pl --help` 报「未知运营商: --help」；`examples/` 下 4 个虽有 `--help` 但**只看 `$ARGV[0]`**，`perl examples/01_dns_query.pl 8.8.8.8 --help` 会把 `--help` 当第 2 个 DNS 静默吞掉。修法：9 个脚本统一为「扫描全部参数 → `-h/--help` 任意位置打印用法 exit 0；其余 `-` 开头明确拒绝 exit 1」，并保留 `03_test_router_dns.pl` 的 `--` 语义分隔符
   - **DNSUtil IPv4 校验不再委托 inet_aton**（本机实测发现，**CI 不可见**）：`dns_sockaddr` 的 IPv4 分支只做形状检查，范围校验交给 `inet_aton`；而该函数在 bionic(Android) 等 libc 上沿用经典 BSD 宽松语义，本机实测接受 `999.999.999.999` / `256.1.1.1` / `1.2.3` / `1.2.3.4.5` / `0x7f.1` 并全部返回 4 字节——非法地址被当合法地址用，`tests/01` 的「非法 IPv4」子用例长期在本机红（进而 smoke 第 22 项红），而 CI 的 glibc/macOS 上 `inet_aton` 恰好严格故恒绿。修法：改与 bash 侧 `valid_dns_addr` 同规格的严格 0-255 正则，形似 IPv4 即按 IPv4 报错口径处理（不再落到 IPv6 分支报误导信息）；`tests/01` 现有子用例内补 6 组畸形写法断言
   - **lite/full 未知选项误报**（由新测试当场抓出）：`lib/core.sh` 的 `print_dns_list` 把 `-` 开头的选项送进地址校验，`bash lite.sh --zzz-bogus` 报「❌ 非法DNS地址」。修法：校验前先判别 `-` 开头并报「未知选项」（一处修复覆盖 lite/full）

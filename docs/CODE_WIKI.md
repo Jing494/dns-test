@@ -1,7 +1,7 @@
 # DNS/网络测试工具集 — Code Wiki
 
 > 本文档是项目的结构化代码 Wiki，涵盖整体架构、模块职责、关键类与函数、依赖关系及运行方式。
-> 对应仓库：`dns-test`（MIT，当前版本 `v1.18 / v2026.08.31`）
+> 对应仓库：`dns-test`（MIT，当前版本 `v1.19 / v2026.09.1`）
 > 适用对象：开发者 / 二次维护者 / AI 助手
 
 > 🤖 **给 AI 的指引**：本工具集最重要的使用方是 AI 助手。需要**理解或修改本仓库代码**时，请先读本文档（代码结构与实现），再配合 [docs/AI_GUIDE.md](docs/AI_GUIDE.md)（操作流程）使用——两者分工互补：**AI_GUIDE 教你"怎么操作测试"**（初始化/流程/排障），**本文档教你"代码长什么样、想改哪里看哪里"**（架构/模块/函数/依赖）。修改代码后务必运行 `bash smoke_test.sh` + `bash verify.sh` 做回归验证，并同步更新 [docs/CHANGELOG.md](docs/CHANGELOG.md) 记录变更轮次。
@@ -44,7 +44,7 @@
 
 - `vYYYY.MM.N`：日期式，N=当月发布序号（补丁级修复仅递增 N）
 - `vX.Y`：语义版本（X=主版本，重大重构才升；Y=次版本，功能更新）
-- 当前：`v1.18 = v2026.08.31`
+- 当前：`v1.19 = v2026.09.1`
 
 ---
 
@@ -126,7 +126,8 @@ dns-test/
 │   ├── 06_compare_e2e.sh         # compare 端到端 125 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune/--until/--alert/--vs/周对比/突变检测(前值0ms边界)/--since当日边界/--md/--json/--week/--webhook/--archive 归档/--export 报障包/HTML归档小节/compare↔trends互链，mock dig/ping 离线 + 用户 results 备份恢复）
 │   ├── 07_doctor.sh              # doctor 自检+补全+install+新参数校验 60 用例（doctor正常/参数/--cron模板/PATH剥离FAIL路径 + bash补全语法/注册/模拟TAB(--fix/--archive-keep/值位不补) + zsh头与内容(--fix/--archive-keep) + install --completions幂等(假HOME)）
 │   ├── 08_trends_lib.sh          # trends_lib 纯函数 23 用例（分位数空/单值/奇偶样本/P95取位/clamp + score/delay全10态趋势判定 + trends.sh端到端等价冒烟）
-│   └── 09_cli_contract.sh        # CLI 契约与修复回归 89 用例（12 入口与 9 个 perl 脚本的 --help/--version/未知选项；release.sh 参数校验不产出垃圾包；dns-preset 命令行优先于 PRESET_DNS_CSV；SAVE_LOG 覆盖全部入口且 trends --json 跳过；dns-test --strict 不被当 DNS 地址）
+│   ├── 09_cli_contract.sh        # CLI 契约与修复回归 89 用例（12 入口与 9 个 perl 脚本的 --help/--version/未知选项；release.sh 参数校验不产出垃圾包；dns-preset 命令行优先于 PRESET_DNS_CSV；SAVE_LOG 覆盖全部入口且 trends --json 跳过；dns-test --strict 不被当 DNS 地址）
+│   └── 10_trends_parse.sh        # trends 解析健壮性 + 数据安全回归 12 用例（字段顺序调换/插入新字段/多空格/对象跨行/同行多对象 均不得丢记录；解析失败必须告警且不污染 --json stdout；install_exit_traps 下 TERM 必须显式退出；tests/06 必须以 cp 备份用户数据）
 ├── tools/                        # 专项测试工具
 │   ├── manifest.sh               # 插件注册表
 │   ├── vowifi/                   # VoWiFi 专项（ePDG/路由器）
@@ -262,6 +263,12 @@ use DNSUtil;
 | `run_common_tests` | 统一测试逻辑，`mode` 参数（full/lite）控制差异点：A 记录延迟计算（仅 full）、记录类型数量（lite 仅 MX/NS/TXT，full 加 CNAME/SOA）、稳定性指标（full 输出 min/max/avg，lite 仅成功率）、综合评分高级项（DNSSEC/ECS/PTR/TTL/结果对比/递归） |
 | `run_full_test` | 薄包装：`run_common_tests <addr> <name> full`（完整版 16 项） |
 | `run_lite_test` | 薄包装：`run_common_tests <addr> <name> lite`（精简版 10 项，输出更短） |
+| `cleanup_tmpdirs` | 统一清理全部临时目录（`PARR_TMPDIR` + `TMPDIR_LIST`），供下面的 trap 安装函数调用 |
+| `install_exit_traps` | 安装退出/中断 trap：`EXIT` 只清理；**`INT`/`TERM` 清理后显式 `exit 130/143`**。必要性：bash 执行完 INT/TERM 的 trap handler 后会**继续执行后续语句**，只清理不退出会让脚本在 Ctrl-C 后接着跑（临时目录已被删 → 结果全空 → 被记成"不可达"并落盘污染历史数据） |
+| `html_escape` | HTML 文本转义（`& < > "`）。报告内插外部数据（DNS 地址来自 JSON、提供商标签来自环境变量）前必须调用，否则 HTML 注入/破版 |
+| `json_escape` | JSON 字符串转义（反斜杠/引号/制表/回车/换行；多行压单行） |
+
+**`trends.sh` 的数据入口**：`parse_dns_records <file>` 用 awk 按键值对扫描 dns 数组（对象边界以 `{` 判定），对**字段顺序、字段间空白/换行、额外字段**一律不敏感；每行输出一条 `addr<TAB>score<TAB>stab<TAB>delay_ms`。旧实现是行正则 `grep -oE '"addr": ?"...", ?"score": ?"..."`，要求 4 个字段紧邻且顺序固定 —— 任何形态变化都会**静默丢记录**，故已废弃（回归见 §8.1 `tests/10`）。扫描循环另有**解析完整性核对**：文件里 `"addr"` 键数量 > 解析出的记录数即告警并点名文件。
 
 ### 5.3 lib/plugins.sh（插件加载器）
 
@@ -396,8 +403,9 @@ dns-test.sh 选"专项测试"
 | [tests/07_doctor.sh](../tests/07_doctor.sh) | doctor 自检 + 补全 + install + 新参数校验 60 用例（doctor 正常路径/参数/--cron 模板/PATH 剥离 FAIL 路径、bash 补全语法/注册/模拟 TAB 三场景（含 --fix/--archive-keep）、zsh compdef 头与内容、install --completions 幂等安装（假HOME）、trends --json/--week/--webhook/--archive/--export 参数校验） | `bash tests/07_doctor.sh` |
 | [tests/08_trends_lib.sh](../tests/08_trends_lib.sh) | trends_lib 纯函数 23 用例（trends_percentile 空/单值/奇偶样本 P50/P95 取位/边界 clamp；trends_slope_judge score/delay 全 10 态；trends.sh --json 端到端等价冒烟） | `bash tests/08_trends_lib.sh` |
 | [tests/09_cli_contract.sh](../tests/09_cli_contract.sh) | CLI 契约与修复回归 89 用例（12 入口 + 9 个 perl 脚本的 --help/--version/未知选项退出码；release.sh --help 不产出垃圾包、非法版本 exit 1；dns-preset.sh 显式预设胜过 PRESET_DNS_CSV（mock dig 离线）；SAVE_LOG 覆盖 compare/trends/doctor/verify/lite 且 trends --json 跳过；dns-test.sh --strict 不被当 DNS 地址） | `bash tests/09_cli_contract.sh` |
+| [tests/10_trends_parse.sh](../tests/10_trends_parse.sh) | trends 解析健壮性 + 数据安全回归 12 用例（字段顺序调换/中间插入新字段/字段间多空格/对象跨行/同轮多对象 都必须解析出记录且取值正确；有记录解析不出来时必须告警并点名文件；告警不得污染 `--json` stdout；`install_exit_traps` 下 TERM 退出码 143 且不继续执行；tests/06 必须以 `cp` 备份 results/ 与 trends/） | `bash tests/10_trends_parse.sh` |
 
-`02~08_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
+`02~10_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
 
 ### 8.2 冒烟测试（smoke_test.sh）
 
@@ -411,7 +419,7 @@ dns-test.sh 选"专项测试"
 
 1. 语法检查（.sh + .pl）
 2. shellcheck（可选依赖，`--strict` 强制）
-3. 单元测试（18+9+4+19+13+125+60+23+89 用例）
+3. 单元测试（18+9+4+19+13+125+60+23+89+12 用例）
 4. 冒烟测试（24 项/25 检查点）
 5. compare 快测（2 DNS）
 6. trends 聚合（无数据/超时跳过）

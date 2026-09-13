@@ -365,12 +365,55 @@ round_idx() {
   echo "-1"
 }
 
+# 解析单个 compare JSON 的 dns 数组 → 每行一条 "addr<TAB>score<TAB>stab<TAB>delay_ms"
+#
+# 为什么不是行正则（原实现 `grep -oE '"addr": ?"...", ?"score": ?"...", ...`）：
+# 那条正则要求 4 个字段**紧邻、顺序固定、字段间最多一个空格**，于是
+#   · 字段之间换行（合法 JSON）      · 字段顺序调整
+#   · 两字段之间插入新字段（如 jitter_ms/loss）
+#   · 字段间出现 2 个及以上空格
+# 任意一种都会让**整条记录被静默丢弃**，且没有任何计数/告警。而 results/ 里本就并存
+# 多种 producer 格式（compare.sh 带空格 + 外部工具产出），一次字段插入即可让趋势清零。
+#
+# 现改为 awk 按键值对扫描：对空白/换行/字段顺序/额外字段一律不敏感；
+# 对象边界用花括号判定（"{" 出现在本键之前 ⇒ 上一个对象结束），因此
+# 「addr 排在字段之前」与「addr 排在字段之后」两种排布都能正确切分，对象跨行也正确。
+parse_dns_records() {
+  awk '
+    function stripq(s) { sub(/^"/, "", s); sub(/"$/, "", s); return s }
+    function flush() {
+      if (addr != "") printf "%s\t%s\t%s\t%s\n", addr, score, stab, (delay == "" ? 0 : delay)
+      addr = ""; score = ""; stab = ""; delay = ""
+    }
+    {
+      rest = $0
+      while (match(rest, /"[A-Za-z_]+"[ \t]*:[ \t]*("[^"]*"|[0-9]+|true|false|null)/)) {
+        # 对象边界：本键之前若出现 "{"，说明上一个 dns 对象已结束 → 先把它落盘。
+        # 为什么不用 addr 当边界：addr 排在字段之后时（如 {"delay_ms":20,...,"addr":"1.1.1.1"}），
+        # 按 addr 切分会把 addr 之前刚读到的 score/stab/delay 一起清掉（实测得到空值）
+        if (index(substr(rest, 1, RSTART - 1), "{") > 0) flush()
+        tok = substr(rest, RSTART, RLENGTH)
+        rest = substr(rest, RSTART + RLENGTH)
+        k = tok; sub(/[ \t]*:.*$/, "", k); gsub(/"/, "", k)
+        v = tok; sub(/^[^:]*:[ \t]*/, "", v); v = stripq(v)
+        if (k == "addr") addr = v
+        else if (k == "score") score = v
+        else if (k == "stab")  stab  = v
+        else if (k == "delay_ms") delay = v
+      }
+    }
+    END { flush() }
+  ' "$1"
+}
+
 rec_total=0
 MODE_SEEN=""   # 已见采集模式（lite/full 混采则评分口径不一致，扫描后统一警告）
 LAST_TS=""     # 最新一条采集时间戳（数据新鲜度计算用）
 BAD_N=0        # 无法解析（缺 timestamp）的文件数——不静默跳过，否则会误报成"不可达/被过滤"
 BAD_LIST=""    # 前若干个坏文件名（告警里列出，便于直接定位）
 ACCEPT_FILES=""  # 通过 --since/--until 过滤的文件清单（--export 复用同一窗口口径）
+PARSE_WARN=0     # 有记录没能解析出来的文件数（解析器完整性核对，见扫描循环末尾）
+PARSE_WARN_LIST=""
 # while read 迭代（不用 for f in $FILES 的 IFS 分词）：数据目录含空格时文件名不被拆断；
 # 进程替换不开子 shell，循环内的数组累积（RAW_ADDR/RAW_VAL/ROUNDS_TS）在主 shell 生效
 while IFS= read -r f; do
@@ -394,13 +437,12 @@ while IFS= read -r f; do
   _m=$(grep -oE '"mode": ?"[^"]+"' "$f" | head -1 | sed 's/"mode": *"//;s/"$//')
   [ -z "$_m" ] && _m="unknown"
   case " $MODE_SEEN " in *" $_m "*) ;; *) MODE_SEEN="$MODE_SEEN $_m";; esac
-  while IFS= read -r line; do
-    [ -z "$line" ] && continue
-    addr=$(echo "$line" | sed -n 's/.*"addr": *"\([^"]*\)".*/\1/p')
+  # 记录级解析：awk 按键值对扫描（对空白/换行/字段顺序/额外字段均不敏感）
+  _rec=0
+  while IFS=$'\t' read -r addr score stab delay; do
     [ -z "$addr" ] && continue
-    score=$(echo "$line" | sed -n 's/.*"score": *"\([^"]*\)".*/\1/p')
-    stab=$(echo "$line" | sed -n 's/.*"stab": *"\([^"]*\)".*/\1/p')
-    delay=$(echo "$line" | sed -n 's/.*"delay_ms": *\([0-9]*\).*/\1/p')
+    _rec=$((_rec+1))
+    [ -z "$delay" ] && delay=0
     if [ ${#FILTER[@]} -gt 0 ]; then
       in=0
       for fd in "${FILTER[@]}"; do [ "$fd" = "$addr" ] && in=1; done
@@ -419,8 +461,26 @@ while IFS= read -r f; do
 "
       rec_total=$((rec_total+1))
     fi
-  done < <(grep -oE '"addr": ?"[^"]+", ?"score": ?"[^"]*", ?"stab": ?"[^"]*", ?"delay_ms": ?[0-9]+' "$f")
+  done < <(parse_dns_records "$f")
+  # 解析完整性核对：文件里出现多少个 "addr" 键，就应当产出多少条记录。
+  # 少了 = 该文件有记录没能解析（结构异常/被外部工具改写）。绝不能静默少算 ——
+  # 少算会被读成"该DNS不可达/被窗口过滤"，把解析失败伪装成数据结论。
+  _seen=$(grep -o '"addr"' "$f" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${_seen:-0}" -gt "$_rec" ]; then
+    PARSE_WARN=$((PARSE_WARN+1))
+    PARSE_WARN_LIST="$PARSE_WARN_LIST$f（含 \"addr\" 键 ${_seen} 个，仅解析出 ${_rec} 条）
+"
+  fi
 done < <(printf '%s' "$FILES")
+
+if [ "$PARSE_WARN" -gt 0 ]; then
+  # 显式 >&2：--json 模式 stdout 是机器可读契约
+  {
+    echo "⚠️  有 $PARSE_WARN 个文件的部分 dns 记录未能解析（字段缺失/结构被改写）："
+    printf '%s' "$PARSE_WARN_LIST" | while IFS= read -r _p; do [ -n "$_p" ] && echo "      $_p"; done
+    echo "    该文件的其余记录已正常计入；若条数明显偏少，请检查该 JSON 是否被外部工具改写"
+  } >&2
+fi
 
 if [ "$BAD_N" -gt 0 ]; then
   # 显式 >&2：--json 模式的 stdout 是机器可读契约，且本段位于其重定向之前
