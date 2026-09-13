@@ -22,7 +22,7 @@ _dns-test() {
   # 各专项脚本的 flag 集（与 dns-test.bash 的 *_flags 对应）
   cmp_flags=(--html --md --json --open --full --no-save --watch --rounds --keep --version --help)
   trd_flags=(--html --open --md --json --csv --vs --cron --detail --limit --since --until --prune --archive --archive-keep --export --alert --webhook --week --version --help)
-  ver_flags=(--strict --version --help)
+  ver_flags=(--strict --ci --version --help)
   case "$script" in
     compare.sh)
       _values 'option/预设/DNS' ${cmp_flags[@]} ${presets[@]} "${dns_words[@]}" ;;

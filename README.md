@@ -29,7 +29,7 @@ bash smoke_test.sh     # 自动化冒烟（24 项/25 检查点）
 bash dns-test.sh       # 交互引导测试（或 bash lite.sh 223.5.5.5 0 快速测）
 ```
 
-**快速全量自检**（真机推荐）：`bash verify.sh`——语法+shellcheck+单测+冒烟+compare+trends+专项 一键跑完，输出汇总报告（约 5 分钟）。shellcheck 为**可选依赖**：未装则该项提示跳过（不阻塞，CI 已兜底）；开发者可 `bash verify.sh --strict` 强制要求（未装算失败）。
+**快速全量自检**（真机推荐）：`bash verify.sh`——语法+shellcheck+单测+冒烟+compare+trends+专项 一键跑完，输出汇总报告（约 5 分钟）。shellcheck 为**可选依赖**：未装则该项提示跳过（不阻塞，CI 已兜底）；开发者可 `bash verify.sh --strict` 强制要求（未装算失败）；CI 用 `bash verify.sh --ci`（= 严格 + 跳过网络项，网络项由 CI 的 smoke 层覆盖）。
 
 **典型输出**（`bash lite.sh 223.5.5.5 0` 结尾）：
 
@@ -79,7 +79,7 @@ dns-test/
 ├── verify.sh / smoke_test.sh       # 自检工具（一键验证 / 冒烟测试）
 ├── install.sh / release.sh         # 安装 / 打包发布
 ├── lib/                            # 公共库（core.sh / compat.sh / plugins.sh / DNSUtil.pm）
-├── tests/                          # 单元测试（perl 18 + bash 9 + 4 + 19 + 13 + 125 + 60 + 23 + 89 + 12 用例，共 372）
+├── tests/                          # 单元测试（perl 18 + bash 9 + 4 + 19 + 13 + 125 + 60 + 23 + 89 + 15 用例，共 375）
 ├── docs/                           # 技术文档（AI_GUIDE / TEST_METHOD / CODE_WIKI / FAQ / CHANGELOG / SANDBOX_GUIDE）
 ├── tools/                          # 专项测试（vowifi/ / network/）
 ├── examples/                       # 通用示例脚本（4 个 Perl）
@@ -302,7 +302,7 @@ bash install.sh --completions               # 自动写入 ~/.bashrc / ~/.zshrc�
 
 按优先级排序：
 
-- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截）+ `tests/03_dig_target.sh` 4 用例（IPv6 加方括号）+ `tests/04_core_functions.sh` 19 用例（地址校验（含 `::` 全零地址）/响应判断/CDN 判定/入口参数解析）+ `tests/05_run_common_tests.sh` 13 用例（lite 计分口径/稳定性降轮（含 STAB_ROUNDS 空串）/CONFIG_DOMAINS 安全解析/dig @server 前缀回归/full 模式 @server 遮蔽回归/ECS_SUBNET 注入拦截/par_run 元字符禁令）+ `tests/06_compare_e2e.sh` 125 用例（compare 端到端离线回归：--watch 参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/--rounds/--keep 校验与清理/--json stdout/--watch+--open 子轮HTML回归/断点续采（同签名续采+签名不匹配重开+跑满清除）/采集模式HTML自动刷新/trends --prune/--until/--alert/--vs/周对比/突变检测（前值0ms边界）/--since 当日边界/--md/--json/--week/--webhook/--archive 归档/--export 报障包/HTML 归档小节，mock dig/ping + 用户 results 目录备份恢复）+ `tests/07_doctor.sh` 60 用例（doctor 自检/参数/--cron 模板/PATH 剥离 FAIL 路径 + bash/zsh 补全词表与脚本实支持一致性 + install --completions 幂等安装（假HOME）+ trends 新参数校验）+ `tests/09_cli_contract.sh` 89 用例（CLI 契约与历轮修复回归）+ `tests/08_trends_lib.sh` 23 用例（trends 纯函数：分位数/斜率判定/--json 等价冒烟）+ `tests/10_trends_parse.sh` 12 用例（trends 解析健壮性：字段顺序调换/中间插新字段/多空格/对象跨行 均不得丢记录、解析失败必须告警并点名文件、告警不污染 --json stdout、中断必须显式退出、tests/06 必须以 cp 备份用户数据），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh` / `bash tests/03_dig_target.sh` / `bash tests/04_core_functions.sh` / `bash tests/05_run_common_tests.sh` / `bash tests/06_compare_e2e.sh` / `bash tests/07_doctor.sh` / `bash tests/08_trends_lib.sh` / `bash tests/09_cli_contract.sh` / `bash tests/10_trends_parse.sh`
+- **单元测试（✅ 已完成）**：`lib/DNSUtil.pm` 提取 DNS 纯函数（9 个：sockaddr/域名编码/响应解析/PTR/反向名/IPv6 展开等）+ `tests/01_dnsutil.t` 18 用例（perl）+ `tests/02_plugins.sh` 9 用例（bash 轻量断言：插件注册表/参数策略/拦截）+ `tests/03_dig_target.sh` 4 用例（IPv6 加方括号）+ `tests/04_core_functions.sh` 19 用例（地址校验（含 `::` 全零地址）/响应判断/CDN 判定/入口参数解析）+ `tests/05_run_common_tests.sh` 13 用例（lite 计分口径/稳定性降轮（含 STAB_ROUNDS 空串）/CONFIG_DOMAINS 安全解析/dig @server 前缀回归/full 模式 @server 遮蔽回归/ECS_SUBNET 注入拦截/par_run 元字符禁令）+ `tests/06_compare_e2e.sh` 125 用例（compare 端到端离线回归：--watch 参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/--rounds/--keep 校验与清理/--json stdout/--watch+--open 子轮HTML回归/断点续采（同签名续采+签名不匹配重开+跑满清除）/采集模式HTML自动刷新/trends --prune/--until/--alert/--vs/周对比/突变检测（前值0ms边界）/--since 当日边界/--md/--json/--week/--webhook/--archive 归档/--export 报障包/HTML 归档小节，mock dig/ping + 用户 results 目录备份恢复）+ `tests/07_doctor.sh` 60 用例（doctor 自检/参数/--cron 模板/PATH 剥离 FAIL 路径 + bash/zsh 补全词表与脚本实支持一致性 + install --completions 幂等安装（假HOME）+ trends 新参数校验）+ `tests/09_cli_contract.sh` 89 用例（CLI 契约与历轮修复回归）+ `tests/08_trends_lib.sh` 23 用例（trends 纯函数：分位数/斜率判定/--json 等价冒烟）+ `tests/10_trends_parse.sh` 15 用例（trends 解析健壮性：字段顺序调换/中间插新字段/多空格/对象跨行 均不得丢记录、解析失败必须告警并点名文件、告警不污染 --json stdout、中断必须显式退出、tests/06 必须以 cp 备份用户数据），9 个 perl 脚本全量迁移 DNSUtil，已接入 verify + CI strict；运行 `perl -Ilib tests/01_dnsutil.t` / `bash tests/02_plugins.sh` / `bash tests/03_dig_target.sh` / `bash tests/04_core_functions.sh` / `bash tests/05_run_common_tests.sh` / `bash tests/06_compare_e2e.sh` / `bash tests/07_doctor.sh` / `bash tests/08_trends_lib.sh` / `bash tests/09_cli_contract.sh` / `bash tests/10_trends_parse.sh`
   - bats 评估结论（2026-08-13）：**不引入**——现有 perl 单测 + smoke/verify 集成已够，bash 纯函数用零依赖轻量断言（tests/02_plugins.sh）补充，避免增加依赖
 - **par_run 通用化（✅ 已完成）**：PARR_MAX 环境变量可调并发数（默认 8），临时目录自动注册 TMPDIR_LIST 统一清理
 - **trends svg_chart 模板化（✅ 已完成）**：SVG 图表公共框架 `chart_begin`/`chart_end` 下沉（card/Y轴/极值标签统一），svg_chart 与 svg_multi_chart 复用同一框架，点线绘制各自保留

@@ -60,7 +60,7 @@ jobs:
           ls "$TMPR/out/report.html" "$TMPR/out/trends.csv" >/dev/null 2>&1 || { echo "❌ trends产物缺失"; exit 1; }
           rm -rf "$TMPR"
           echo "  ✅ trends 聚合+产物"
-          echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 19 + 计分口径 13 + compare e2e 125 + doctor/completions/trends参数 60 + trends_lib纯函数 23 + CLI契约 89 + trends解析/数据安全 12）"
+          echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 19 + 计分口径 13 + compare e2e 125 + doctor/completions/trends参数 60 + trends_lib纯函数 23 + CLI契约 89 + trends解析/数据安全 15）"
           # 失败时打印输出尾部（断言名直接进日志，不再盲猜）
           UTLOG=$(mktemp)
           ut() { bash "tests/$1" >"$UTLOG" 2>&1 || { echo "❌ $1 失败断言（含上下文）:"; grep -n -B1 -A1 "❌" "$UTLOG" | head -80; cp "$UTLOG" "/tmp/utlog-$1.txt"; exit 1; }; }
@@ -95,6 +95,14 @@ jobs:
           bash -c 'PLUGIN_MANIFEST=/dev/null; PLUGIN_ITEMS=("x|dns-test.sh|测试|python|"); PLUGIN_DIR_x="."; source lib/plugins.sh && plugin_run 1' >/dev/null 2>&1 && { echo "❌ 未知执行器未拦截"; exit 1; }
           echo "  ✅ 插件拦截"
           echo "════ Strict checks 全部通过 ════"
+
+      - name: verify.sh 一键自检（CI 模式：严格 shellcheck + 跳过网络项）
+        # 为什么在 CI 里再跑一遍 verify：上面的 1-8 步是"手写清单"，与 verify.sh 的
+        # 步骤清单是两份；一旦新增测试文件漏接其中一份（历史上发生过：新增 tests/09
+        # 时 verify.sh 与 smoke.yml 都要手工同步），CI 不会发现。这一步把 verify.sh
+        # 自身接入门禁：它漏接/写错就会在这里红。网络项（冒烟/compare/专项）由本文件的
+        # smoke 层覆盖，故用 --ci 跳过，避免 runner 网络波动把 strict 层变成必红。
+        run: bash verify.sh --ci
 
       - name: Upload failed test log
         if: failure()

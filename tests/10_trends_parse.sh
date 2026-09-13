@@ -143,6 +143,20 @@ else
   echo "  ⏭️  跳过（无可用 python3）"
 fi
 
+echo "═══ E. 测试清单接线守卫（新增测试不得漏接 verify.sh / CI） ═══"
+# 为什么需要：verify.sh 第 3 步与 CI strict 第 6 步各自维护一份"要跑哪些测试"的清单，
+# 新增测试文件时要手工同步两处（历史上新增 tests/09 时确实两处都改过）。漏接时
+# 本地 verify 与 CI 都照常绿，新测试形同不存在。这里把两条接线固化成断言。
+MISS_V=""; MISS_C=""
+for t in tests/*; do
+  [ -f "$t" ] || continue
+  b=$(basename "$t")
+  grep -q "tests/$b" verify.sh || MISS_V="$MISS_V $b"
+  grep -q "$b" .github/workflows/smoke.yml || MISS_C="$MISS_C $b"
+done
+[ -z "$MISS_V" ] && ok "verify.sh 已接线全部 tests/ 文件" || notok "verify.sh 漏接:${MISS_V}"
+[ -z "$MISS_C" ] && ok "CI strict 层已接线全部 tests/ 文件" || notok "CI 漏接:${MISS_C}"
+
 echo ""
 echo "════════ tests/10 结果: ✅${PASS} 通过  ❌${FAIL} 失败 ════════"
 [ "$FAIL" -eq 0 ] || exit 1

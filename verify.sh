@@ -2,9 +2,12 @@
 # ============================================================================
 # 一键全面验证：语法 + shellcheck + 单测 + 冒烟 + compare + trends + 专项抽查
 # 真机/沙箱通用——在你自己的机器上跑一遍，等于完成全部自检
-# 用法: bash verify.sh [--strict]
+# 用法: bash verify.sh [--strict|--ci]
 #   （默认）  shellcheck 未安装时提示并跳过（可选依赖，CI 已兜底）
 #   --strict  shellcheck 未安装时该项记失败（退出码 1），适合开发者/CI 真机自检
+#   --ci      CI 模式：等价 --strict，且跳过网络项（冒烟/compare/专项抽查），
+#             因为 CI 里网络敏感项由 smoke 层单独跑（含 continue-on-error 语义），
+#             否则把 runner 的网络波动变成"必红"，正是当初拆 strict/smoke 两层要避免的
 #   --help    打印用法说明
 # 退出码: 0=全部通过 1=有失败项；--help 返回 0，未知参数返回 1
 # 注意: compare/trends 为网络项，海外/受限网络可能超时；trends 无历史数据会提示跳过
@@ -16,14 +19,17 @@ source lib/compat.sh
 # SAVE_LOG：整轮自检输出落盘
 save_log_init "$0"
 STRICT=0
+CI_MODE=0
 case "$1" in
   --strict) STRICT=1 ;;
+  --ci) CI_MODE=1; STRICT=1 ;;
   -h|--help|help)
-    echo "用法: bash verify.sh [--strict]"
+    echo "用法: bash verify.sh [--strict|--ci]"
     echo ""
     echo "  不带参数: 语法+shellcheck+单测+冒烟+compare+trends+专项 全量自检（约5分钟）"
     echo "             shellcheck 为可选依赖：未安装时提示跳过（CI 已兜底），不阻塞"
     echo "  --strict : shellcheck 未安装时该项记失败（退出码 1），适合开发者/CI 真机自检"
+    echo "  --ci     : 等价 --strict，并跳过网络项（冒烟/compare/专项由 CI smoke 层覆盖）"
     echo ""
     echo "  安装可选依赖: bash install.sh --all"
     exit 0
@@ -83,9 +89,9 @@ else
   tick "shellcheck(未装跳过)" 0
 fi
 
-echo "--- 3. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 19 + 计分口径 13 + compare e2e 125 + doctor/补全/install 60 + trends_lib纯函数 23 + CLI契约 89 + trends解析/数据安全 12）"
+echo "--- 3. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 19 + 计分口径 13 + compare e2e 125 + doctor/补全/install 60 + trends_lib纯函数 23 + CLI契约 89 + trends解析/数据安全 15）"
 if perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 && bash tests/02_plugins.sh >/dev/null 2>&1 && bash tests/03_dig_target.sh >/dev/null 2>&1 && bash tests/04_core_functions.sh >/dev/null 2>&1 && bash tests/05_run_common_tests.sh >/dev/null 2>&1 && bash tests/06_compare_e2e.sh >/dev/null 2>&1 && bash tests/07_doctor.sh >/dev/null 2>&1 && bash tests/08_trends_lib.sh >/dev/null 2>&1 && bash tests/09_cli_contract.sh >/dev/null 2>&1 && bash tests/10_trends_parse.sh >/dev/null 2>&1; then
-  tick "单测(18+9+4+19+13+125+60+23+89+12用例)" 0
+  tick "单测(18+9+4+19+13+125+60+23+89+15用例)" 0
 else
   tick "单测" 1
 fi
@@ -93,14 +99,20 @@ fi
 echo "--- 4. 冒烟测试（24项/25检查点，含网络项约3分钟）"
 # 注意：smoke 结果行是 "N 通过 / 0 失败"（N=25：24 编号项+2.5 full 子项），
 # 不硬编码具体数字防再次漂移（历史教训：曾写死 "24/25 通过"，smoke 项数一变就误报红）
-if timeout 300 bash smoke_test.sh 2>&1 | grep -q "通过 / 0 失败"; then
+if [ "$CI_MODE" = "1" ]; then
+  echo "  ⏭️  CI 模式跳过网络项（冒烟由 CI 的 smoke 层覆盖，避免 runner 网络波动变必红）"
+  tick "冒烟(CI跳过)" 0
+elif timeout 300 bash smoke_test.sh 2>&1 | grep -q "通过 / 0 失败"; then
   tick "冒烟(24项)" 0
 else
   tick "冒烟" 1
 fi
 
 echo "--- 5. compare 快测（2 DNS，网络项）"
-if timeout 60 bash compare.sh 223.5.5.5 119.29.29.29 >/dev/null 2>&1; then
+if [ "$CI_MODE" = "1" ]; then
+  echo "  ⏭️  CI 模式跳过网络项（compare 由 CI 的 smoke 层覆盖）"
+  tick "compare(CI跳过)" 0
+elif timeout 60 bash compare.sh 223.5.5.5 119.29.29.29 >/dev/null 2>&1; then
   tick "compare(2DNS)" 0
 else
   tick "compare" 1
@@ -123,10 +135,15 @@ else
 fi
 
 echo "--- 7. 专项抽查（示例02对比 / DoH检测，网络项）"
-OK=1
-timeout 20 perl examples/02_multi_dns_compare.pl 223.5.5.5 119.29.29.29 >/dev/null 2>&1 || OK=0
-timeout 15 bash tools/network/doh_dot_check.sh 223.5.5.5 >/dev/null 2>&1 || OK=0
-tick "专项(示例02/DoH)" $((1-OK))
+if [ "$CI_MODE" = "1" ]; then
+  echo "  ⏭️  CI 模式跳过网络项（专项抽查由 CI 的 smoke 层覆盖）"
+  tick "专项(CI跳过)" 0
+else
+  OK=1
+  timeout 20 perl examples/02_multi_dns_compare.pl 223.5.5.5 119.29.29.29 >/dev/null 2>&1 || OK=0
+  timeout 15 bash tools/network/doh_dot_check.sh 223.5.5.5 >/dev/null 2>&1 || OK=0
+  tick "专项(示例02/DoH)" $((1-OK))
+fi
 
 echo ""
 echo "════ 汇总: $PASS 通过 / $FAIL 失败 ════"
@@ -137,5 +154,6 @@ echo "  bash dns-test.sh                    # 交互引导测试（选DNS组/版
 echo "  bash compare.sh 223.5.5.5 119.29.29.29  # 多DNS横向对比"
 echo "  bash trends.sh --html               # DNS趋势洞察（积累compare数据后）"
 echo "  bash verify.sh --strict             # 严格模式（shellcheck 未装算失败，开发者用）"
+echo "  bash verify.sh --ci                 # CI 模式（严格 + 跳过网络项；CI strict 层用）"
 [ "$FAIL" -gt 0 ] && echo "  💡 有失败项：对照上方输出重跑单项，或看 docs/AI_GUIDE.md 第十一章（环境差异）"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

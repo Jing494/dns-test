@@ -31,7 +31,7 @@ _dns_test_complete() {
   # 各专项脚本的 flag 集（集中定义；dns-test.sh 的并集直接复用，避免三处各写一份）
   cmp_flags="--html --md --json --open --full --no-save --watch --rounds --keep --version --help"
   trd_flags="--html --open --md --json --csv --vs --cron --detail --limit --since --until --prune --archive --archive-keep --export --alert --webhook --week --version --help"
-  ver_flags="--strict --version --help"
+  ver_flags="--strict --ci --version --help"
 
   case "$script" in
     compare.sh)

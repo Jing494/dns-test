@@ -127,7 +127,7 @@ dns-test/
 │   ├── 07_doctor.sh              # doctor 自检+补全+install+新参数校验 60 用例（doctor正常/参数/--cron模板/PATH剥离FAIL路径 + bash补全语法/注册/模拟TAB(--fix/--archive-keep/值位不补) + zsh头与内容(--fix/--archive-keep) + install --completions幂等(假HOME)）
 │   ├── 08_trends_lib.sh          # trends_lib 纯函数 23 用例（分位数空/单值/奇偶样本/P95取位/clamp + score/delay全10态趋势判定 + trends.sh端到端等价冒烟）
 │   ├── 09_cli_contract.sh        # CLI 契约与修复回归 89 用例（12 入口与 9 个 perl 脚本的 --help/--version/未知选项；release.sh 参数校验不产出垃圾包；dns-preset 命令行优先于 PRESET_DNS_CSV；SAVE_LOG 覆盖全部入口且 trends --json 跳过；dns-test --strict 不被当 DNS 地址）
-│   └── 10_trends_parse.sh        # trends 解析健壮性 + 数据安全回归 12 用例（字段顺序调换/插入新字段/多空格/对象跨行/同行多对象 均不得丢记录；解析失败必须告警且不污染 --json stdout；install_exit_traps 下 TERM 必须显式退出；tests/06 必须以 cp 备份用户数据）
+│   └── 10_trends_parse.sh        # trends 解析健壮性 + 数据安全回归 15 用例（字段顺序调换/插入新字段/多空格/对象跨行/同行多对象 均不得丢记录；解析失败必须告警且不污染 --json stdout；install_exit_traps 下 TERM 必须显式退出；tests/06 必须以 cp 备份用户数据）
 ├── tools/                        # 专项测试工具
 │   ├── manifest.sh               # 插件注册表
 │   ├── vowifi/                   # VoWiFi 专项（ePDG/路由器）
@@ -304,7 +304,7 @@ use DNSUtil;
 | `bash` 3.2+ | ✅ 必需 | 所有 shell 脚本 | — |
 | `ping` / `ping6` | 可选 | 连通性测试 [7]/[7b] | 无权限时该项跳过 |
 | `curl` | 可选 | DoH 实测 | 无 curl 时 DoH 降级为 443 端口级探测 |
-| `shellcheck` | 可选 | `verify.sh` 静态检查 | 未装则该项提示跳过（CI 已兜底）；`--strict` 强制要求 |
+| `shellcheck` | 可选 | `verify.sh` 静态检查 | 未装则该项提示跳过（CI 已兜底）；`--strict` 强制要求；`--ci` = 严格 + 跳过网络项（CI strict 层用） |
 
 **DoT 检测特殊要求**：需 bind 9.18+ 的 dig 才支持 `dig +tls`，旧版降级为端口级。`install.sh` 会自动检测。
 
@@ -403,7 +403,7 @@ dns-test.sh 选"专项测试"
 | [tests/07_doctor.sh](../tests/07_doctor.sh) | doctor 自检 + 补全 + install + 新参数校验 60 用例（doctor 正常路径/参数/--cron 模板/PATH 剥离 FAIL 路径、bash 补全语法/注册/模拟 TAB 三场景（含 --fix/--archive-keep）、zsh compdef 头与内容、install --completions 幂等安装（假HOME）、trends --json/--week/--webhook/--archive/--export 参数校验） | `bash tests/07_doctor.sh` |
 | [tests/08_trends_lib.sh](../tests/08_trends_lib.sh) | trends_lib 纯函数 23 用例（trends_percentile 空/单值/奇偶样本 P50/P95 取位/边界 clamp；trends_slope_judge score/delay 全 10 态；trends.sh --json 端到端等价冒烟） | `bash tests/08_trends_lib.sh` |
 | [tests/09_cli_contract.sh](../tests/09_cli_contract.sh) | CLI 契约与修复回归 89 用例（12 入口 + 9 个 perl 脚本的 --help/--version/未知选项退出码；release.sh --help 不产出垃圾包、非法版本 exit 1；dns-preset.sh 显式预设胜过 PRESET_DNS_CSV（mock dig 离线）；SAVE_LOG 覆盖 compare/trends/doctor/verify/lite 且 trends --json 跳过；dns-test.sh --strict 不被当 DNS 地址） | `bash tests/09_cli_contract.sh` |
-| [tests/10_trends_parse.sh](../tests/10_trends_parse.sh) | trends 解析健壮性 + 数据安全回归 12 用例（字段顺序调换/中间插入新字段/字段间多空格/对象跨行/同轮多对象 都必须解析出记录且取值正确；有记录解析不出来时必须告警并点名文件；告警不得污染 `--json` stdout；`install_exit_traps` 下 TERM 退出码 143 且不继续执行；tests/06 必须以 `cp` 备份 results/ 与 trends/） | `bash tests/10_trends_parse.sh` |
+| [tests/10_trends_parse.sh](../tests/10_trends_parse.sh) | trends 解析健壮性 + 数据安全回归 15 用例（字段顺序调换/中间插入新字段/字段间多空格/对象跨行/同轮多对象 都必须解析出记录且取值正确；有记录解析不出来时必须告警并点名文件；告警不得污染 `--json` stdout；`install_exit_traps` 下 TERM 退出码 143 且不继续执行；tests/06 必须以 `cp` 备份 results/ 与 trends/） | `bash tests/10_trends_parse.sh` |
 
 `02~10_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
 
@@ -418,12 +418,14 @@ dns-test.sh 选"专项测试"
 7 步全量自检（约 5 分钟）：
 
 1. 语法检查（.sh + .pl）
-2. shellcheck（可选依赖，`--strict` 强制）
-3. 单元测试（18+9+4+19+13+125+60+23+89+12 用例）
+2. shellcheck（可选依赖，`--strict` 强制；CI 走 `--ci`）
+3. 单元测试（18+9+4+19+13+125+60+23+89+15 用例）
 4. 冒烟测试（24 项/25 检查点）
 5. compare 快测（2 DNS）
 6. trends 聚合（无数据/超时跳过）
 7. 专项抽查（示例 02 / DoH）
+
+> CI 接入方式：strict 层最后一步跑 `bash verify.sh --ci`（严格 shellcheck + 跳过第 4/5/7 步网络项），把 verify.sh 自身的步骤清单也纳入门禁 —— 新增测试漏接 verify.sh 或 smoke.yml 任一处都会在这里红；网络项由 smoke 层覆盖（`continue-on-error`）。
 
 ### 8.4 CI（.github/workflows/smoke.yml）
 

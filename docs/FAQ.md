@@ -7,7 +7,7 @@
 ### Q: verify.sh 提示"未安装 shellcheck，跳过"，需要装吗？
 不需要也行——shellcheck 是**可选依赖**（shell 静态检查工具），只影响 verify.sh 的"代码质量检查"这一项，**不影响任何 DNS 测试功能**；代码质量已由 CI 兜底（GitHub Actions 每轮自动检查）。
 - 想装（推荐开发者）：`bash install.sh --all`（自动检测包管理器一键装），或按系统手动 `sudo apt-get install -y shellcheck` / `brew install shellcheck`
-- 装完后 `bash verify.sh` 该项会显示 "shellcheck(0告警)"；`bash verify.sh --strict` 可强制要求该项必须存在
+- 装完后 `bash verify.sh` 该项会显示 "shellcheck(0告警)"；`bash verify.sh --strict` 可强制要求该项必须存在（CI 用 `--ci`，含义同严格但跳过网络项）
 
 ### Q: 运行超时怎么办？
 完整版测试单DNS约2-4分钟，多DNS完整跑完会超过大多数调用超时限制。解决方案：
