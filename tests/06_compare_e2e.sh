@@ -68,21 +68,26 @@ printf '#!/bin/bash\necho "Global: 10.99.99.99"\n' > "$STUB/resolvectl"
 chmod +x "$STUB/resolvectl"
 MOCK_CUR_DNS="10.99.99.99"
 
-# --- 用户 results/ 备份（compare.sh 硬编码 results/ 落盘，测完原样恢复） ---
-RESULTS_BAKED=0
-if [ -d results ]; then
-  mv results "$STUB/results-backup" && RESULTS_BAKED=1
-fi
+# --- 用户数据安全：results/ 与 trends/ 都用 cp 备份，**绝不用 mv** ---
+# compare.sh 硬编码 results/ 落盘、trends.sh 默认写 trends/，本测试会在 repo 内反复 rm -rf 这两个目录。
+# 必须 cp 而非 mv：mv 会让"唯一副本"在测试运行期间只存在于临时目录里，一旦进程被 SIGKILL
+# （EXIT/TERM 两个 trap 都不会执行）就永久丢失 —— 2026-09-13 真实事故即为此。
+# cp 保证任何时刻磁盘上都有完整副本；且备份目录**不登记**进 TMPDIR_LIST，避免被清理逻辑连带删除。
+RESULTS_BAKED=0; TRENDS_BAKED=0
+[ -d results ] && { cp -a results "$STUB/results-backup" && RESULTS_BAKED=1; }
+[ -d trends ]  && { cp -a trends  "$STUB/trends-backup"  && TRENDS_BAKED=1; }
 restore_results() {
-  if [ "$RESULTS_BAKED" = "1" ]; then
-    rm -rf results
-    mv "$STUB/results-backup" results
-  else
-    rm -rf results
-  fi
-  rm -rf trends "$STUB"   # trends.sh 聚合时会 mkdir trends/（产物目录），测试不留痕
+  trap - EXIT INT TERM   # 先摘掉 trap：否则中断路径会被 EXIT 再触发一次
+  rm -rf results trends
+  if [ "$RESULTS_BAKED" = "1" ]; then cp -a "$STUB/results-backup" results; fi
+  if [ "$TRENDS_BAKED" = "1" ]; then cp -a "$STUB/trends-backup" trends; fi
+  rm -rf "$STUB"
 }
-trap restore_results EXIT INT TERM
+# 中断也必须恢复后**显式退出**：bash 执行完 INT/TERM 的 trap 会继续往下跑，
+# 那样测试体里的 rm -rf results 会立刻把刚恢复的数据再删一次（审阅#16）
+trap 'rc=$?; restore_results; exit $rc' EXIT
+trap 'restore_results; exit 130' INT
+trap 'restore_results; exit 143' TERM
 
 # 无 perl 的环境也兼容（compare.sh 会 source core.sh，其前置检查要求 dig+perl 都存在；
 # dig 已 mock 于 $STUB，perl 缺失则整体失败——补最小 stub，与 tests/04/05/08 同策略）

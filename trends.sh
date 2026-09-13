@@ -43,8 +43,9 @@ case " $* " in
   *) save_log_init "$0" ;;
 esac
 
-# 异常退出时统一清理 mktemp 临时目录（--export 的 EXP_STAGE 等；与 lite/compare 同款 trap 延迟求值）
-trap '[ "${#TMPDIR_LIST[@]}" -gt 0 ] && rm -rf "${TMPDIR_LIST[@]}" 2>/dev/null; true' EXIT INT TERM
+# 异常退出时统一清理 mktemp 临时目录（--export 的 EXP_STAGE 等；与 lite/compare 同款）
+# INT/TERM 显式 exit，避免"清理完继续跑完整报告"（审阅#16；实现见 lib/core.sh）
+install_exit_traps
 
 VERSION="${PROJECT_VERSION}"
 SRC_DIR="${COMPARE_RESULTS_DIR:-results}"   # compare JSON 数据源

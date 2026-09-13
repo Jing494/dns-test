@@ -13,6 +13,27 @@
 # 临时目录清理清单（各测试函数 mktemp 后追加，EXIT/INT/TERM 统一清理防泄漏）
 TMPDIR_LIST=()
 
+# ---------------------------------------------------------------------------
+# 退出 / 中断统一清理与中止语义（审阅#16）
+#
+# 背景（真实事故）：bash 执行完 INT/TERM 的 trap handler 后**会继续执行后续语句**，
+# 不会自动退出。所以"只清理、不 exit"的 trap 会让脚本在 Ctrl-C 之后接着往下跑：
+# 临时目录已被删 → 后续 `cat "$PARR_TMPDIR/N.out"` 全空 → 结果被记成"不可达"
+# 并落盘进 results/，把一次中断污染成一份假的"全部不可达"历史数据。
+# 因此 INT/TERM 必须显式 exit（130/143），并先关掉 EXIT trap 避免清理跑两遍。
+# ---------------------------------------------------------------------------
+cleanup_tmpdirs() {
+  [ -n "${PARR_TMPDIR:-}" ] && rm -rf "$PARR_TMPDIR"
+  [ "${#TMPDIR_LIST[@]}" -gt 0 ] && rm -rf "${TMPDIR_LIST[@]}"
+  return 0
+}
+
+install_exit_traps() {
+  trap 'cleanup_tmpdirs' EXIT
+  trap 'cleanup_tmpdirs; trap - EXIT; exit 130' INT
+  trap 'cleanup_tmpdirs; trap - EXIT; exit 143' TERM
+}
+
 # 前置检查：dig + perl 必需（perl 用于专项测试）
 command -v dig >/dev/null 2>&1 || { echo "❌ 未找到 dig 命令，请先安装 dnsutils/bind-utils"; exit 1; }
 command -v perl >/dev/null 2>&1 || { echo "❌ 未找到 perl 命令，请先安装 perl（专项测试需要）"; exit 1; }

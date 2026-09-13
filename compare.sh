@@ -29,9 +29,9 @@
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
 cd "$SCRIPT_DIR" || exit 1
 source lib/core.sh
-# 异常退出时统一清理：全部临时目录走 TMPDIR_LIST（含 par_run 自动注册的 PARR_TMPDIR），trap 延迟求值
-# 空数组/空值时避免 macOS 的 rm 收到空串参数而报错（审阅#1）
-trap '[ "${#TMPDIR_LIST[@]}" -gt 0 ] && rm -rf "${TMPDIR_LIST[@]}"' EXIT INT TERM
+# 异常退出时统一清理：全部临时目录走 TMPDIR_LIST（含 par_run 自动注册的 PARR_TMPDIR）
+# INT/TERM 显式 exit，避免"清理完继续跑"把中断轮写成假的不可达数据（审阅#16；实现见 lib/core.sh）
+install_exit_traps
 
 # SAVE_LOG：输出落盘（实现见 lib/compat.sh 的 save_log_init）
 save_log_init "$0"

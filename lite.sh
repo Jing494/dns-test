@@ -28,7 +28,8 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/lib/core.sh"
 # 异常退出时统一清理：并行临时目录 + 各测试函数注册的临时目录（TMPDIR_LIST 由 core.sh 维护）
 # ${VAR:+...} 空值时展开为空串参数仍会让 macOS 的 rm 报错，改用条件判断（审阅#1）
-trap '[ -n "${PARR_TMPDIR:-}" ] && rm -rf "$PARR_TMPDIR"; [ "${#TMPDIR_LIST[@]}" -gt 0 ] && rm -rf "${TMPDIR_LIST[@]}"' EXIT INT TERM
+# INT/TERM 由 cleanup_tmpdirs + 显式 exit 处理，避免中断后继续跑（审阅#16；见 lib/core.sh）
+install_exit_traps
 
 # 自动保存日志（SAVE_LOG=1 时写入 results/）
 # 实现统一在 lib/compat.sh 的 save_log_init —— 各入口共用一份，避免多处副本漂移
