@@ -28,7 +28,7 @@
 # ============================================================================
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) || exit 1
 cd "$SCRIPT_DIR" || exit 1
-source lib/core.sh
+source lib/core.sh || { echo "❌ 无法加载 lib/core.sh（请确认脚本在项目根目录内、且 lib/ 完整）"; exit 1; }
 # 异常退出时统一清理：全部临时目录走 TMPDIR_LIST（含 par_run 自动注册的 PARR_TMPDIR）
 # INT/TERM 显式 exit，避免"清理完继续跑"把中断轮写成假的不可达数据（审阅#16；实现见 lib/core.sh）
 install_exit_traps
@@ -241,7 +241,17 @@ if [ -n "$WATCH_N" ]; then
     echo ""
     echo "════ 第 ${WROUND} 轮采集 $(date '+%Y-%m-%d %H:%M:%S') ════"
     # 子轮重放（含 --html/--md 等原参数）；子轮自身 exit 2（全不可达）不终止采集
-    bash "$0" "${CLEAN_ARGS[@]}" || true
+    # 必须用 SCRIPT_DIR 拼绝对路径：本脚本开头已 cd 到 SCRIPT_DIR，若此前用 `bash "$0"`，
+    # 以「带目录的相对路径」调用（如 `bash dns-test/compare.sh … --watch`）时 $0 是相对路径，
+    # cd 之后解析成 <项目>/dns-test/compare.sh → 每轮子进程直接失败而采集进度照常推进。
+    SUB_RC=0
+    bash "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" "${CLEAN_ARGS[@]}" || SUB_RC=$?
+    if [ "$SUB_RC" -ne 0 ] && [ "$SUB_RC" -ne 2 ]; then
+      # 2=全部不可达，是有效的数据结论；其它非零=子轮真的失败，绝不能当作"本轮完成"
+      echo "  ⚠️  本轮子进程异常退出（rc=$SUB_RC），本轮不计入已完成轮数；请检查上方子轮报错"
+      printf '%s\n%s\n' "$WSIG" "$WDONE" > "$WSTATE"
+      continue
+    fi
     WDONE=$WROUND
     # 每轮落进度（断点续采依据；JSON glob 不含隐藏文件，不会混入 --keep 清理范围）
     printf '%s\n%s\n' "$WSIG" "$WDONE" > "$WSTATE"
@@ -264,8 +274,13 @@ if [ -n "$WATCH_N" ]; then
     if [ -n "$ROUNDS_N" ] && [ "$WROUND" -ge "$ROUNDS_N" ]; then
       rm -f "$WSTATE"
       echo ""
-      echo "✅ 已完成指定 ${ROUNDS_N} 轮采集（可用 bash trends.sh --html 查看趋势）"
-      exit 0
+      # 用了 --rounds 就必须区分"采满"与"只跑了次数"：子轮失败的轮次不算完成
+      if [ "$WDONE" -ge "$ROUNDS_N" ]; then
+        echo "✅ 已完成指定 ${ROUNDS_N} 轮采集（可用 bash trends.sh --html 查看趋势）"
+        exit 0
+      fi
+      echo "⚠️  已达 ${ROUNDS_N} 轮上限，但仅 ${WDONE} 轮成功（其余子进程异常退出），未采满 ${ROUNDS_N} 轮"
+      exit 1
     fi
     echo "  ⏳ ${WATCH_N} 分钟后进行下一轮（Ctrl-C 停止）"
     # sleep 后台化 + wait：Ctrl-C 能立即中断等待而不是等满整个间隔
@@ -354,7 +369,7 @@ MAXC="${COMPARE_MAX_CONCURRENCY:-3}"
 [[ "$MAXC" =~ ^[1-9][0-9]*$ ]] || MAXC=3
 echo ""
 echo "  ━━━ [1] 测试（$( [ "$MODE" = "full" ] && echo "完整版 77~78项" || echo "lite精简版 ${LITE_ITEMS}项" )/DNS, 并发${MAXC}） ━━━"
-TMPD=$(mktemp -d "${TMPDIR:-/tmp}/dns-test-compare.XXXXXX")
+TMPD=$(mktemp -d "${TMPDIR:-/tmp}/dns-test-compare.XXXXXX") || { echo "❌ 无法创建临时目录（TMPDIR=${TMPDIR:-/tmp} 不可写）"; exit 1; }
 TMPDIR_LIST+=("$TMPD")
 
 IDX_MAP=()
@@ -385,6 +400,16 @@ for i in "${IDX_MAP[@]}"; do
   out=$(cat "$TMPD/$n.out")
   SCORE_VAL[$i]=$(echo "$out" | grep -oE "综合评分: [0-9]+" | grep -oE "[0-9]+")
   STAB_VAL[$i]=$(echo "$out" | grep -oE "稳定性: [0-9]+%" | grep -oE "[0-9]+")
+  if [ -z "${SCORE_VAL[$i]}" ]; then
+    # 解析不到评分：把子进程输出尾部打出来。否则失败信息被封在临时目录里、
+    # 退出时又被清理，现场只剩一句"不可达"，排障零线索（审阅#17）
+    if [ -z "$out" ]; then
+      echo "     ⚠️  ${DNS_ARGS[$i]} 子进程无任何输出（${MODE}.sh 启动失败？）"
+    else
+      echo "     ⚠️  ${DNS_ARGS[$i]} 未能解析评分，子进程输出尾部:"
+      printf '%s\n' "$out" | tail -3 | sed 's/^/         /'
+    fi
+  fi
   [ -z "${SCORE_VAL[$i]}" ] && SCORE_VAL[$i]="不可达"
   [ -z "${STAB_VAL[$i]}" ] && STAB_VAL[$i]="-"
   # 百分号只在有数值时拼接（防 "不可达%" / "稳定性-%" 的破相显示）
@@ -494,16 +519,22 @@ fi
 # ============================================================================
 # JSON 字符串编码：优先 python3（macOS/Linux 自带），无则 sed 转义回退（审阅#15，零新增硬依赖）
 json_enc() {
+  local _out
   if command -v python3 >/dev/null 2>&1; then
-    python3 -c 'import sys,json; print(json.dumps(sys.argv[1], ensure_ascii=False))' "$1"
-  else
-    printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+    # python3 "存在"不等于"可用"（残缺环境/被 wrapper 拦截）：调用失败必须回退，
+    # 否则 esc_d 为空会写出 {"addr": , ...} 这种语法非法的 JSON，且已 mv 成正式文件
+    _out=$(python3 -c 'import sys,json; print(json.dumps(sys.argv[1], ensure_ascii=False))' "$1" 2>/dev/null)
+    if [ -n "$_out" ]; then printf '%s' "$_out"; return 0; fi
   fi
+  printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"
 }
 TS=$(date '+%Y%m%d-%H%M%S')
 if [ "$SAVE_JSON" = "1" ]; then
   mkdir -p results
   JF="results/compare-${TS}.json"
+  # 同一秒内两次运行会指向同一文件名，mv -f 会静默覆盖掉上一份真实样本；仅冲突时追加 PID 区分
+  [ -e "$JF" ] && JF="results/compare-${TS}-$$.json"
+  TMPDIR_LIST+=("$JF.tmp.$$")   # 半成品也登记：半成品名不匹配 compare-*.json，中断后会永久残留
   {
     echo "{"
     echo "  \"tool\": \"dns-test/compare.sh\","
@@ -523,6 +554,7 @@ if [ "$SAVE_JSON" = "1" ]; then
     echo "  ]"
     echo "}"
     # 先写 .tmp.$$ 再原子 mv：避免 trends 并发扫描时读到半截 JSON；同秒双实例共写不同 tmp 互不干扰
+    # tmp 也登记进清理清单：中断时兜底删除半成品（半成品不匹配 compare-*.json，永不回收）
   } > "$JF.tmp.$$" && mv -f "$JF.tmp.$$" "$JF"
   echo ""
   echo "  💾 JSON结果已保存: $JF"
@@ -583,6 +615,9 @@ fi
 if [ "$GEN_HTML" = "1" ]; then
   mkdir -p results
   HF="results/report.html"
+  # 与 JSON 同口径的原子写：--watch 下页面带 meta refresh 会自动重载，
+  # 直接覆写会瞬时渲染出截断 HTML；中断也可能留半截文件
+  HFT="$HF.tmp.$$"; TMPDIR_LIST+=("$HFT")
   {
     echo "<!DOCTYPE html>"
     echo "<html lang='zh'>"
@@ -760,7 +795,7 @@ if [ "$GEN_HTML" = "1" ]; then
     fi
     echo "</div>"
     echo "</body></html>"
-  } > "$HF"
+  } > "$HFT" && mv -f "$HFT" "$HF"
   echo ""
   echo "  📄 HTML报告已生成: $HF"
 fi
@@ -776,6 +811,7 @@ fi
 if [ "$GEN_MD" = "1" ]; then
   mkdir -p results
   MF="results/report.md"
+  MFT="$MF.tmp.$$"; TMPDIR_LIST+=("$MFT")   # 原子写，理由同 HTML
   {
     echo "# DNS 对比报告"
     echo ""
@@ -842,7 +878,7 @@ if [ "$GEN_MD" = "1" ]; then
     fi
     echo "---"
     echo "<sub>由 dns-test ${VERSION} 生成；趋势: \`bash trends.sh --html\`；定时采集: \`bash compare.sh DNS1 DNS2 --watch 30\`</sub>"
-  } > "$MF"
+  } > "$MFT" && mv -f "$MFT" "$MF"
   echo ""
   echo "  📝 Markdown报告已生成: $MF"
 fi
