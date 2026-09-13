@@ -238,6 +238,11 @@ if [ -n "$WATCH_N" ]; then
   fi
   WROUND=$WSTART
   WDONE=$WSTART   # 已完整跑完的轮数（Ctrl-C 打断在子轮中时，该轮不计入"完成"）
+  # --keep 的可见范围：只看"本会话开始时就有的" + "本会话自己采出来的" JSON。
+  # 不能直接 glob results/compare-*.json —— 采集长跑期间若有人手动跑一次对比，
+  # 那份新 JSON 会被当成"最老的一份"清掉（并发写入者没料到自己的数据被删）。
+  WOWN=()
+  for _wf in results/compare-*.json; do [ -e "$_wf" ] && WOWN+=("$_wf"); done
   trap 'echo ""; echo "🛑 已停止采集（共完成 ${WDONE} 轮${ROUNDS_N:+/共 ${ROUNDS_N} 轮}；重跑同命令将从第 $((WDONE + 1)) 轮继续，可用 bash trends.sh --html 查看趋势）"; exit 0' INT TERM
   # 子轮经环境变量感知采集间隔：HTML 报告加 meta refresh，挂屏页面到点自动刷新
   export COMPARE_REFRESH_SEC=$((WATCH_N * 60))
@@ -266,10 +271,17 @@ if [ -n "$WATCH_N" ]; then
     WDONE=$WROUND
     # 每轮落进度（断点续采依据；JSON glob 不含隐藏文件，不会混入 --keep 清理范围）
     printf '%s\n%s\n' "$WSIG" "$WDONE" > "$WSTATE"
-    # --keep K：JSON 超出保留份数时清最老的（glob 字典序=时间序，与 trends --prune 同口径）
+    # 记录本轮子进程新写出的 JSON（本会话归属），供 --keep 精确统计
+    for _nf in results/compare-*.json; do
+      [ -e "$_nf" ] || continue
+      _known=0
+      for _of in "${WOWN[@]}"; do [ "$_of" = "$_nf" ] && _known=1; done
+      [ "$_known" = "0" ] && WOWN+=("$_nf")
+    done
+    # --keep K：只清"本会话归属"文件里最老的（字典序=时间序，与 trends --prune 同口径）
     if [ -n "$KEEP_N" ]; then
       KFILES=()
-      for kf in results/compare-*.json; do [ -e "$kf" ] && KFILES+=("$kf"); done
+      for kf in "${WOWN[@]}"; do [ -e "$kf" ] && KFILES+=("$kf"); done
       KTOT=${#KFILES[@]}
       if [ "$KTOT" -gt "$KEEP_N" ]; then
         KDEL=$((KTOT - KEEP_N))
@@ -448,20 +460,64 @@ COST=$((T1 - T0))
 # ============================================================================
 # 3) 文本对比结果 + 推荐
 # ============================================================================
+# ---------- 逐 DNS 展示事实（文本/HTML/MD 三份报告共享） ----------
+# 为什么抽函数：三份报告原先各写一遍「标签拼接 / 评分与稳定性显示 / 延迟+抖动 /
+# 当前系统 DNS 判定 / HTML 徽章配色」——口径改动要同时改三处，极易漂移。
+# 填充（下标与 DNS_ARGS 对齐）：
+#   LBL[]      提供商标签（预设内才有；空=无）
+#   SV[]       评分显示（"83%" / "不可达"）
+#   TV[]       稳定性显示（"100%" / "-"，MD 侧自行把 "-" 映射成 "—"）
+#   DV[]       延迟显示（文本用："95±9" / "—"）
+#   DVM[]      延迟显示（HTML/MD 用："95ms±9" / "—"，抖动拼在 ms 之后，与旧输出逐字一致）
+#   CUR[]      1=当前系统正在使用
+#   UNREACH[]  1=不可达
+#   BCLS[]/DCLS[]/TCLS[]  HTML 徽章配色（阈值口径与旧实现逐字一致）
+compute_show_facts() {
+  local i s tv dl
+  LBL=(); SV=(); TV=(); DV=(); DVM=(); CUR=(); UNREACH=(); BCLS=(); DCLS=(); TCLS=()
+  for i in "${!DNS_ARGS[@]}"; do
+    LBL[$i]=""
+    _lbl=$(dns_preset_label "${DNS_ARGS[$i]}") && LBL[$i]="$_lbl"
+    CUR[$i]=0; is_current_dns "${DNS_ARGS[$i]}" && CUR[$i]=1
+    s="${SCORE_VAL[$i]}"; tv="${STAB_VAL[$i]}"; dl="${DELAY_VAL[$i]:-}"
+    # 评分
+    if [ "$s" = "不可达" ]; then
+      SV[$i]="不可达"; UNREACH[$i]=1; BCLS[$i]="bg-n"
+    else
+      SV[$i]="${s}%"; UNREACH[$i]=0
+      BCLS[$i]="bg-g"; [ "$s" -lt 80 ] && BCLS[$i]="bg-a"; [ "$s" -lt 60 ] && BCLS[$i]="bg-r"
+    fi
+    # 稳定性
+    if [ "$tv" = "-" ]; then
+      TV[$i]="-"; TCLS[$i]="bg-n"
+    else
+      TV[$i]="${tv}%"; TCLS[$i]="bg-g"; [ "$tv" -lt 80 ] && TCLS[$i]="bg-a"; [ "$tv" -lt 50 ] && TCLS[$i]="bg-r"
+    fi
+    # 延迟（含抖动）
+    if [ -z "$dl" ]; then
+      DV[$i]="—"; DVM[$i]="—"; DCLS[$i]="bg-n"
+    else
+      DV[$i]="$dl"; DVM[$i]="${dl}ms"; DCLS[$i]="bg-g"
+      if [ -n "${JITTER_VAL[$i]:-}" ]; then
+        DV[$i]="${DV[$i]}±${JITTER_VAL[$i]}"
+        DVM[$i]="${DVM[$i]}±${JITTER_VAL[$i]}"
+      fi
+      [ "$dl" -ge 100 ] && DCLS[$i]="bg-a"; [ "$dl" -ge 300 ] && DCLS[$i]="bg-r"
+    fi
+  done
+}
+compute_show_facts
+
 echo ""
 echo "════ 对比结果（总耗时 ${COST}s） ════"
 printf "  %-3s %-42s %-9s %-10s %-8s\n" "#" "DNS" "评分" "延迟ms" "稳定性"
 rank=0
 for i in "${!DNS_ARGS[@]}"; do
   rank=$((rank+1))
-  sv="${SCORE_VAL[$i]}"; [ "$sv" != "不可达" ] && sv="${sv}%"
-  tv="${STAB_VAL[$i]}"; [ "$tv" != "-" ] && tv="${tv}%"
-  # DNS 列拼提供商标签（预设内才有，如 223.5.5.5·阿里DNS-v4-1）；延迟列拼抖动（如 10±4）
+  # 展示值统一来自 compute_show_facts（标签/评分/延迟+抖动/稳定性）
   dshow="${DNS_ARGS[$i]}"
-  _lbl=$(dns_preset_label "${DNS_ARGS[$i]}") && dshow="${dshow}·${_lbl}"
-  dlshow="${DELAY_VAL[$i]:-—}"
-  [ -n "${JITTER_VAL[$i]:-}" ] && dlshow="${dlshow}±${JITTER_VAL[$i]}"
-  printf "  %-3d %-42s %-9s %-10s %-8s\n" "$rank" "$dshow" "$sv" "$dlshow" "$tv"
+  [ -n "${LBL[$i]}" ] && dshow="${dshow}·${LBL[$i]}"
+  printf "  %-3d %-42s %-9s %-10s %-8s\n" "$rank" "$dshow" "${SV[$i]}" "${DV[$i]}" "${TV[$i]}"
 done
 
 BEST=""; BEST_IDX=-1; BEST_SCORE=-1; BEST_DELAY=99999
@@ -482,6 +538,12 @@ if [ "$BEST_IDX" -ge 0 ]; then
 else
   echo ""
   echo "  💀 全部DNS不可达"
+fi
+# 实测项数（来自 lite/full --emit-kv 的 total=）：与配置估算值不同就提示一句 ——
+# 项数会随 STAB_ROUNDS 变化（稳定性项按轮次计分），逐轮比较评分前要先看分母是否一致
+ITEMS_SHOW="${ITEMS_TOTAL[0]:-$LITE_ITEMS}"
+if [ -n "${ITEMS_TOTAL[0]:-}" ] && [ "${ITEMS_TOTAL[0]}" != "$LITE_ITEMS" ]; then
+  echo "  ℹ️  本轮实测项数 ${ITEMS_TOTAL[0]}（配置估算 ${LITE_ITEMS}）：项数随 STAB_ROUNDS 变化，逐轮比较评分前请注意分母"
 fi
 
 # ---------- 排名序列（HTML/MD 报告共享）：评分降序 + 延迟升序，不可达沉底 ----------
@@ -689,7 +751,7 @@ if [ "$GEN_HTML" = "1" ]; then
     echo "</head><body>"
     echo "<div class='wrap'>"
     echo "<div class='card'><h1>🌐 DNS 对比报告</h1>"
-    echo "<div class='meta'>$(date '+%Y-%m-%d %H:%M:%S') ｜ $( [ "$MODE" = "full" ] && echo "完整版" || echo "lite精简版" ) ${LITE_ITEMS:+${LITE_ITEMS}项}/DNS ｜ dns-test ${VERSION} ｜ 耗时${COST}s</div>"
+    echo "<div class='meta'>$(date '+%Y-%m-%d %H:%M:%S') ｜ $( [ "$MODE" = "full" ] && echo "完整版" || echo "lite精简版" ) ${ITEMS_SHOW:+${ITEMS_SHOW}项}/DNS ｜ dns-test ${VERSION} ｜ 耗时${COST}s</div>"
     if [ "$BEST_IDX" -ge 0 ]; then
       _rec_note=""; is_current_dns "$BEST" && _rec_note=" ｜ 👤 当前正在使用"
       # 推荐卡内插的标签同样可被 DEFAULT_DNS_NAME_CSV 覆盖 → 必须转义（报告要分享/归档）
@@ -709,31 +771,12 @@ if [ "$GEN_HTML" = "1" ]; then
     rank=0
     for oi in "${RANKED_IDX[@]}"; do
       rank=$((rank+1))
-      sv="${SCORE_VAL[$oi]}"; tv="${STAB_VAL[$oi]}"; dl="${DELAY_VAL[$oi]:-—}"
-      bcls="bg-n"; [ "$sv" != "不可达" ] && bcls="bg-g"
-      if [ "$sv" != "不可达" ]; then
-        [ "$sv" -lt 80 ] && bcls="bg-a"
-        [ "$sv" -lt 60 ] && bcls="bg-r"
-        sv="$sv%"
-      fi
-      if [ "$tv" != "-" ]; then
-        tcls="bg-g"; [ "$tv" -lt 80 ] && tcls="bg-a"; [ "$tv" -lt 50 ] && tcls="bg-r"
-        tvs="$tv%"
+      # 展示值统一来自 compute_show_facts（口径改动只需改那一处）
+      sv="${SV[$oi]}"; tvs="${TV[$oi]}"; bcls="${BCLS[$oi]}"; tcls="${TCLS[$oi]}"
+      if [ "${UNREACH[$oi]}" = "1" ]; then
+        dcls="bg-n"; dvs="—"; st="<span class='bdg bg-r'>不可达</span>"
       else
-        tcls="bg-n"; tvs="-"
-      fi
-      if [ "$dl" != "—" ]; then
-        dcls="bg-g"; [ "$dl" -ge 100 ] && dcls="bg-a"; [ "$dl" -ge 300 ] && dcls="bg-r"
-        dvs="${dl}ms"
-        # 抖动并进延迟徽章（如 10ms±4；max-min，越小越稳），title 悬浮解释
-        [ -n "${JITTER_VAL[$oi]:-}" ] && dvs="${dvs}±${JITTER_VAL[$oi]}"
-      else
-        dcls="bg-n"; dvs="—"
-      fi
-      if [ "${SCORE_VAL[$oi]}" = "不可达" ]; then
-        st="<span class='bdg bg-r'>不可达</span>"
-      else
-        st="<span class='bdg bg-g'>可达</span>"
+        dcls="${DCLS[$oi]}"; dvs="${DVM[$oi]}"; st="<span class='bdg bg-g'>可达</span>"
       fi
       case "$rank" in
         1) mk="🥇";; 2) mk="🥈";; 3) mk="🥉";; *) mk="$rank";;
@@ -760,11 +803,10 @@ if [ "$GEN_HTML" = "1" ]; then
         ds_cell=""; dd_cell=""
       fi
       # 当前系统 DNS 徽章（命中才渲染，不破坏 addr 列等宽字体排版）
-      cur_b=""; is_current_dns "${DNS_ARGS[$oi]}" && cur_b=" <span class='bdg bg-n'>👤当前</span>"
-      # 提供商标签（预设内的 DNS 才有，地址下方小字副行）
-      # _pl 来自 dns_preset_label，而名字可被 DEFAULT_DNS_NAME_CSV 等环境变量覆盖 →
+      cur_b=""; [ "${CUR[$oi]}" = "1" ] && cur_b=" <span class='bdg bg-n'>👤当前</span>"
+      # 提供商标签（地址下方小字副行）。LBL 可能来自 DEFAULT_DNS_NAME_CSV 等环境变量 →
       # 必须转义后再内插，否则报告会被注入/破版（报告是要分享、归档的产物；审阅 M4）
-      pl_b=""; _pl=$(dns_preset_label "${DNS_ARGS[$oi]}") && pl_b="<span class='pname'>$(html_escape "$_pl")</span>"
+      pl_b=""; [ -n "${LBL[$oi]}" ] && pl_b="<span class='pname'>$(html_escape "${LBL[$oi]}")</span>"
       echo "<tr${rowcls}><td class='rank'>$mk</td><td class='addr'>${DNS_ARGS[$oi]}${cur_b}${pl_b}</td><td><span class='bdg $bcls'>$sv</span></td>${ds_cell}<td><span class='bdg $dcls' title='中位数±抖动(ms)'>$dvs</span></td>${dd_cell}<td><span class='bdg $tcls'>$tvs</span></td><td>$st</td></tr>"
     done
     echo "</tbody></table></div></div>"
@@ -842,7 +884,7 @@ if [ "$GEN_MD" = "1" ]; then
   {
     echo "# DNS 对比报告"
     echo ""
-    echo "> $(date '+%Y-%m-%d %H:%M:%S') ｜ $( [ "$MODE" = "full" ] && echo "完整版" || echo "lite精简版" ) ${LITE_ITEMS:+${LITE_ITEMS}项}/DNS ｜ dns-test ${VERSION} ｜ 耗时${COST}s"
+    echo "> $(date '+%Y-%m-%d %H:%M:%S') ｜ $( [ "$MODE" = "full" ] && echo "完整版" || echo "lite精简版" ) ${ITEMS_SHOW:+${ITEMS_SHOW}项}/DNS ｜ dns-test ${VERSION} ｜ 耗时${COST}s"
     echo ""
     if [ "$BEST_IDX" -ge 0 ]; then
       _md_note=""; is_current_dns "$BEST" && _md_note=" ｜ 👤 当前正在使用"
@@ -866,19 +908,16 @@ if [ "$GEN_MD" = "1" ]; then
     rank=0
     for oi in "${RANKED_IDX[@]}"; do
       rank=$((rank+1))
-      sv="${SCORE_VAL[$oi]}"; tv="${STAB_VAL[$oi]}"
-      dshow="${DNS_ARGS[$oi]}"
-      _mlbl=$(dns_preset_label "${DNS_ARGS[$oi]}") && dshow="${dshow}（${_mlbl}）"
-      if [ "$sv" = "不可达" ]; then
-        mk="$rank"; sv="不可达"; dvs="—"; st="❌ 不可达"
+      # 展示值统一来自 compute_show_facts；MD 习惯：稳定性缺失显示 "—"，延迟带 ms
+      sv="${SV[$oi]}"; tv="${TV[$oi]}"; [ "$tv" = "-" ] && tv="—"
+      dshow="${DNS_ARGS[$oi]}"; [ -n "${LBL[$oi]}" ] && dshow="${dshow}（${LBL[$oi]}）"
+      if [ "${UNREACH[$oi]}" = "1" ]; then
+        mk="$rank"; dvs="—"; st="❌ 不可达"
       else
         case "$rank" in 1) mk="🥇";; 2) mk="🥈";; 3) mk="🥉";; *) mk="$rank";; esac
-        sv="${sv}%"; dvs="${DELAY_VAL[$oi]}ms"
-        [ -n "${JITTER_VAL[$oi]:-}" ] && dvs="${dvs}±${JITTER_VAL[$oi]}"
-        st="✅ 可达"
+        dvs="${DVM[$oi]}"; st="✅ 可达"
       fi
-      [ "$tv" != "-" ] && tv="${tv}%" || tv="—"
-      cur_md=""; is_current_dns "${DNS_ARGS[$oi]}" && cur_md=" 👤"
+      cur_md=""; [ "${CUR[$oi]}" = "1" ] && cur_md=" 👤"
       if [ "$ANY_DELTA" = "1" ]; then
         ds="${DELTA_S[$oi]:-}"; dd="${DELTA_D[$oi]:-}"
         ds="$( [ -n "$ds" ] && printf '%+d' "$ds" || echo —)"

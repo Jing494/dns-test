@@ -89,9 +89,9 @@ else
   tick "shellcheck(未装跳过)" 0
 fi
 
-echo "--- 3. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 29 + 计分口径 17 + compare e2e 130 + doctor/补全/install 60 + trends_lib纯函数 23 + CLI契约 94 + trends解析/数据安全 15）"
+echo "--- 3. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 29 + 计分口径 17 + compare e2e 132 + doctor/补全/install 60 + trends_lib纯函数 23 + CLI契约 94 + trends解析/数据安全 15）"
 if perl -Ilib tests/01_dnsutil.t >/dev/null 2>&1 && bash tests/02_plugins.sh >/dev/null 2>&1 && bash tests/03_dig_target.sh >/dev/null 2>&1 && bash tests/04_core_functions.sh >/dev/null 2>&1 && bash tests/05_run_common_tests.sh >/dev/null 2>&1 && bash tests/06_compare_e2e.sh >/dev/null 2>&1 && bash tests/07_doctor.sh >/dev/null 2>&1 && bash tests/08_trends_lib.sh >/dev/null 2>&1 && bash tests/09_cli_contract.sh >/dev/null 2>&1 && bash tests/10_trends_parse.sh >/dev/null 2>&1; then
-  tick "单测(18+9+4+29+17+130+60+23+94+15用例)" 0
+  tick "单测(18+9+4+29+17+132+60+23+94+15用例)" 0
 else
   tick "单测" 1
 fi

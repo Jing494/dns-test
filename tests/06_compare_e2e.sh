@@ -199,6 +199,10 @@ else
   case "$JOUT" in "{"*) ok "--json stdout 以 { 开头（无 python3，弱校验）" ;; *) notok "--json stdout 非 JSON 开头" ;; esac
 fi
 grep -q '"items_total"' results/compare-*.json 2>/dev/null && ok "JSON 记录 items_total（真实分母，不再只有硬编码 53）" || notok "JSON 缺 items_total"
+# 取分必须是"双路径"：主路径走 KV 契约行，兜底路径兼容旧版 lite/full 的显示文案。
+# 兜底路径靠人工构造旧版子脚本才能跑通，这里做静态守卫，防止某次重构把任一条悄悄删掉。
+grep -q "grep -m1 '\^KV '" compare.sh && ok "compare 取分主路径存在（KV 契约行）" || notok "compare 缺 KV 取分主路径"
+grep -q '综合评分: \[0-9\]' compare.sh && ok "compare 取分兜底路径存在（旧版文案兼容）" || notok "compare 缺兜底取分路径"
 bash compare.sh 223.5.5.5 --json --no-save 2>&1 | grep -q "已忽略 --no-save" && ok "--json 冲突忽略 --no-save" || notok "--json/--no-save 冲突未处理"
 bash compare.sh 223.5.5.5 --watch 1 --rounds 1 --json 2>&1 | grep -q "已忽略 --json" && ok "采集模式剔除 --json" || notok "采集模式未剔除 --json"
 

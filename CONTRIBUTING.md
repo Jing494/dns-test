@@ -20,7 +20,7 @@ dns-test/
 │   ├── compat.sh            # 平台兼容层（timeout等，macOS）
 │   ├── plugins.sh           # 插件加载器（专项菜单动态驱动）
 │   └── DNSUtil.pm           # DNS纯函数模块（可单测）
-├── tests/                   # 单元测试（01~10 共 399 用例，逐个文件的职责见 docs/CODE_WIKI.md §八）
+├── tests/                   # 单元测试（01~10 共 401 用例，逐个文件的职责见 docs/CODE_WIKI.md §八）
 ├── tools/manifest.sh        # 插件注册表（专项插件清单，新增专项加一行）
 ├── tools/vowifi/            # VoWiFi专项（ePDG检测/路由器转发）
 ├── tools/network/           # 端口测试 / DoH-DoT检测
