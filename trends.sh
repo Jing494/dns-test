@@ -468,7 +468,7 @@ while IFS= read -r f; do
   _seen=$(grep -o '"addr"' "$f" 2>/dev/null | wc -l | tr -d ' ')
   if [ "${_seen:-0}" -gt "$_rec" ]; then
     PARSE_WARN=$((PARSE_WARN+1))
-    PARSE_WARN_LIST="$PARSE_WARN_LIST$f（含 \"addr\" 键 ${_seen} 个，仅解析出 ${_rec} 条）
+    PARSE_WARN_LIST="$PARSE_WARN_LIST${f}（含 \"addr\" 键 ${_seen} 个，仅解析出 ${_rec} 条）
 "
   fi
 done < <(printf '%s' "$FILES")

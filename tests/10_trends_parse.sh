@@ -110,6 +110,39 @@ grep -q 'cp -a results' tests/06_compare_e2e.sh && ok "tests/06 以 cp 备份用
 grep -q 'cp -a trends' tests/06_compare_e2e.sh && ok "tests/06 同时备份用户 trends/（原先从未备份却无条件删）" || notok "tests/06 未备份 trends/"
 grep -qE '(^|[^a-z])mv results ' tests/06_compare_e2e.sh && notok "tests/06 仍以 mv 移动用户 results/" || ok "tests/06 不再以 mv 移动用户数据"
 
+echo "═══ D. 变量紧邻中文的写法守卫（macOS bash 3.2 实测翻车点） ═══"
+# 为什么需要：`$f（含…` 这种「变量紧跟多字节字符」的写法，在 macOS 自带的 bash 3.2 +
+# UTF-8 locale 下会被解析成变量名 `f` + 中文首字节，于是该变量展开为空、多字节字符被
+# 劈掉首字节渲染成乱码。CI 实测：trends.sh 的解析告警在 macOS 上把文件名整段吞掉
+# （ubuntu 与 bash 5 一切正常），断言才把它抓出来。修法是写成 `${f}（含…`。
+# 这里做静态守卫，防止再引入同类写法（注释行不参与展开，故排除）。
+if command -v python3 >/dev/null 2>&1 && python3 -c 'pass' 2>/dev/null; then
+  BADFMT=$(python3 - <<'PYEOF'
+import re, pathlib
+pat = re.compile(r'\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7f]')
+out = []
+for p in sorted(pathlib.Path('.').rglob('*')):
+    if p.suffix not in ('.sh', '.pm') or not p.is_file() or '.git' in p.parts:
+        continue
+    for i, line in enumerate(p.read_text(encoding='utf-8', errors='replace').splitlines(), 1):
+        s = line.strip()
+        if s.startswith('#'):
+            continue
+        for m in pat.finditer(line):
+            out.append('%s:%d: %s' % (p, i, s[:100]))
+print('\n'.join(out))
+PYEOF
+)
+  if [ -z "$BADFMT" ]; then
+    ok "代码中无「\$var 紧跟非 ASCII」写法"
+  else
+    notok "存在「\$var 紧跟非 ASCII」写法（macOS bash 3.2 下变量名会被多字节首字节污染）"
+    printf '%s\n' "$BADFMT" | sed 's/^/      | /'
+  fi
+else
+  echo "  ⏭️  跳过（无可用 python3）"
+fi
+
 echo ""
 echo "════════ tests/10 结果: ✅${PASS} 通过  ❌${FAIL} 失败 ════════"
 [ "$FAIL" -eq 0 ] || exit 1

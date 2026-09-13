@@ -129,7 +129,7 @@ UNIQ=()
 for d in "${DNS_ARGS[@]}"; do
   # - 开头是选项而非地址：分开报错，避免把选项误判成"非法DNS地址"误导排查
   if [ "${d#-}" != "$d" ]; then
-    echo "❌ 未知选项: $d（可用 bash compare.sh --help 查看用法）"; exit 1
+    echo "❌ 未知选项: ${d}（可用 bash compare.sh --help 查看用法）"; exit 1
   fi
   if ! valid_dns_addr "$d"; then
     echo "❌ 非法DNS地址: $d"; exit 1
@@ -248,7 +248,7 @@ if [ -n "$WATCH_N" ]; then
     bash "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" "${CLEAN_ARGS[@]}" || SUB_RC=$?
     if [ "$SUB_RC" -ne 0 ] && [ "$SUB_RC" -ne 2 ]; then
       # 2=全部不可达，是有效的数据结论；其它非零=子轮真的失败，绝不能当作"本轮完成"
-      echo "  ⚠️  本轮子进程异常退出（rc=$SUB_RC），本轮不计入已完成轮数；请检查上方子轮报错"
+      echo "  ⚠️  本轮子进程异常退出（rc=${SUB_RC}），本轮不计入已完成轮数；请检查上方子轮报错"
       printf '%s\n%s\n' "$WSIG" "$WDONE" > "$WSTATE"
       continue
     fi
