@@ -423,18 +423,10 @@ for p in "${pids[@]}"; do wait "$p" 2>/dev/null; done
 n=0
 for i in "${IDX_MAP[@]}"; do
   out=$(cat "$TMPD/$n.out")
-  # 取分首选机器可读契约行 "KV addr=.. score=.. stab=.. pass=.. total=.."
-  # （lite/full --emit-kv 输出；字段名固定、值纯数字，人类文案怎么改都不影响）
-  kvline=$(printf '%s\n' "$out" | grep -m1 '^KV ')
-  if [ -n "$kvline" ]; then
-    SCORE_VAL[$i]=$(printf '%s' "$kvline" | sed -n 's/.* score=\([0-9]\{1,\}\).*/\1/p')
-    STAB_VAL[$i]=$(printf '%s' "$kvline" | sed -n 's/.* stab=\([0-9]\{1,\}\).*/\1/p')
-    ITEMS_TOTAL[$i]=$(printf '%s' "$kvline" | sed -n 's/.* total=\([0-9]\{1,\}\).*/\1/p')
-  else
-    # 兜底：旧版 lite/full（无 --emit-kv）仍从显示文案取分。仅作兼容，不作为契约
-    SCORE_VAL[$i]=$(echo "$out" | grep -oE "综合评分: [0-9]+" | grep -oE "[0-9]+")
-    STAB_VAL[$i]=$(echo "$out" | grep -oE "稳定性: [0-9]+%" | grep -oE "[0-9]+")
-  fi
+  # 取分走 core.sh 的纯函数：主路径 = --emit-kv 的机器可读契约行，
+  # 兜底 = 旧版 lite/full 的显示文案（两条路径都有 tests/04 的样本断言）
+  IFS='|' read -r _pv_score _pv_stab _pv_total <<< "$(parse_test_output "$out")"
+  SCORE_VAL[$i]="$_pv_score"; STAB_VAL[$i]="$_pv_stab"; ITEMS_TOTAL[$i]="$_pv_total"
   if [ -z "${SCORE_VAL[$i]}" ]; then
     # 解析不到评分：把子进程输出尾部打出来。否则失败信息被封在临时目录里、
     # 退出时又被清理，现场只剩一句"不可达"，排障零线索（审阅#17）

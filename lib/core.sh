@@ -343,6 +343,27 @@ dns_partner_default() {
 
 # DNS可达性预检函数：不可达返回1（快速跳过，避免59~90次查询白等）
 # 双域名并行探测：任一成功即可达（避免 baidu.com 在海外网络解析慢导致误判，且不可达 DNS 最多等 2s 而非 4s）
+# ---------------------------------------------------------------------------
+# 从 lite/full 的输出里取分：优先机器可读契约行（--emit-kv 的 "KV … score=… stab=… total=…"），
+# 取不到再回退解析显示文案（兼容旧版子脚本 —— 旧版没有 KV 行）。
+#   $1 = 子进程完整输出；输出 "score|stab|total"（未取到的字段为空）
+# 为什么抽成纯函数：主/兜底两条路径原来内联在 compare.sh 里，兜底路径要人工构造旧版子脚本
+# 才能跑通、等于没有测试；下沉到 core.sh 后 tests/04 可以直接喂样本断言两条路径。
+parse_test_output() {
+  local txt="$1" kv s tv tot
+  kv=$(printf '%s\n' "$txt" | grep -m1 '^KV ')
+  if [ -n "$kv" ]; then
+    s=$(printf '%s' "$kv" | sed -n 's/.* score=\([0-9]\{1,\}\).*/\1/p')
+    tv=$(printf '%s' "$kv" | sed -n 's/.* stab=\([0-9]\{1,\}\).*/\1/p')
+    tot=$(printf '%s' "$kv" | sed -n 's/.* total=\([0-9]\{1,\}\).*/\1/p')
+  else
+    s=$(printf '%s\n' "$txt" | grep -oE "综合评分: [0-9]+" | grep -oE "[0-9]+" | head -1)
+    tv=$(printf '%s\n' "$txt" | grep -oE "稳定性: [0-9]+%" | grep -oE "[0-9]+" | head -1)
+    tot=""
+  fi
+  printf '%s|%s|%s\n' "$s" "$tv" "$tot"
+}
+
 dns_health_check() {
   local addr="$1" p1 p2
   local t=$(dig_target "$addr")

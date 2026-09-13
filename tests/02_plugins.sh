@@ -33,6 +33,17 @@ if [ "$P_FWD" = "0" ]; then ok "split6字段FWD=0"; else notok "split6字段FWD=
 _plugin_split "x|y.pl|测试|perl||1"
 if [ "$P_FWD" = "1" ]; then ok "split6字段FWD=1"; else notok "split6字段FWD=1 (FWD=$P_FWD)"; fi
 
+# 4b. _plugin_split 7 字段：P_OPTS 解析与缺省
+_plugin_split "x|y.pl|测试|perl||0|1"
+if [ "$P_OPTS" = "1" ]; then ok "split7字段P_OPTS=1"; else notok "split7字段P_OPTS=1 (OPTS=$P_OPTS)"; fi
+_plugin_split "x|y.pl|测试|perl||0"
+if [ "$P_OPTS" = "0" ]; then ok "缺第7字段默认P_OPTS=0"; else notok "缺第7字段默认P_OPTS=0 (OPTS=$P_OPTS)"; fi
+
+# 4c. plugin_accepts_opts：只有声明 P_OPTS=1 的编号才接受命令行参数
+if plugin_accepts_opts 4; then ok "plugin_accepts_opts(4=carrier_epdg) 为真"; else notok "plugin_accepts_opts(4) 应为真"; fi
+if plugin_accepts_opts 1; then notok "plugin_accepts_opts(1) 应为假"; else ok "plugin_accepts_opts(1) 为假"; fi
+if plugin_accepts_opts 999; then notok "plugin_accepts_opts(999) 应为假"; else ok "plugin_accepts_opts(无效编号) 为假"; fi
+
 # 5. plugin_list 输出格式（编号. 名称）
 if plugin_list | head -1 | grep -qE "^[0-9]+\. "; then ok "plugin_list格式"; else notok "plugin_list格式"; fi
 

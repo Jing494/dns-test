@@ -60,7 +60,7 @@ jobs:
           ls "$TMPR/out/report.html" "$TMPR/out/trends.csv" >/dev/null 2>&1 || { echo "❌ trends产物缺失"; exit 1; }
           rm -rf "$TMPR"
           echo "  ✅ trends 聚合+产物"
-          echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins 9 + dig_target 4 + core函数 29 + 计分口径 17 + compare e2e 132 + doctor/completions/trends参数 60 + trends_lib纯函数 23 + CLI契约 94 + trends解析/数据安全 15）"
+          echo "--- 6. 单元测试（DNSUtil perl 18用例 + plugins 14 + dig_target 4 + core函数 33 + 计分口径 17 + compare e2e 130 + doctor/completions/trends参数 60 + trends_lib纯函数 23 + CLI契约 94 + trends解析/数据安全 15）"
           # 失败时打印输出尾部（断言名直接进日志，不再盲猜）
           UTLOG=$(mktemp)
           ut() { bash "tests/$1" >"$UTLOG" 2>&1 || { echo "❌ $1 失败断言（含上下文）:"; grep -n -B1 -A1 "❌" "$UTLOG" | head -80; cp "$UTLOG" "/tmp/utlog-$1.txt"; exit 1; }; }
@@ -95,6 +95,20 @@ jobs:
           bash -c 'PLUGIN_MANIFEST=/dev/null; PLUGIN_ITEMS=("x|dns-test.sh|测试|python|"); PLUGIN_DIR_x="."; source lib/plugins.sh && plugin_run 1' >/dev/null 2>&1 && { echo "❌ 未知执行器未拦截"; exit 1; }
           echo "  ✅ 插件拦截"
           echo "════ Strict checks 全部通过 ════"
+
+      - name: release.sh 真出包门禁（打包自检四项）
+        # 为什么要有这一步：release.sh 的"打包 + 四项自检"此前只被 tests/09 校验了参数分支
+        # （--help/非法版本），真正出包这条路径本地/CI 都没跑过 —— 而它恰好是那种
+        # "沙箱里 tar/gzip 坏掉、包是 0 字节却没人发现"的地方。这里在干净 checkout 里真打一次包。
+        run: |
+          bash release.sh v2026.09.99
+          test -s dns-test-v2026.09.99.tar.gz || { echo "❌ 发行包为空"; exit 1; }
+          n=$(tar tzf dns-test-v2026.09.99.tar.gz | wc -l | tr -d ' ')   # BSD wc 有前导空格
+          env_n=$(tar tzf dns-test-v2026.09.99.tar.gz | grep -c 'env\.sh' || true)
+          [ "$n" -gt 50 ] || { echo "❌ 包内条目过少: $n"; exit 1; }
+          [ "$env_n" -eq 0 ] || { echo "❌ 设备专用 env.sh 混进发行包"; exit 1; }
+          echo "  ✅ 出包 $n 条目，env.sh 未混入"
+          rm -f dns-test-v2026.09.99.tar.gz
 
       - name: verify.sh 一键自检（CI 模式：严格 shellcheck + 跳过网络项）
         # 为什么在 CI 里再跑一遍 verify：上面的 1-8 步是"手写清单"，与 verify.sh 的

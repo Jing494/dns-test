@@ -192,6 +192,24 @@ DNS_LIST=(223.5.5.5 119.29.29.29)
 P=$(dns_partner_default)
 [ "$P" = "8.8.8.8" ] && ok "dns_partner_default 跳过已在列表的候选" || notok "dns_partner_default 取值异常: $P"
 
+echo "═══ parse_test_output 单测（compare 取分：KV 主路径 + 旧版文案兜底） ═══"
+# 主路径：--emit-kv 的契约行（字段名固定、值纯数字）
+R=$(parse_test_output "进度文字
+KV addr=223.5.5.5 mode=lite score=83 stab=100 pass=44 total=53
+尾部文字")
+[ "$R" = "83|100|53" ] && ok "KV 契约行取分（score/stab/total）" || notok "KV 取分异常: [$R]"
+# 兜底路径：旧版 lite/full 只有中文显示文案
+R=$(parse_test_output "  ┃ 📊 综合评分: 91% (48/53 项通过)
+  ┃ ⏱️  稳定性: 95%")
+[ "$R" = "91|95|" ] && ok "旧版文案兜底取分（total 为空）" || notok "兜底取分异常: [$R]"
+# 两者都在时以 KV 为准（防文案与契约不一致时取错源）
+R=$(parse_test_output "综合评分: 1%
+KV addr=x mode=lite score=99 stab=98 pass=1 total=2")
+[ "$R" = "99|98|2" ] && ok "KV 优先于显示文案" || notok "优先级异常: [$R]"
+# 垃圾输出：三个字段都空（调用方据此判定"不可达"并打诊断）
+R=$(parse_test_output "MOCK-ERR: dig 缺少 @server")
+[ "$R" = "||" ] && ok "无法解析时输出空字段（不误报分数）" || notok "垃圾输入异常: [$R]"
+
 echo ""
 echo "════ 结果: $PASS 通过 / $FAIL 失败 ════"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

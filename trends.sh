@@ -380,30 +380,54 @@ round_idx() {
 # 对象边界用花括号判定（"{" 出现在本键之前 ⇒ 上一个对象结束），因此
 # 「addr 排在字段之前」与「addr 排在字段之后」两种排布都能正确切分，对象跨行也正确。
 parse_dns_records() {
+  # 一次 awk 同时产出两类行（原先还要 3 条 grep 逐个文件捞 timestamp/mode/addr 键数）：
+  #   元信息（先输出，调用方据此决定是否继续处理本文件）："#TS <ts>" / "#MODE <m>" / "#ADDRKEYS <n>"
+  #   记录行："addr<TAB>score<TAB>stab<TAB>delay_ms"
+  # 做法：BEGIN 里先把整个文件读进内存（体量小），抽完元信息再按键值对扫描对象。
   awk '
     function stripq(s) { sub(/^"/, "", s); sub(/"$/, "", s); return s }
+    function field(src, key,   m) {
+      if (match(src, "\"" key "\"[ \t]*:[ \t]*\"[^\"]*\"")) {
+        m = substr(src, RSTART, RLENGTH)
+        sub(/^[^:]*:[ \t]*"/, "", m); sub(/"$/, "", m)
+        return m
+      }
+      return ""
+    }
     function flush() {
       if (addr != "") printf "%s\t%s\t%s\t%s\n", addr, score, stab, (delay == "" ? 0 : delay)
       addr = ""; score = ""; stab = ""; delay = ""
     }
-    {
-      rest = $0
-      while (match(rest, /"[A-Za-z_]+"[ \t]*:[ \t]*("[^"]*"|[0-9]+|true|false|null)/)) {
-        # 对象边界：本键之前若出现 "{"，说明上一个 dns 对象已结束 → 先把它落盘。
-        # 为什么不用 addr 当边界：addr 排在字段之后时（如 {"delay_ms":20,...,"addr":"1.1.1.1"}），
-        # 按 addr 切分会把 addr 之前刚读到的 score/stab/delay 一起清掉（实测得到空值）
-        if (index(substr(rest, 1, RSTART - 1), "{") > 0) flush()
-        tok = substr(rest, RSTART, RLENGTH)
-        rest = substr(rest, RSTART + RLENGTH)
-        k = tok; sub(/[ \t]*:.*$/, "", k); gsub(/"/, "", k)
-        v = tok; sub(/^[^:]*:[ \t]*/, "", v); v = stripq(v)
-        if (k == "addr") addr = v
-        else if (k == "score") score = v
-        else if (k == "stab")  stab  = v
-        else if (k == "delay_ms") delay = v
+    BEGIN {
+      # 注意：命令行上的 FILE=… 赋值在 BEGIN 之前不生效（awk 语义），必须用 ARGV[1]
+      while ((getline ln < ARGV[1]) > 0) all = all ln "\n"
+      close(ARGV[1])
+      ts = field(all, "timestamp"); mode = field(all, "mode")
+      if (mode == "") mode = "unknown"
+      n_addr = 0
+      tmp = all
+      while (match(tmp, /"addr"[ \t]*:/)) { n_addr++; tmp = substr(tmp, RSTART + RLENGTH) }
+      printf "#TS %s\n#MODE %s\n#ADDRKEYS %d\n", ts, mode, n_addr
+      rest = all
+      while (length(rest) > 0) {
+        if (index(rest, "\n") == 0) { line = rest; rest = "" } else { line = substr(rest, 1, index(rest, "\n") - 1); rest = substr(rest, index(rest, "\n") + 1) }
+        while (match(line, /"[A-Za-z_]+"[ \t]*:[ \t]*("[^"]*"|[0-9]+|true|false|null)/)) {
+          # 对象边界：本键之前若出现 "{"，说明上一个 dns 对象已结束 → 先把它落盘。
+          # 为什么不用 addr 当边界：addr 排在字段之后时（如 {"delay_ms":20,...,"addr":"1.1.1.1"}），
+          # 按 addr 切分会把 addr 之前刚读到的 score/stab/delay 一起清掉（实测得到空值）
+          if (index(substr(line, 1, RSTART - 1), "{") > 0) flush()
+          tok = substr(line, RSTART, RLENGTH)
+          line = substr(line, RSTART + RLENGTH)
+          k = tok; sub(/[ \t]*:.*$/, "", k); gsub(/"/, "", k)
+          v = tok; sub(/^[^:]*:[ \t]*/, "", v); v = stripq(v)
+          if (k == "addr") addr = v
+          else if (k == "score") score = v
+          else if (k == "stab")  stab  = v
+          else if (k == "delay_ms") delay = v
+        }
       }
+      flush()
     }
-    END { flush() }
   ' "$1"
 }
 
@@ -419,29 +443,40 @@ PARSE_WARN_LIST=""
 # 进程替换不开子 shell，循环内的数组累积（RAW_ADDR/RAW_VAL/ROUNDS_TS）在主 shell 生效
 while IFS= read -r f; do
   [ -z "$f" ] && continue
-  ts=$(grep -oE '"timestamp": ?"[^"]+"' "$f" | head -1 | sed 's/"timestamp": *"//;s/"$//')
-  if [ -z "$ts" ]; then
-    # 取不到 timestamp ⇒ 该文件无法解析（通常已损坏）。计数而非静默跳过：
-    # 全坏时会走到"无可用数据"，若不带这条线索会被误读成"DNS 全不可达"。
-    BAD_N=$((BAD_N+1))
-    [ "$BAD_N" -le 3 ] && BAD_LIST="$BAD_LIST$f
+  # 一次 awk 拿到该文件的元信息 + 全部记录（原先每文件还要 3 条 grep 捞 timestamp/mode/键数）。
+  # 元信息行在流的最前面，所以"能不能用这个文件"在读到记录之前就能定：
+  #   #TS <ts> / #MODE <m> / #ADDRKEYS <键数> —— 行内没有 TAB，用 ${a#\#TS } 剥前缀
+  _fd_ts=""; _fd_mode="unknown"; _fd_seen=0; _fd_bad=0; _fd_skip=0; _rec=0
+  while IFS=$'\t' read -r ra rb rc rd; do
+    case "$ra" in
+      '#TS '*)
+        _fd_ts="${ra#\#TS }"
+        if [ -z "$_fd_ts" ]; then
+          # 取不到 timestamp ⇒ 该文件无法解析（通常已损坏）。计数而非静默跳过：
+          # 全坏时会走到"无可用数据"，若不带这条线索会被误读成"DNS 全不可达"。
+          _fd_bad=1
+          continue
+        fi
+        # --since/--until 按 YYYY-MM-DD 日期前缀比较（含两端；纯 ASCII 前缀不受 locale 排序影响）
+        if [ -n "$SINCE" ] && [[ "${_fd_ts:0:10}" < "$SINCE" ]]; then _fd_skip=1; continue; fi
+        if [ -n "$UNTIL" ] && [[ "${_fd_ts:0:10}" > "$UNTIL" ]]; then _fd_skip=1; continue; fi
+        ROUNDS_TS+=("$_fd_ts")
+        ACCEPT_FILES="$ACCEPT_FILES$f
 "
-    continue
-  fi
-  # --since/--until 均按 YYYY-MM-DD 日期前缀比较（含两端日期；纯 ASCII 前缀不受 locale 排序影响）
-  if [ -n "$SINCE" ] && [[ "${ts:0:10}" < "$SINCE" ]]; then continue; fi
-  if [ -n "$UNTIL" ] && [[ "${ts:0:10}" > "$UNTIL" ]]; then continue; fi
-  ROUNDS_TS+=("$ts")
-  ACCEPT_FILES="$ACCEPT_FILES$f
-"
-  LAST_TS="$ts"
-  _m=$(grep -oE '"mode": ?"[^"]+"' "$f" | head -1 | sed 's/"mode": *"//;s/"$//')
-  [ -z "$_m" ] && _m="unknown"
-  case " $MODE_SEEN " in *" $_m "*) ;; *) MODE_SEEN="$MODE_SEEN $_m";; esac
-  # 记录级解析：awk 按键值对扫描（对空白/换行/字段顺序/额外字段均不敏感）
-  _rec=0
-  while IFS=$'\t' read -r addr score stab delay; do
-    [ -z "$addr" ] && continue
+        LAST_TS="$_fd_ts"
+        continue ;;
+      '#MODE '*)
+        _fd_mode="${ra#\#MODE }"
+        case " $MODE_SEEN " in *" $_fd_mode "*) ;; *) MODE_SEEN="$MODE_SEEN $_fd_mode";; esac
+        continue ;;
+      '#ADDRKEYS '*)
+        _fd_seen="${ra#\#ADDRKEYS }"
+        continue ;;
+    esac
+    [ "$_fd_bad" = "1" ] && continue
+    [ "$_fd_skip" = "1" ] && continue
+    [ -z "$ra" ] && continue
+    addr="$ra"; score="$rb"; stab="$rc"; delay="$rd"
     _rec=$((_rec+1))
     [ -z "$delay" ] && delay=0
     if [ ${#FILTER[@]} -gt 0 ]; then
@@ -460,21 +495,27 @@ while IFS= read -r f; do
       ix=$(( ${#RAW_ADDR[@]} - 1 ))
     fi
     if [ "$score" = "不可达" ]; then
-      RAW_VAL[$ix]="${RAW_VAL[$ix]}${ts}|不可达|-|${delay}|UNREACH
+      RAW_VAL[$ix]="${RAW_VAL[$ix]}${_fd_ts}|不可达|-|${delay}|UNREACH
 "
     else
-      RAW_VAL[$ix]="${RAW_VAL[$ix]}${ts}|${score}|${stab}|${delay}
+      RAW_VAL[$ix]="${RAW_VAL[$ix]}${_fd_ts}|${score}|${stab}|${delay}
 "
       rec_total=$((rec_total+1))
     fi
   done < <(parse_dns_records "$f")
-  # 解析完整性核对：文件里出现多少个 "addr" 键，就应当产出多少条记录。
+  if [ "$_fd_bad" = "1" ]; then
+    BAD_N=$((BAD_N+1))
+    [ "$BAD_N" -le 3 ] && BAD_LIST="$BAD_LIST${f}
+"
+    continue
+  fi
+  [ "$_fd_skip" = "1" ] && continue
+  # 解析完整性核对：文件里出现多少个 "addr" 键，就应当产出多少条记录（键数由同一次 awk 给出）。
   # 少了 = 该文件有记录没能解析（结构异常/被外部工具改写）。绝不能静默少算 ——
   # 少算会被读成"该DNS不可达/被窗口过滤"，把解析失败伪装成数据结论。
-  _seen=$(grep -o '"addr"' "$f" 2>/dev/null | wc -l | tr -d ' ')
-  if [ "${_seen:-0}" -gt "$_rec" ]; then
+  if [ "${_fd_seen:-0}" -gt "$_rec" ]; then
     PARSE_WARN=$((PARSE_WARN+1))
-    PARSE_WARN_LIST="$PARSE_WARN_LIST${f}（含 \"addr\" 键 ${_seen} 个，仅解析出 ${_rec} 条）
+    PARSE_WARN_LIST="$PARSE_WARN_LIST${f}（含 \"addr\" 键 ${_fd_seen} 个，仅解析出 ${_rec} 条）
 "
   fi
 done < <(printf '%s' "$FILES")

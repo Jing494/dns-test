@@ -29,12 +29,28 @@ _plugins_load() {
 }
 _plugins_load
 
-# 拆分注册表行（| 分隔，纯内置）: $1=行  ->  全局 P_ID/P_SCRIPT/P_NAME/P_EXEC/P_PROMPT/P_FWD
+# 拆分注册表行（| 分隔，纯内置）: $1=行 -> 全局 P_ID/P_SCRIPT/P_NAME/P_EXEC/P_PROMPT/P_FWD/P_OPTS
+# 第 7 字段 P_OPTS=1：该插件接受命令行额外参数（非 DNS 的那些），由调用方原样传进来当显式参数
 _plugin_split() {
   local line="$1"
-  P_ID=""; P_SCRIPT=""; P_NAME=""; P_EXEC=""; P_PROMPT=""; P_FWD=1
-  IFS='|' read -r P_ID P_SCRIPT P_NAME P_EXEC P_PROMPT P_FWD <<< "$line"
+  P_ID=""; P_SCRIPT=""; P_NAME=""; P_EXEC=""; P_PROMPT=""; P_FWD=1; P_OPTS=0
+  IFS='|' read -r P_ID P_SCRIPT P_NAME P_EXEC P_PROMPT P_FWD P_OPTS <<< "$line"
   [ -z "$P_FWD" ] && P_FWD=1
+  [ -z "$P_OPTS" ] && P_OPTS=0
+}
+
+# 该编号的插件是否接受命令行额外参数（0=是 1=否；与 shell 惯例一致）
+plugin_accepts_opts() {
+  local n="$1" i=1 item
+  for item in "${PLUGIN_ITEMS[@]}"; do
+    if [ "$i" = "$n" ]; then
+      _plugin_split "$item"
+      [ "$P_OPTS" = "1" ] && return 0
+      return 1
+    fi
+    i=$((i+1))
+  done
+  return 1
 }
 
 # 打印所有菜单项: "编号. 名称"
@@ -82,6 +98,9 @@ plugin_run() {
         local -a args_arr
         read -r -a args_arr <<< "$args"
         "$P_EXEC" "$path" "${args_arr[@]}"
+      elif [ "$P_OPTS" = "1" ] && [ $# -gt 0 ]; then
+        # P_OPTS=1：调用方传来的 "$@" 是插件的显式参数（不是 DNS），原样透传
+        "$P_EXEC" "$path" "$@"
       elif [ "$P_FWD" = "1" ]; then
         "$P_EXEC" "$path" "$@"
       else
