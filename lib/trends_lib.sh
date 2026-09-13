@@ -30,7 +30,13 @@ trends_percentile() {
 #   平稳档内首尾仍有差 → 微升/微降（score）或 变差/变好（delay）
 trends_slope_judge() {
   local slope="$1" first="$2" last="$3" kind="$4"
-  local diff=$((last - first))
+  # 首尾差只在两端都是纯整数时才计算：脏数据（"85.5"/"1.2.3"/"-"/空）会让
+  # $(( )) 报 arithmetic syntax error，stderr 噪声之外还会把趋势字段清成空串；
+  # 非数值一律视为无首尾差（回落为纯斜率判定）
+  local diff=0
+  if [[ "$first" =~ ^-?[0-9]+$ ]] && [[ "$last" =~ ^-?[0-9]+$ ]]; then
+    diff=$((last - first))
+  fi
   if awk "BEGIN{exit !($slope > 0.05)}"; then
     if [ "$kind" = "delay" ]; then echo "↓ 变差"; else echo "↑ 变好"; fi
     return

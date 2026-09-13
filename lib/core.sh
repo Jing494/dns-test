@@ -397,6 +397,15 @@ json_escape() {
   }' <<< "$1"
 }
 
+# HTML 文本转义（报告内插外部数据前必须调用）
+#   trends/compare 的报告会把 DNS 地址、提供商标签写进 HTML；这些值可能来自外部
+#   JSON 文件或 DEFAULT_DNS_NAME_CSV 等环境变量（trends 侧不校验 addr），
+#   不转义即造成 HTML 注入/破版，且报告是被分享/归档的产物（审阅#18）
+# 顺序要求：& 必须先转，否则会把后面生成的 &lt; 二次转义
+html_escape() {
+  printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'
+}
+
 # webhook 推送（trends --webhook 告警用）：按 URL 自动识别通道，一次性纯 curl 实现
 #   飞书 open.feishu.cn｜钉钉 oapi.dingtalk.com｜企微 qyapi.weixin.qq.com → text 消息体
 #   Telegram api.telegram.org（URL 需自带 chat_id 查询参数）→ -G --data-urlencode

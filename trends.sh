@@ -169,8 +169,16 @@ if [ -n "$VS_ARG" ]; then
   done
 fi
 # --week 窗口校验：2-365 的整数天（近N天 vs 前N天，默认 7）
-if ! [[ "$WEEK_N" =~ ^[0-9]+$ ]] || [ "$WEEK_N" -lt 2 ] || [ "$WEEK_N" -gt 365 ]; then
+# 必须用 ^[1-9][0-9]*$ 而不能用 ^[0-9]+$：后者放行 "08"，而后续 $((WEEK_N - 1))
+# 会把前导零当八进制解析并报 "value too great for base"，周对比静默失效
+# （与 --prune/--archive-keep/--alert 的校验口径保持一致）
+if ! [[ "$WEEK_N" =~ ^[1-9][0-9]*$ ]] || [ "$WEEK_N" -lt 2 ] || [ "$WEEK_N" -gt 365 ]; then
   echo "❌ --week 必须为 2-365 的整数天数，收到: $WEEK_N"
+  exit 1
+fi
+# --limit 明细条数校验：非法值会让 tail 报错、明细段静默为空，而脚本仍 exit 0（假成功）
+if [ -n "$LIMIT" ] && ! [[ "$LIMIT" =~ ^[1-9][0-9]*$ ]]; then
+  echo "❌ --limit 必须为正整数（明细条数），收到: $LIMIT"
   exit 1
 fi
 # --webhook 校验：须为 http(s) URL，且推送时机=告警命中（需配合 --alert，否则没有触发点）
@@ -220,6 +228,9 @@ if [ "$ARCHIVE" = "1" ] && [ -z "$PRUNE_N" ]; then
     if tar -czf "$A_TAR" -C "$SRC_DIR" "${AFULL[@]}" 2>/dev/null; then
       echo "  🗄️  --archive: 已全量归档 ${#AFULL[@]} 份 → ${A_TAR}（原文件保留不动）"
     else
+      # tar 失败时输出文件已被创建（0 字节）：不清掉会被 --archive-keep 计入配额，
+      # 并被 HTML 归档清单当成一个"有效包"展示
+      rm -f "$A_TAR"
       echo "  ⚠️  --archive: tar 打包失败（tar 不可用/磁盘满？），原文件未受影响"
     fi
   fi
@@ -253,6 +264,7 @@ if [ -n "$PRUNE_N" ]; then
       if tar -czf "$A_TAR" -C "$SRC_DIR" "${A_NAMES[@]}" 2>/dev/null; then
         echo "  🗄️  已归档待清理的 ${#A_NAMES[@]} 份 → $A_TAR"
       else
+        rm -f "$A_TAR"   # 同上：清掉 0 字节半成品，避免污染归档配额与清单
         echo "  ⚠️  --archive 归档失败，为数据安全本次跳过清理（排查 tar/磁盘后重试）"
         ARCHIVE_OK=0
       fi
@@ -288,14 +300,22 @@ if [ -n "$ARCHIVE_KEEP" ]; then
   else
     KDEL=$((KTOTAL - ARCHIVE_KEEP))
     echo "  🗄️  --archive-keep: 共 ${KTOTAL} 个归档包，保留最近 ${ARCHIVE_KEEP} 个，删除 ${KDEL} 个:"
+    # 必须按「包名内嵌时间戳」排序，不能按整名排：full-*/prune-* 前缀会先于时间戳参与
+    # 比较，于是 prune-20251201 排在 full-20260201 之前被当成"最老"删掉 ——
+    # 实测会保留最老的包、删掉较新的包，与"只留最近 N 个"的语义相反
+    KSORTED=$(for _f in "${KFILES[@]}"; do
+      _ts=$(basename "$_f" | sed -n 's/^[^0-9]*\([0-9]\{8\}-[0-9]\{6\}\).*/\1/p')
+      printf '%s|%s\n' "${_ts:-00000000-000000}" "$_f"
+    done | sort)
     k=0
-    for _f in "${KFILES[@]}"; do
+    while IFS='|' read -r _kts _f; do
+      [ -z "$_f" ] && continue
       k=$((k+1))
       if [ "$k" -le "$KDEL" ]; then
         echo "     🗑️  $(basename "$_f")"
         rm -f "$_f"
       fi
-    done
+    done <<< "$KSORTED"
   fi
 fi
 
@@ -350,6 +370,7 @@ MODE_SEEN=""   # 已见采集模式（lite/full 混采则评分口径不一致�
 LAST_TS=""     # 最新一条采集时间戳（数据新鲜度计算用）
 BAD_N=0        # 无法解析（缺 timestamp）的文件数——不静默跳过，否则会误报成"不可达/被过滤"
 BAD_LIST=""    # 前若干个坏文件名（告警里列出，便于直接定位）
+ACCEPT_FILES=""  # 通过 --since/--until 过滤的文件清单（--export 复用同一窗口口径）
 # while read 迭代（不用 for f in $FILES 的 IFS 分词）：数据目录含空格时文件名不被拆断；
 # 进程替换不开子 shell，循环内的数组累积（RAW_ADDR/RAW_VAL/ROUNDS_TS）在主 shell 生效
 while IFS= read -r f; do
@@ -367,6 +388,8 @@ while IFS= read -r f; do
   if [ -n "$SINCE" ] && [[ "${ts:0:10}" < "$SINCE" ]]; then continue; fi
   if [ -n "$UNTIL" ] && [[ "${ts:0:10}" > "$UNTIL" ]]; then continue; fi
   ROUNDS_TS+=("$ts")
+  ACCEPT_FILES="$ACCEPT_FILES$f
+"
   LAST_TS="$ts"
   _m=$(grep -oE '"mode": ?"[^"]+"' "$f" | head -1 | sed 's/"mode": *"//;s/"$//')
   [ -z "$_m" ] && _m="unknown"
@@ -416,6 +439,17 @@ if [ "$rec_total" -eq 0 ]; then
     echo "❌ 无可用数据（所有记录均为不可达，或已被 --since/过滤条件排除）"
   fi
   exit 2
+fi
+
+# --vs 地址存在性校验提前到任何产物生成之前：原先在聚合与 CSV 写出、HTML 之前才 exit 1，
+# 会留下"CSV 已写、报告未写"的半套产物（调用方拿到失败，目录却已被改脏）
+if [ -n "$VS_ARG" ]; then
+  for _v in "$VS_A" "$VS_B"; do
+    if [ "$(raw_idx "$_v")" = "-1" ]; then
+      echo "❌ --vs 的 ${_v} 不在数据集中（先采集该DNS: bash compare.sh ${VS_A} ${VS_B}）"
+      exit 1
+    fi
+  done
 fi
 
 # 期间/计数改用"已入选数据"口径（ROUNDS_TS 只含通过 --since/--until 过滤的文件，与表格/图表一致）
@@ -547,7 +581,7 @@ svg_chart() {
   local n=0
   while IFS= read -r line; do [ -n "$line" ] && n=$((n+1)); done <<< "$data"
   if [ "$n" -lt 2 ]; then
-    echo "<div class='card'><h2>$addr — $title</h2><div class='meta'>样本不足（${n}条，至少2条才出图）</div></div>"
+    echo "<div class='card'><h2>$(html_escape "$addr") — $(html_escape "$title")</h2><div class='meta'>样本不足（${n}条，至少2条才出图）</div></div>"
     return
   fi
   local col=2; [ "$metric" = "delay" ] && col=4
@@ -567,7 +601,7 @@ svg_chart() {
     fi
     i=$((i+1))
   done <<< "$data"
-  chart_begin "<span class='mono'>$addr</span> — $title" "最新: $last_disp$unit ｜ 均值: $mean_disp$unit ｜ 趋势: $trend" \
+  chart_begin "<span class='mono'>$(html_escape "$addr")</span> — $(html_escape "$title")" "最新: $last_disp$unit ｜ 均值: $mean_disp$unit ｜ 趋势: $trend" \
     "$w" "$h" "$pad_l" "$pad_t" "$plot_w" "$plot_h" "$minv" "$maxv"
   echo "<polyline points='$pts' fill='none' stroke='$color' stroke-width='2' stroke-linejoin='round'/>"
   echo "$dots"
@@ -634,8 +668,9 @@ svg_multi_chart() {
       echo "<polyline points='$pts' fill='none' stroke='$color' stroke-width='2' stroke-linejoin='round' opacity='.85'/>"
       echo "$dots"
     fi
-    # 图例：色块 + 地址（+提供商标签）
-    local _lg="${RAW_ADDR[$k]}"; _lt=$(dns_preset_label "${RAW_ADDR[$k]}") && _lg="${_lg}·${_lt}"
+    # 图例：色块 + 地址（+提供商标签）；地址同样来自外部 JSON，必须转义
+    local _lg; _lg=$(html_escape "${RAW_ADDR[$k]}")
+    local _lt; _lt=$(dns_preset_label "${RAW_ADDR[$k]}") && _lg="${_lg}·$(html_escape "$_lt")"
     legend="$legend<span class='lg-i'><span class='lg-c' style='background:$color'></span>${_lg}</span>"
     ci=$((ci+1))
   done
@@ -657,8 +692,11 @@ MD_ROWS=""         # --md 总览表行（与 HTML_ROWS 同口径）
 JSON_DNS=()        # --json 逐DNS对象（循环后拼装，下标与 RAW_ADDR 对齐）
 WK_JSON=()         # --json 周对比对象（有 Δ 才有值，否则 null）
 MUT_N=()           # --json 突变计数（按下标）
-# --json 数值字段兜底：空串/"-" 等非数字输出 null（JSON 语法要求）
-_num_or_null() { case "$1" in ''|*[!0-9.]*) echo "null" ;; *) echo "$1" ;; esac; }
+# --json 数值字段兜底：非「完整数字」一律输出 null（JSON 数字语法要求）
+# 判据不能是"字符都属于 [0-9.]"：那样 "1.2.3"/"." 会被原样当数字发出去，json.loads 直接失败
+_num_or_null() {
+  if [[ "$1" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then echo "$1"; else echo "null"; fi
+}
 # 周对比窗口（--week N 可配，默认7）：近N天（含今天）= 日期 >= W1；前N天 = W2 <= 日期 <= W2E
 # 字符串字典序比较（零子进程开销）；date_days_ago 不可用（极端环境）时跳过该节，不阻断主流程
 W1=$(date_days_ago $((WEEK_N - 1)))
@@ -806,15 +844,18 @@ ${mut_hits}
 
   # HTML
   if [ "$GEN_HTML" = "1" ]; then
-    pl_b=""; [ -n "${plabel:-}" ] && pl_b="<span class='pname'>${plabel}</span>"
+    # addr 来自外部 JSON（trends 侧不校验 addr），标签来自可被环境变量覆盖的名称：
+    # 两者都必须先转义再内插，否则报告会被注入/破版（报告是要被分享、归档的产物；审阅#18）
+    addr_h=$(html_escape "$addr")
+    pl_b=""; [ -n "${plabel:-}" ] && pl_b="<span class='pname'>$(html_escape "$plabel")</span>"
     if [ "$n_ok" -ge 1 ]; then
       stc="flat"
       case "$score_t" in *变好*) stc="up";; *变差*) stc="down";; esac
       dtc="flat"
       case "$delay_t" in *变好*) dtc="up";; *变差*) dtc="down";; esac
-      HTML_ROWS="$HTML_ROWS<tr><td class='addr'>$addr$pl_b</td><td>$n_ok</td><td>${score_mean}%</td><td><span class='bdg b-$stc'>$score_t</span></td><td>${delay_mean}ms</td><td><span class='bdg b-$dtc'>$delay_t</span></td><td>${p95_show}</td></tr>"
+      HTML_ROWS="$HTML_ROWS<tr><td class='addr'>$addr_h$pl_b</td><td>$n_ok</td><td>${score_mean}%</td><td><span class='bdg b-$stc'>$score_t</span></td><td>${delay_mean}ms</td><td><span class='bdg b-$dtc'>$delay_t</span></td><td>${p95_show}</td></tr>"
     else
-      HTML_ROWS="$HTML_ROWS<tr><td class='addr'>$addr$pl_b</td><td>0</td><td>—</td><td><span class='bdg b-flat'>—</span></td><td>—</td><td><span class='bdg b-flat'>—</span></td><td>—</td></tr>"
+      HTML_ROWS="$HTML_ROWS<tr><td class='addr'>$addr_h$pl_b</td><td>0</td><td>—</td><td><span class='bdg b-flat'>—</span></td><td>—</td><td><span class='bdg b-flat'>—</span></td><td>—</td></tr>"
     fi
     ok_lines=$(printf '%s\n' "$lines" | grep -v UNREACH)
     if [ "$n_ok" -ge 2 ]; then
@@ -841,7 +882,7 @@ ${mut_hits}
     p5=$(_num_or_null "$p50"); p9=$(_num_or_null "$p95")
     st=$(json_escape "$score_t"); dt=$(json_escape "$delay_t"); lb=$(json_escape "${plabel:-}")
     wk_j="${WK_JSON[$k]:-null}"
-    JSON_DNS[${#JSON_DNS[@]}]="    {\"addr\": \"${addr}\", \"label\": \"${lb}\", \"n_ok\": ${n_ok:-0}, \"n_unreach\": ${n_un:-0}, \"score_mean\": ${sm}, \"score_last\": ${sl}, \"score_trend\": \"${st}\", \"delay_mean\": ${dm}, \"delay_last\": ${dl}, \"delay_trend\": \"${dt}\", \"delay_p50_ms\": ${p5}, \"delay_p95_ms\": ${p9}, \"mutation_count\": ${MUT_N[$k]:-0}, \"week\": ${wk_j}}"
+    JSON_DNS[${#JSON_DNS[@]}]="    {\"addr\": \"$(json_escape "$addr")\", \"label\": \"${lb}\", \"n_ok\": ${n_ok:-0}, \"n_unreach\": ${n_un:-0}, \"score_mean\": ${sm}, \"score_last\": ${sl}, \"score_trend\": \"${st}\", \"delay_mean\": ${dm}, \"delay_last\": ${dl}, \"delay_trend\": \"${dt}\", \"delay_p50_ms\": ${p5}, \"delay_p95_ms\": ${p9}, \"mutation_count\": ${MUT_N[$k]:-0}, \"week\": ${wk_j}}"
   fi
 done
 
@@ -1115,9 +1156,9 @@ if [ "$GEN_JSON" = "1" ]; then
     echo "  \"version\": \"${VERSION}\","
     echo "  \"generated_at\": \"${_gen_at}\","
     echo "  \"files\": ${N_FILES},"
-    echo "  \"period\": {\"from\": \"${T0_TS}\", \"to\": \"${T1_TS}\"},"
+    echo "  \"period\": {\"from\": \"$(json_escape "$T0_TS")\", \"to\": \"$(json_escape "$T1_TS")\"},"
     echo "  \"freshness\": \"$(json_escape "${FRESHNESS:-}")\","
-    echo "  \"modes\": \"${MODE_SEEN# }\","  # 去前导空格（扫描期拼接产物）
+    echo "  \"modes\": \"$(json_escape "${MODE_SEEN# }")\","  # 去前导空格（扫描期拼接产物）
     echo "  \"week_window_days\": ${WEEK_N},"
     echo "  \"dns\": ["
     printf '%s\n' "$(printf '%s,\n' "${JSON_DNS[@]}" | sed '$ s/,$//')"
@@ -1137,25 +1178,18 @@ if [ "$EXPORT" = "1" ]; then
   else
     TMPDIR_LIST+=("$EXP_STAGE")   # 注册清理清单：cp/tar/doctor 任一步被中断也由 EXIT trap 兜底
     mkdir -p "$EXP_STAGE/results" "$EXP_STAGE/trends"
-    # 时间窗过滤（--since/--until 复用主流程变量）：按文件名内嵌日期段 compare-YYYYMMDD- 比较
-    EXP_SINCE="${SINCE//-/}"; EXP_UNTIL="${UNTIL//-/}"
-    EXP_N=0; EXP_SKIP=0
-    for _f in "$SRC_DIR"/compare-*.json; do
+    # 时间窗口径必须与主扫描一致：主扫描按 JSON 内部 timestamp 过滤，这里原先按文件名
+    # 日期段过滤 —— 两者不一致时会出现"报告统计了某份数据、报障包却不含它"（--since 场景实测）。
+    # 直接复用主扫描已过滤好的 $ACCEPT_FILES，同一次运行口径必然一致（审阅#19）
+    EXP_N=0; EXP_SKIP=0; EXP_TOTAL=0
+    for _f in "$SRC_DIR"/compare-*.json; do [ -e "$_f" ] && EXP_TOTAL=$((EXP_TOTAL+1)); done
+    while IFS= read -r _f; do
+      [ -z "$_f" ] && continue
       [ -e "$_f" ] || continue
-      if [ -n "$EXP_SINCE" ] || [ -n "$EXP_UNTIL" ]; then
-        EXP_D=$(basename "$_f" | sed 's/^compare-\([0-9]\{8\}\)-.*/\1/')
-        case "$EXP_D" in
-          [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
-          *) EXP_D="" ;;  # 文件名异常（非标准命名）不过滤，保留
-        esac
-        if [ -n "$EXP_D" ]; then
-          if [ -n "$EXP_SINCE" ] && [ "$EXP_D" -lt "$EXP_SINCE" ] 2>/dev/null; then EXP_SKIP=$((EXP_SKIP+1)); continue; fi
-          if [ -n "$EXP_UNTIL" ] && [ "$EXP_D" -gt "$EXP_UNTIL" ] 2>/dev/null; then EXP_SKIP=$((EXP_SKIP+1)); continue; fi
-        fi
-      fi
       cp "$_f" "$EXP_STAGE/results/" 2>/dev/null && EXP_N=$((EXP_N+1))
-    done
-    [ "$EXP_SKIP" -gt 0 ] && echo "  ℹ️  --export: ${EXP_SKIP} 份在 --since/--until 窗口外，未打包"
+    done <<< "$ACCEPT_FILES"
+    EXP_SKIP=$((EXP_TOTAL - EXP_N - BAD_N))
+    [ "$EXP_SKIP" -gt 0 ] && echo "  ℹ️  --export: ${EXP_SKIP} 份在 --since/--until 窗口外或不可解析，未打包"
     EXP_R=0
     for _r in report.html report.md trends.csv; do
       [ -f "$OUT_DIR/$_r" ] && { cp "$OUT_DIR/$_r" "$EXP_STAGE/trends/" 2>/dev/null; EXP_R=$((EXP_R+1)); }

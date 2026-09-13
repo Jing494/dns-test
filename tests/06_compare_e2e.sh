@@ -85,6 +85,7 @@ restore_results() {
 }
 # 中断也必须恢复后**显式退出**：bash 执行完 INT/TERM 的 trap 会继续往下跑，
 # 那样测试体里的 rm -rf results 会立刻把刚恢复的数据再删一次（审阅#16）
+rc=0   # 供 EXIT trap 引用（trap 内自行取 $?；此处只为 shellcheck 静态可见）
 trap 'rc=$?; restore_results; exit $rc' EXIT
 trap 'restore_results; exit 130' INT
 trap 'restore_results; exit 143' TERM
@@ -424,6 +425,22 @@ HW2=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-hook-out bash tr
 [ "$HW2" -ge 1 ] && ok "推送失败时降级提示" || notok "推送失败时静默"
 rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-hook-out "$HOOKSTUB"
 
+# --- tar 可用性预检 ---
+# 部分环境（Termux/精简容器）tar 的压缩通道不可用（tar.real 无法 exec 压缩器），
+# 此时 --archive/--export 必然失败，而这两段的断言都要求真实产物。
+# 与"网络敏感项不可达即跳过"同策略：环境限制跳过而不是误报成代码缺陷。
+# CI（ubuntu/macOS）tar 正常，本段照常执行。
+TAR_OK=0
+if printf 'x' > "${TMPDIR:-/tmp}/t06-tarprobe.txt" 2>/dev/null \
+   && tar -czf "${TMPDIR:-/tmp}/t06-tarprobe.tgz" -C "${TMPDIR:-/tmp}" t06-tarprobe.txt 2>/dev/null \
+   && [ -s "${TMPDIR:-/tmp}/t06-tarprobe.tgz" ]; then
+  TAR_OK=1
+fi
+rm -f "${TMPDIR:-/tmp}/t06-tarprobe.txt" "${TMPDIR:-/tmp}/t06-tarprobe.tgz"
+if [ "$TAR_OK" != "1" ]; then
+echo "═══ trends.sh: --archive / --export ⏭️  跳过（本机 tar 压缩通道不可用，CI 上照常执行）═══"
+else
+# 说明：以下两段未重新缩进，以保持与跳过包装前的代码逐行一致（便于对照 diff）
 echo "═══ trends.sh: --archive 归档（全量打包 / prune 删前归档） ═══"
 TRD=${TMPDIR:-/tmp}/t06-arch; rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-arch-out; mkdir -p "$TRD"
 for i in 1 2 3; do
@@ -464,6 +481,7 @@ COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-exp-out bash trends.sh
 grep -q "归档包" ${TMPDIR:-/tmp}/t06-exp-out/report.html && ok "HTML 含归档包小节" || notok "HTML 缺归档小节"
 grep -q "full-20260814.tar.gz" ${TMPDIR:-/tmp}/t06-exp-out/report.html && ok "HTML 列出归档文件" || notok "HTML 未列出归档文件"
 rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-exp-out
+fi
 
 echo ""
 echo "═══ 结果: $PASS 通过 / $FAIL 失败 ═══"
