@@ -49,6 +49,10 @@ fi
 OUT="dns-test-${VERSION}.tar.gz"
 rm -f "$OUT"
 
+# 干净 checkout 里没有 results/（它被 .gitignore 忽略），而本脚本的自检要求包里含该空目录
+# （脚本用 results/ 落采集数据，缺了会找不到目录）。这里主动补一个，保证打包恒成功。
+mkdir -p results
+
 # env.sh 是设备专用本地环境脚本（已 gitignore），不该随发行版分发
 tar czf "$OUT" --exclude='.git' --exclude='results/*' --exclude='trends' --exclude='*.tar.gz' \
   --exclude='.trae-html-share-packages' --exclude='./env.sh' . 2>/dev/null
