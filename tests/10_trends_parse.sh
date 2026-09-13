@@ -68,7 +68,18 @@ echo "═══ B. 解析失败必须可见（不得静默少算） ═══"
 fixture 20260804-080000 '{"tool":"x","timestamp":"2026-08-04 08:00:00 +0800","mode":"lite","dns":[{"addr":"","score":"50","stab":"100","delay_ms":10}]}'
 E1=$(trs 2>&1 >/dev/null)
 echo "$E1" | grep -q "未能解析" && ok "存在无法解析的记录时给出显式告警" || notok "解析丢记录却无告警（静默少算）"
-echo "$E1" | grep -q "compare-20260804" && ok "告警点名具体文件，便于定位" || notok "告警未点名文件"
+if echo "$E1" | grep -q "compare-20260804"; then
+  ok "告警点名具体文件，便于定位"
+else
+  notok "告警未点名文件"
+  # 失败时把实际告警文本与文件内容打出来，避免只能靠猜
+  echo "      --- 实际 stderr ---"
+  printf '%s\n' "$E1" | sed 's/^/      | /'
+  echo "      --- 该文件内容 ---"
+  sed 's/^/      | /' "$IN/compare-20260804-080000.json"
+  echo "      --- addr 键计数 / 文件存在 ---"
+  echo "      | seen=$(grep -o '"addr"' "$IN/compare-20260804-080000.json" 2>/dev/null | wc -l | tr -d ' ') exists=$([ -e "$IN/compare-20260804-080000.json" ] && echo yes || echo no)"
+fi
 # B2 --json 的 stdout 不被告警污染（告警必须走 stderr）
 rm -f "$IN/compare-20260804-080000.json"
 trs --json > "$STUB/j.json" 2>/dev/null
