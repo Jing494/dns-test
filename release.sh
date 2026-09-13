@@ -54,14 +54,17 @@ rm -f "$OUT"
 mkdir -p results
 
 # env.sh 是设备专用本地环境脚本（已 gitignore），不该随发行版分发
-tar czf "$OUT" --exclude='.git' --exclude='results/*' --exclude='trends' --exclude='*.tar.gz' \
+# 注意 --exclude='results/?*' 而不是 'results/*'：BSD tar（macOS）的 'results/*' 连**空目录本身**
+# 都会匹配掉（* 可匹配空），导致包内没有 results/ 条目、下面的自检必然报"results目录=0"；
+# 要求斜杠后至少一个字符后，两种 tar 都只排内容、保留空目录。
+tar czf "$OUT" --exclude='.git' --exclude='results/?*' --exclude='trends' --exclude='*.tar.gz' \
   --exclude='.trae-html-share-packages' --exclude='./env.sh' . 2>/dev/null
 
 echo "════ 打包完成 ════"
 echo "  文件: $OUT ($(du -h "$OUT" | cut -f1))"
 echo "  条目: $(tar tzf "$OUT" | wc -l) 个"
 BAD=$(tar tzf "$OUT" | grep -cE '\.log|报告')
-RSLT=$(tar tzf "$OUT" | grep -c 'results/$')
+RSLT=$(tar tzf "$OUT" | grep -cE '(^|/)results/?$')   # 容忍 tar 实现差异：带不带尾部斜杠都算
 echo "  日志/报告: ${BAD} 处（应为0）"
 echo "  results目录: ${RSLT} 个（应为1，防脚本找不到目录）"
 echo ""
