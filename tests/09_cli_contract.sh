@@ -15,6 +15,8 @@
 #      - SAVE_LOG：compare/trends/doctor/verify/lite 均落盘；trends --json 跳过
 #      - dns-test.sh：--strict 不再被当 DNS 地址
 #      - trends.sh：损坏 JSON 不得静默跳过（须告警 + 给 doctor --fix 指引，且不污染 --json stdout）
+#   F. 入口交互契约（pty 驱动，需 python3）：带命令行 DNS 时主菜单仍提供 3. DNS 管理、
+#      输入 3 能进子菜单（不再静默重绘）、提示范围与实际可选项一致、compare 继承已传 DNS
 # 用法: bash tests/09_cli_contract.sh   （退出码 0=全过 1=有失败）
 # 注意: 本文件刻意不使用 timeout —— macOS 无该命令，走 lib/compat.sh 的兼容函数时，
 #       其后台 watcher 会继承 $(...) 的 stdout 管道，使每次 out=$(timeout N cmd) 都被
@@ -161,6 +163,62 @@ case "$res" in
   NOFUNC) notok "compat timeout 未被定义（覆盖 command 失效）" ;;
   *)      notok "compat timeout 用例异常: [$res]" ;;
 esac
+
+echo "═══ F. 入口交互契约（pty 驱动：菜单可选=提示范围、已传 DNS 被继承、3 号不再静默） ═══"
+# 为什么放这里：这些行为只有真终端才走得通（无 TTY 时入口自动降级为"非交互 lite"）。
+# 用 python3 的 pty 驱动，并配一个"必失败"的 dig 桩，避免真的发网络请求（strict 层要求无网络）。
+# 注意: 不用 shell 的 timeout 命令（macOS 无它，走 compat 兼容函数会拖满超时，见文件头说明），
+#       超时由 python 侧控制。
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import pty' 2>/dev/null; then
+  STUBD="$TMP/pty-stub"; mkdir -p "$STUBD"
+  printf '#!/bin/bash\nexit 1\n' > "$STUBD/dig"; chmod +x "$STUBD/dig"
+  # 副作用隔离：入口里跑 compare 会往 results/ 写 JSON。测试不该在用户目录留痕，
+  # 也不该给后续测试（tests/06 的"环比上次"）留下环境状态 —— 先快照、跑完原样恢复。
+  RSNAP="$TMP/results-snap"; SNAP_OK=0
+  [ -d results ] && { cp -a results "$RSNAP" && SNAP_OK=1; }
+  TTY_OUT=$(PATH="$STUBD:$PATH" python3 - <<'PYEOF'
+import os, pty, select, subprocess, sys, time
+m, s = pty.openpty()
+p = subprocess.Popen(['bash', 'dns-test.sh', '8.8.8.8'], stdin=s, stdout=s, stderr=s, close_fds=True)
+os.close(s)
+out = b''
+# 3=进 DNS 管理 → 0=返回 → 2=专项 → 11=compare → 空行(回车取继承的默认值) → 0=退出
+inputs = ['3', '0', '2', '11', '', '0']
+i = 0
+t0 = time.time(); nxt = t0 + 2.0
+while time.time() - t0 < 60:
+    r, _, _ = select.select([m], [], [], 0.2)
+    if r:
+        try:
+            d = os.read(m, 65536)
+        except OSError:
+            break
+        if not d:
+            break
+        out += d
+    if i < len(inputs) and time.time() >= nxt:
+        os.write(m, (inputs[i] + '\n').encode()); i += 1; nxt = time.time() + 1.5
+    if p.poll() is not None:
+        break
+if p.poll() is None:
+    p.kill()
+try:
+    os.close(m)
+except OSError:
+    pass
+sys.stdout.write(out.decode('utf-8', 'replace'))
+PYEOF
+)
+  # 恢复入口测试造成的 results/ 副作用（原先没有该目录时直接删掉，不留痕）
+  rm -rf results
+  [ "$SNAP_OK" = "1" ] && cp -a "$RSNAP" results
+  echo "$TTY_OUT" | grep -q "3. DNS 管理（追加/替换/删除/清空；当前 1 个" && ok "带命令行 DNS 时主菜单仍提供 3. DNS 管理" || notok "带命令行 DNS 时第 3 项缺失"
+  echo "$TTY_OUT" | grep -q "DNS 管理 ────" && ok "输入 3 进入 DNS 管理子菜单（不再静默重绘）" || notok "输入 3 无任何反应"
+  echo "$TTY_OUT" | grep -q "请选择(0-3)" && ok "主菜单提示范围与实际可选项一致(0-3)" || notok "主菜单提示范围与实际可选项不符"
+  echo "$TTY_OUT" | grep -q "未输入，默认对比 8.8.8.8 与" && ok "compare 分支继承已传 DNS（默认值含它）" || notok "compare 分支丢掉了已传 DNS"
+else
+  echo "  ⏭️  跳过（无 python3 或 pty 不可用）"
+fi
 
 rm -rf "$TMP"
 echo ""

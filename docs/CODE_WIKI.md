@@ -1,7 +1,7 @@
 # DNS/网络测试工具集 — Code Wiki
 
 > 本文档是项目的结构化代码 Wiki，涵盖整体架构、模块职责、关键类与函数、依赖关系及运行方式。
-> 对应仓库：`dns-test`（MIT，当前版本 `v1.19 / v2026.09.1`）
+> 对应仓库：`dns-test`（MIT，当前版本 `v1.20 / v2026.09.2`）
 > 适用对象：开发者 / 二次维护者 / AI 助手
 
 > 🤖 **给 AI 的指引**：本工具集最重要的使用方是 AI 助手。需要**理解或修改本仓库代码**时，请先读本文档（代码结构与实现），再配合 [docs/AI_GUIDE.md](docs/AI_GUIDE.md)（操作流程）使用——两者分工互补：**AI_GUIDE 教你"怎么操作测试"**（初始化/流程/排障），**本文档教你"代码长什么样、想改哪里看哪里"**（架构/模块/函数/依赖）。修改代码后务必运行 `bash smoke_test.sh` + `bash verify.sh` 做回归验证，并同步更新 [docs/CHANGELOG.md](docs/CHANGELOG.md) 记录变更轮次。
@@ -44,7 +44,7 @@
 
 - `vYYYY.MM.N`：日期式，N=当月发布序号（补丁级修复仅递增 N）
 - `vX.Y`：语义版本（X=主版本，重大重构才升；Y=次版本，功能更新）
-- 当前：`v1.19 = v2026.09.1`
+- 当前：`v1.20 = v2026.09.2`
 
 ---
 
@@ -121,12 +121,12 @@ dns-test/
 │   ├── 01_dnsutil.t              # DNSUtil 18 用例（perl）
 │   ├── 02_plugins.sh             # 插件系统 9 用例（bash）
 │   ├── 03_dig_target.sh          # dig_target 4 用例（IPv6加方括号）
-│   ├── 04_core_functions.sh      # core 纯函数 19 用例（地址校验/响应判断/CDN/入口参数解析）
+│   ├── 04_core_functions.sh      # core 纯函数 29 用例（地址校验/响应判断/CDN/入口参数解析）
 │   ├── 05_run_common_tests.sh    # lite 计分口径/full 回归 13 用例（稳定性降轮/CONFIG_DOMAINS安全解析/dig @server回归/for t遮蔽回归/ECS_SUBNET注入拦截/par_run元字符禁令，mock dig/ping 离线）
 │   ├── 06_compare_e2e.sh         # compare 端到端 125 用例（--watch参数校验/当前DNS👤标记三出口/环比Δ/提供商标签+抖动/预设组名展开/trends --prune/--until/--alert/--vs/周对比/突变检测(前值0ms边界)/--since当日边界/--md/--json/--week/--webhook/--archive 归档/--export 报障包/HTML归档小节/compare↔trends互链，mock dig/ping 离线 + 用户 results 备份恢复）
 │   ├── 07_doctor.sh              # doctor 自检+补全+install+新参数校验 60 用例（doctor正常/参数/--cron模板/PATH剥离FAIL路径 + bash补全语法/注册/模拟TAB(--fix/--archive-keep/值位不补) + zsh头与内容(--fix/--archive-keep) + install --completions幂等(假HOME)）
 │   ├── 08_trends_lib.sh          # trends_lib 纯函数 23 用例（分位数空/单值/奇偶样本/P95取位/clamp + score/delay全10态趋势判定 + trends.sh端到端等价冒烟）
-│   ├── 09_cli_contract.sh        # CLI 契约与修复回归 89 用例（12 入口与 9 个 perl 脚本的 --help/--version/未知选项；release.sh 参数校验不产出垃圾包；dns-preset 命令行优先于 PRESET_DNS_CSV；SAVE_LOG 覆盖全部入口且 trends --json 跳过；dns-test --strict 不被当 DNS 地址）
+│   ├── 09_cli_contract.sh        # CLI 契约与修复回归 93 用例（12 入口与 9 个 perl 脚本的 --help/--version/未知选项；release.sh 参数校验不产出垃圾包；dns-preset 命令行优先于 PRESET_DNS_CSV；SAVE_LOG 覆盖全部入口且 trends --json 跳过；dns-test --strict 不被当 DNS 地址）
 │   └── 10_trends_parse.sh        # trends 解析健壮性 + 数据安全回归 15 用例（字段顺序调换/插入新字段/多空格/对象跨行/同行多对象 均不得丢记录；解析失败必须告警且不污染 --json stdout；install_exit_traps 下 TERM 必须显式退出；tests/06 必须以 cp 备份用户数据）
 ├── tools/                        # 专项测试工具
 │   ├── manifest.sh               # 插件注册表
@@ -151,7 +151,7 @@ dns-test/
 
 | 脚本 | 职责 | 关键特性 |
 |------|------|---------|
-| [dns-test.sh](../dns-test.sh) | 统一交互入口，引导选 DNS 组/测试类型/专项 | 交互双模式（有/无终端）；非交互自动降级 lite+单 DNS；**支持专项选项透传**（按 `valid_dns_addr` 切分 DNS 与选项，原样转发给所选专项脚本由其自校验） |
+| [dns-test.sh](../dns-test.sh) | 统一交互入口，引导选 DNS 管理/测试类型/专项 | 交互双模式（有/无终端）；非交互自动降级 lite+单 DNS；**主菜单 3 = DNS 管理**（追加手工输入 / 追加或替换预设组 / 删除某个 / 清空 / 恢复默认），命令行传没传 DNS 都可用，自动去重并拦截非法地址；**选项与 DNS 透传**（按 `valid_dns_addr` 切分 DNS 与选项）：compare 继承当前 DNS（缺对手时默认值含已传那个）、trends 在"显式指定过 DNS"时把列表当过滤条件（默认组不过滤，`--cron` 依赖它）、verify 透传 `--strict`/`--ci`；基础测试与 1-10 号插件忽略命令行选项并明确提示；「本次只测某一个 DNS」只影响本次、不改写会话列表 |
 | [dns-preset.sh](../dns-preset.sh) | 预设快捷测试（default/ali/tencent/all） | 支持 `PRESET_DNS_CSV` 自定义（命令行参数优先）；索引参数避免超时 |
 | [full.sh](../full.sh) | 完整版基础测试（16 项，77~78 评分点） | `SAVE_LOG=1` 存日志；`trap` 清理临时目录 |
 | [lite.sh](../lite.sh) | 精简版基础测试（10 项，53~54 评分点） | 同上，输出更短 |
@@ -263,6 +263,9 @@ use DNSUtil;
 | `run_common_tests` | 统一测试逻辑，`mode` 参数（full/lite）控制差异点：A 记录延迟计算（仅 full）、记录类型数量（lite 仅 MX/NS/TXT，full 加 CNAME/SOA）、稳定性指标（full 输出 min/max/avg，lite 仅成功率）、综合评分高级项（DNSSEC/ECS/PTR/TTL/结果对比/递归） |
 | `run_full_test` | 薄包装：`run_common_tests <addr> <name> full`（完整版 16 项） |
 | `run_lite_test` | 薄包装：`run_common_tests <addr> <name> lite`（精简版 10 项，输出更短） |
+| `dns_list_has` / `dns_list_add` / `dns_list_remove` | 会话 DNS 列表的查询/追加/删除（操作全局 `DNS_LIST`）：追加校验地址合法性并自动去重，返回值区分「已生效 / 非法或重复」，供菜单给出提示文案。抽到 core.sh 是为了能被 tests/04 单测覆盖（菜单本身要 pty 才能测，见 tests/09 F 段） |
+| `dns_list_is_default_group` | 当前列表是否恰好等于默认组；用于判定「用户是否显式指定过 DNS」——显式指定才在 trends 里当过滤条件，默认组不过滤（否则默认组那 4 个地址会把历史数据裁成只剩它们） |
+| `dns_partner_default` | 挑一个不在当前列表里的常见公共 DNS，作为 compare 分支「只差一个对手」时的默认补位（避免默认值把已传 DNS 挤掉） |
 | `cleanup_tmpdirs` | 统一清理全部临时目录（`PARR_TMPDIR` + `TMPDIR_LIST`），供下面的 trap 安装函数调用 |
 | `install_exit_traps` | 安装退出/中断 trap：`EXIT` 只清理；**`INT`/`TERM` 清理后显式 `exit 130/143`**。必要性：bash 执行完 INT/TERM 的 trap handler 后会**继续执行后续语句**，只清理不退出会让脚本在 Ctrl-C 后接着跑（临时目录已被删 → 结果全空 → 被记成"不可达"并落盘污染历史数据） |
 | `html_escape` | HTML 文本转义（`& < > "`）。报告内插外部数据（DNS 地址来自 JSON、提供商标签来自环境变量）前必须调用，否则 HTML 注入/破版 |
@@ -397,12 +400,12 @@ dns-test.sh 选"专项测试"
 | [tests/01_dnsutil.t](../tests/01_dnsutil.t) | DNSUtil 18 用例（dns_sockaddr/inet_pton_ipv6/build_dns_query/parse_dns_response/check_ips/PTR 系列 + 畸形包防崩） | `perl -Ilib tests/01_dnsutil.t` |
 | [tests/02_plugins.sh](../tests/02_plugins.sh) | 插件系统 9 用例（注册表加载/字段拆分/输出格式/无效编号拦截/未知执行器拦截/脚本缺失检测） | `bash tests/02_plugins.sh` |
 | [tests/03_dig_target.sh](../tests/03_dig_target.sh) | dig_target 4 用例（IPv4 原样/IPv6 加方括号/特殊 IPv6/空输入） | `bash tests/03_dig_target.sh` |
-| [tests/04_core_functions.sh](../tests/04_core_functions.sh) | core 纯函数 19 用例（valid_dns_addr 合法/非法+超范围/IPv6 畸形结构/`::` 全零地址、is_valid_response 错误/纯 OPT、is_cdn_domain、parse_dns_args 入口参数） | `bash tests/04_core_functions.sh` |
+| [tests/04_core_functions.sh](../tests/04_core_functions.sh) | core 纯函数 29 用例（valid_dns_addr 合法/非法+超范围/IPv6 畸形结构/`::` 全零地址、is_valid_response 错误/纯 OPT、is_cdn_domain、parse_dns_args 入口参数） | `bash tests/04_core_functions.sh` |
 | [tests/05_run_common_tests.sh](../tests/05_run_common_tests.sh) | lite 计分口径/full 回归 13 用例（稳定性降轮 20→10+STAB_ROUNDS 空串视为未设置、AAAA 空响应计分、综合评分 45/53、CONFIG_DOMAINS 注入不执行/非法 token 忽略、dig @server 前缀回归、full 模式 @server 遮蔽回归、ECS_SUBNET 注入拦截、par_run 元字符禁令；mock dig/ping 离线） | `bash tests/05_run_common_tests.sh` |
 | [tests/06_compare_e2e.sh](../tests/06_compare_e2e.sh) | compare 端到端 125 用例（--watch 缺值/非法值/0 报错、当前系统 DNS 检测与 👤 标记三出口、环比 Δ 计算、提供商标签+抖动三出口+JSON jitter_ms、预设组名展开含 IPv6、未知词报错、trends --prune/--until/--alert/--vs/周对比/突变检测（前值0ms边界）/--since 当日边界/--md/--json/--week/--webhook（mock curl 抓 payload）/--archive 归档（全量/删前打包/空数据）/--export 报障包（含数据/报告/doctor）/HTML 归档小节/compare↔trends 互链两形态；mock dig/ping 离线，用户 results/ 自动备份恢复） | `bash tests/06_compare_e2e.sh` |
 | [tests/07_doctor.sh](../tests/07_doctor.sh) | doctor 自检 + 补全 + install + 新参数校验 60 用例（doctor 正常路径/参数/--cron 模板/PATH 剥离 FAIL 路径、bash 补全语法/注册/模拟 TAB 三场景（含 --fix/--archive-keep）、zsh compdef 头与内容、install --completions 幂等安装（假HOME）、trends --json/--week/--webhook/--archive/--export 参数校验） | `bash tests/07_doctor.sh` |
 | [tests/08_trends_lib.sh](../tests/08_trends_lib.sh) | trends_lib 纯函数 23 用例（trends_percentile 空/单值/奇偶样本 P50/P95 取位/边界 clamp；trends_slope_judge score/delay 全 10 态；trends.sh --json 端到端等价冒烟） | `bash tests/08_trends_lib.sh` |
-| [tests/09_cli_contract.sh](../tests/09_cli_contract.sh) | CLI 契约与修复回归 89 用例（12 入口 + 9 个 perl 脚本的 --help/--version/未知选项退出码；release.sh --help 不产出垃圾包、非法版本 exit 1；dns-preset.sh 显式预设胜过 PRESET_DNS_CSV（mock dig 离线）；SAVE_LOG 覆盖 compare/trends/doctor/verify/lite 且 trends --json 跳过；dns-test.sh --strict 不被当 DNS 地址） | `bash tests/09_cli_contract.sh` |
+| [tests/09_cli_contract.sh](../tests/09_cli_contract.sh) | CLI 契约与修复回归 93 用例（12 入口 + 9 个 perl 脚本的 --help/--version/未知选项退出码；release.sh --help 不产出垃圾包、非法版本 exit 1；dns-preset.sh 显式预设胜过 PRESET_DNS_CSV（mock dig 离线）；SAVE_LOG 覆盖 compare/trends/doctor/verify/lite 且 trends --json 跳过；dns-test.sh --strict 不被当 DNS 地址） | `bash tests/09_cli_contract.sh` |
 | [tests/10_trends_parse.sh](../tests/10_trends_parse.sh) | trends 解析健壮性 + 数据安全回归 15 用例（字段顺序调换/中间插入新字段/字段间多空格/对象跨行/同轮多对象 都必须解析出记录且取值正确；有记录解析不出来时必须告警并点名文件；告警不得污染 `--json` stdout；`install_exit_traps` 下 TERM 退出码 143 且不继续执行；tests/06 必须以 `cp` 备份 results/ 与 trends/） | `bash tests/10_trends_parse.sh` |
 
 `02~10_*.sh` 采用零依赖轻量断言（不引入 bats），与 perl 单测互补。
@@ -419,7 +422,7 @@ dns-test.sh 选"专项测试"
 
 1. 语法检查（.sh + .pl）
 2. shellcheck（可选依赖，`--strict` 强制；CI 走 `--ci`）
-3. 单元测试（18+9+4+19+13+125+60+23+89+15 用例）
+3. 单元测试（18+9+4+29+13+125+60+23+93+15 用例）
 4. 冒烟测试（24 项/25 检查点）
 5. compare 快测（2 DNS）
 6. trends 聚合（无数据/超时跳过）

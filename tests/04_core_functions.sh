@@ -172,6 +172,26 @@ else
   notok "无参数用默认DNS组"
 fi
 
+echo "═══ dns_list_* / dns_partner_default 单测（入口「DNS 管理」菜单的列表逻辑） ═══"
+# 这些函数把「追加/去重/删除/默认组判定/补位对手」从交互菜单里剥出来，纯逻辑可离线断言；
+# 菜单本身要 pty 才测（见 tests/09 F 段）
+DNS_LIST=(8.8.8.8)
+dns_list_has 8.8.8.8 && ok "dns_list_has 命中已有地址" || notok "dns_list_has 未命中"
+dns_list_has 1.1.1.1 && notok "dns_list_has 误报存在" || ok "dns_list_has 正确报不存在"
+dns_list_add 1.1.1.1 && [ "${DNS_LIST[1]:-}" = "1.1.1.1" ] && ok "dns_list_add 追加成功" || notok "dns_list_add 追加失败"
+dns_list_add 8.8.8.8 && notok "dns_list_add 未拒绝重复" || ok "dns_list_add 拒绝重复"
+dns_list_add "1.1.1.1;id" && notok "dns_list_add 未拒绝非法地址" || ok "dns_list_add 拒绝非法地址（注入串）"
+dns_list_remove 1.1.1.1 && [ "${#DNS_LIST[@]}" -eq 1 ] && ok "dns_list_remove 删除成功" || notok "dns_list_remove 删除失败"
+dns_list_remove 1.1.1.1 && notok "dns_list_remove 未报不在列表" || ok "dns_list_remove 不在列表返回 1"
+
+DNS_LIST=("${DEFAULT_DNS_ADDR[@]}")
+dns_list_is_default_group && ok "默认组判定：完全一致 → 是" || notok "默认组判定：完全一致 误判"
+DNS_LIST=("${DEFAULT_DNS_ADDR[@]}" "1.1.1.1")
+dns_list_is_default_group && notok "默认组判定：多一个 误判为是" || ok "默认组判定：多一个 → 否"
+DNS_LIST=(223.5.5.5 119.29.29.29)
+P=$(dns_partner_default)
+[ "$P" = "8.8.8.8" ] && ok "dns_partner_default 跳过已在列表的候选" || notok "dns_partner_default 取值异常: $P"
+
 echo ""
 echo "════ 结果: $PASS 通过 / $FAIL 失败 ════"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

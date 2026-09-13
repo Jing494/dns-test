@@ -97,6 +97,13 @@ if ! command -v perl >/dev/null 2>&1; then
   chmod +x "$STUB/perl"
 fi
 
+# 起点清空：本文件全程假定 results/ 里只有"本测试自己造的夹具"（环比取"上一份 JSON"、
+# --keep/--prune 计数等都按这个前提断言）。环境里遗留的 compare-*.json 会被当成"上一次采集"
+# 而让断言误红（审阅#L5；实测：先跑过 tests/09 的入口测试就会踩到）。
+# 备份用的是 cp 而非 mv，所以这里的 rm -rf 不会丢用户数据 —— 结束时由 trap 原样恢复。
+rm -rf results trends
+mkdir -p results
+
 export PATH="$STUB:$PATH" TMPDIR="$STUB"
 
 PASS=0; FAIL=0

@@ -278,6 +278,69 @@ valid_ipv6_addr() {
   return 0
 }
 
+# ---------------------------------------------------------------------------
+# DNS 列表管理（供 dns-test.sh 的「DNS 管理」菜单使用；操作全局数组 DNS_LIST）
+#   为什么抽到 core.sh：把追加/去重/删除这类可判定的逻辑从交互菜单里剥出来，
+#   使其能被单测覆盖（见 tests/04）——菜单本身要靠 pty 才能测，成本高得多。
+#   返回值约定：0=已生效 1=未生效（非法/重复/不在列表），调用方据此给出提示文案。
+# ---------------------------------------------------------------------------
+# 列表里是否已有该地址（0=有 1=无）
+dns_list_has() {
+  local a
+  for a in "${DNS_LIST[@]}"; do
+    [ "$a" = "$1" ] && return 0
+  done
+  return 1
+}
+
+# 追加一个地址（合法且不重复才追加）；静默跳过重复/非法，由调用方按返回值提示
+dns_list_add() {
+  valid_dns_addr "$1" || return 1
+  dns_list_has "$1" && return 1
+  DNS_LIST+=("$1")
+  return 0
+}
+
+# 删除一个地址（不在列表里返回 1）
+dns_list_remove() {
+  # 中间数组名不要叫 out —— shellcheck 会做全文件变量类型推断，
+  # 与其它函数里的 `local out=$(...)`（字符串）冲突，报 SC2178/SC2128
+  local keep a
+  keep=()
+  dns_list_has "$1" || return 1
+  for a in "${DNS_LIST[@]}"; do
+    [ "$a" = "$1" ] || keep+=("$a")
+  done
+  DNS_LIST=("${keep[@]}")
+  return 0
+}
+
+# 当前 DNS_LIST 是否恰好等于默认组（个数相同 + 逐项都在默认组里）
+# 用途：判断"用户是否显式指定过 DNS"——显式指定才在 trends 里当过滤条件，
+# 默认组不过滤（否则默认组的 4 个地址会把历史数据过滤成只有它们）
+dns_list_is_default_group() {
+  local a b found
+  [ "${#DNS_LIST[@]}" -eq "${#DEFAULT_DNS_ADDR[@]}" ] || return 1
+  for a in "${DNS_LIST[@]}"; do
+    found=0
+    for b in "${DEFAULT_DNS_ADDR[@]}"; do
+      [ "$a" = "$b" ] && found=1
+    done
+    [ "$found" = "1" ] || return 1
+  done
+  return 0
+}
+
+# 挑一个"不在当前列表里"的常见公共 DNS，作为对比/补位的默认对手
+# （compare 分支复用已传 DNS 时用它补第二个，避免默认值把已传的那个挤掉）
+dns_partner_default() {
+  local c
+  for c in 223.5.5.5 119.29.29.29 8.8.8.8 1.1.1.1 114.114.114.114; do
+    dns_list_has "$c" || { echo "$c"; return 0; }
+  done
+  echo "223.5.5.5"
+}
+
 # DNS可达性预检函数：不可达返回1（快速跳过，避免59~90次查询白等）
 # 双域名并行探测：任一成功即可达（避免 baidu.com 在海外网络解析慢导致误判，且不可达 DNS 最多等 2s 而非 4s）
 dns_health_check() {
