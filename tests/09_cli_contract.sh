@@ -112,6 +112,10 @@ ls results/lite-*.log >/dev/null 2>&1 && ok "SAVE_LOG 覆盖 lite.sh" || notok "
 rm -f results/trends-*.log
 SAVE_LOG=1 bash trends.sh --json >/dev/null 2>&1; sleep 0.3
 ls results/trends-*.log >/dev/null 2>&1 && notok "trends --json 不应落盘却落盘" || ok "trends --json 正确跳过落盘"
+# 参数"值"里含 " --json " 不应被误判为 --json 模式（原先 case " $* " 子串匹配会误跳过日志）
+rm -f results/trends-*.log
+SAVE_LOG=1 bash trends.sh --webhook 'http://127.0.0.1/has--json-inside' --alert 50 >/dev/null 2>&1; sleep 0.3
+ls results/trends-*.log >/dev/null 2>&1 && ok "参数值含 --json 时仍写日志（子串误判已修）" || notok "参数值含 --json 被误判为 --json 模式"
 # 清理本测试产生的日志（绝不动用户 results/ 下的 compare-*.json 历史数据）
 rm -f results/compare-*.log results/trends-*.log results/doctor-*.log results/verify-*.log results/lite-*.log
 

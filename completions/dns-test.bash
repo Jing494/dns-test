@@ -54,7 +54,7 @@ _dns_test_complete() {
       COMPREPLY=( $(compgen -W "--version --help" -- "$cur") ) ;;
     lite.sh|full.sh)
       # 基础测试：DNS 地址 + 自身的 --help/--version
-      COMPREPLY=( $(compgen -W "$dns_words --version --help" -- "$cur") ) ;;
+      COMPREPLY=( $(compgen -W "$dns_words --version --help --emit-kv" -- "$cur") ) ;;
     smoke_test.sh)
       # 无参数脚本：不补任何词
       COMPREPLY=() ;;

@@ -194,6 +194,21 @@ else
   notok "par_run 元字符命令被拒（inj.out 出现=未拦截）"
 fi
 
+echo "═══ --emit-kv 机器可读契约（compare.sh 取分用；改中文文案不应影响取分） ═══"
+KOUT=$(PATH="$STUB:$PATH" EMIT_KV=1 run_common_tests 8.8.8.8 "mockDNS" lite)
+KV=$(printf '%s\n' "$KOUT" | grep -m1 '^KV ')
+echo "$KV" | grep -qE '^KV addr=8\.8\.8\.8 mode=lite score=[0-9]+ stab=[0-9]+ pass=[0-9]+ total=[0-9]+$' \
+  && ok "--emit-kv 输出契约行（字段名固定、值纯数字）" || notok "KV 行格式不符: [${KV:-无}]"
+KVSCORE=$(printf '%s' "$KV" | sed -n 's/.* score=\([0-9]*\).*/\1/p')
+KVTOTAL=$(printf '%s' "$KV" | sed -n 's/.* total=\([0-9]*\).*/\1/p')
+KVPASS=$(printf '%s' "$KV" | sed -n 's/.* pass=\([0-9]*\).*/\1/p')
+DISPTOTAL=$(printf '%s\n' "$KOUT" | sed -n 's/.*([0-9]*\/\([0-9]*\) 项通过).*/\1/p' | head -1)
+DISPSCORE=$(printf '%s\n' "$KOUT" | grep -oE "综合评分: [0-9]+" | grep -oE "[0-9]+" | head -1)
+[ -n "$KVSCORE" ] && [ "$KVSCORE" = "$DISPSCORE" ] && ok "KV score 与显示文案一致($KVSCORE)" || notok "KV score($KVSCORE) ≠ 显示($DISPSCORE)"
+[ -n "$KVTOTAL" ] && [ "$KVTOTAL" = "$DISPTOTAL" ] && ok "KV total 与显示项数一致($KVTOTAL)" || notok "KV total($KVTOTAL) ≠ 显示项数($DISPTOTAL)"
+NOKV=$(PATH="$STUB:$PATH" run_common_tests 8.8.8.8 "mockDNS" lite)
+printf '%s\n' "$NOKV" | grep -q '^KV ' && notok "未设 EMIT_KV 却输出 KV 行" || ok "未设 EMIT_KV 时不输出 KV 行（默认静默）"
+
 echo ""
 echo "════ 结果: $PASS 通过 / $FAIL 失败 ════"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

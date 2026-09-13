@@ -20,6 +20,8 @@ case "$1" in
     echo "    bash full.sh 8.8.8.8 114.114.114.114          # 多个自定义DNS"
     echo "    bash full.sh 240e:52:4800::8888 8.8.8.8       # 混合v4/v6"
     echo "  环境变量: SAVE_LOG=1 保存日志到 results/；DEFAULT_DNS_CSV=... 自定义默认DNS组"
+    echo "  --emit-kv: 额外输出一行机器可读结果（KV addr=… score=… stab=… pass=… total=…）"
+    echo "             供 compare.sh 取分用（从中文显示文案里 grep 取分会在改文案时静默变 0）"
     exit 0
     ;;
   --version)
@@ -28,6 +30,18 @@ case "$1" in
     exit 0
     ;;
 esac
+
+# 机器可读输出开关：--emit-kv（或 EMIT_KV=1）。必须在 parse_dns_args 之前摘掉，
+# 否则会被当成 DNS 地址报"非法DNS地址"。
+EMIT_KV="${EMIT_KV:-0}"
+_rest_args=()
+for _a in "$@"; do
+  case "$_a" in
+    --emit-kv) EMIT_KV=1 ;;
+    *) _rest_args+=("$_a") ;;
+  esac
+done
+if [ ${#_rest_args[@]} -gt 0 ]; then set -- "${_rest_args[@]}"; else set --; fi
 
 # 引入核心库
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -39,7 +53,8 @@ install_exit_traps
 
 # 自动保存日志（SAVE_LOG=1 时写入 results/）
 # 实现统一在 lib/compat.sh 的 save_log_init —— 各入口共用一份，避免多处副本漂移
-save_log_init "$0"
+# --emit-kv 下 stdout 含机器可读契约，跳过日志（save_log_init 会把 stderr 并入 stdout）
+[ "$EMIT_KV" = "1" ] || save_log_init "$0"
 
 # 处理参数 + 打印列表 + 逐个测试（公共逻辑在 core.sh：parse_dns_args/print_dns_list/run_all_dns_tests/finish_dns_tests）
 # 支持 [DNS...] [索引]，索引越界自动忽略改测全部；DNS 地址格式校验在 print_dns_list 内

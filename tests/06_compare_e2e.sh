@@ -191,6 +191,14 @@ bash compare.sh 223.5.5.5 --keep 5 2>&1 | grep -q "\-\-keep 仅与 --watch" && o
 bash compare.sh 223.5.5.5 --watch 1 --keep 0 2>&1 | grep -q "正整数" && ok "--keep 0 报错" || notok "--keep 0 未报错"
 JOUT=$(bash compare.sh 223.5.5.5 --json 2>/dev/null)
 echo "$JOUT" | grep -q '"tool": "dns-test/compare.sh"' && ok "--json 输出到 stdout" || notok "--json 未输出 stdout"
+# stdout 必须是"纯 JSON"（人类可读输出改道 stderr）——否则 `compare.sh --json | jq .` 第一行就报错
+if command -v python3 >/dev/null 2>&1; then
+  printf '%s' "$JOUT" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null \
+    && ok "--json stdout 是纯 JSON（json.loads 通过）" || notok "--json stdout 不是纯 JSON"
+else
+  case "$JOUT" in "{"*) ok "--json stdout 以 { 开头（无 python3，弱校验）" ;; *) notok "--json stdout 非 JSON 开头" ;; esac
+fi
+grep -q '"items_total"' results/compare-*.json 2>/dev/null && ok "JSON 记录 items_total（真实分母，不再只有硬编码 53）" || notok "JSON 缺 items_total"
 bash compare.sh 223.5.5.5 --json --no-save 2>&1 | grep -q "已忽略 --no-save" && ok "--json 冲突忽略 --no-save" || notok "--json/--no-save 冲突未处理"
 bash compare.sh 223.5.5.5 --watch 1 --rounds 1 --json 2>&1 | grep -q "已忽略 --json" && ok "采集模式剔除 --json" || notok "采集模式未剔除 --json"
 
@@ -346,7 +354,21 @@ echo "$WV" | grep -q "1次突增" && ok "突变计数=1" || notok "突变计数�
 WVS=$(tr2 --vs 223.5.5.5,119.29.29.29 2>&1)
 echo "$WVS" | grep -q "223.5.5.5·阿里DNS-v4-1 胜1 ｜ 119.29.29.29·腾讯DNSPod-v4 胜2 ｜ 平0" && ok "--vs 头对头胜负计数(1/2/0)" || notok "--vs 胜负计数错误"
 echo "$WVS" | grep -q "同轮对决 3 局" && ok "--vs 对局数=3" || notok "--vs 对局数错误"
-echo "$WVS" | grep -q "势均力敌" && ok "--vs 占优判定保守(2/3不触发)" || notok "--vs 判定异常"
+# ≥2/3 局才算占优：3 局 2:1（66.7%）应触发（原先 `duel_n*2/3` 向下取整 → 只有 3:0 才算）
+echo "$WVS" | grep -q "🏆 119.29.29.29·腾讯DNSPod-v4 占优" && ok "--vs 占优阈值≥2/3 局（2:1 触发）" || notok "--vs 占优判定异常"
+# 阈值下界：2 局 1:1 仍判势均力敌
+TRD3=${TMPDIR:-/tmp}/t06-vs3; rm -rf "$TRD3" ${TMPDIR:-/tmp}/t06-vs3-out; mkdir -p "$TRD3"
+for i in 1 2; do
+  sc=$([ "$i" = "1" ] && echo 90 || echo 70)
+  cat > "$TRD3/compare-${D5F}-1${i}0000.json" <<EOF6
+{"tool":"x","timestamp":"$D5 1${i}:00:00 +0800","mode":"lite","dns":[
+ {"addr":"223.5.5.5","score":"$sc","stab":"100","delay_ms":20,"reachable":true},
+ {"addr":"119.29.29.29","score":"80","stab":"95","delay_ms":30,"reachable":true}]}
+EOF6
+done
+COMPARE_RESULTS_DIR="$TRD3" TRENDS_DIR=${TMPDIR:-/tmp}/t06-vs3-out bash trends.sh --vs 223.5.5.5,119.29.29.29 2>&1 | grep -q "势均力敌" \
+  && ok "--vs 1:1 仍判势均力敌（阈值下界）" || notok "--vs 1:1 判定异常"
+rm -rf "$TRD3" ${TMPDIR:-/tmp}/t06-vs3-out
 # --vs 错误路径
 tr2 --vs 2>&1 | grep -q "缺少值" && ok "--vs 缺值报错" || notok "--vs 缺值未报错"
 tr2 --vs 223.5.5.5 2>&1 | grep -q "两个不同DNS" && ok "--vs 单值报错" || notok "--vs 单值未报错"
@@ -431,6 +453,27 @@ COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-hook-out PATH="$HOOKST
 HW2=$(COMPARE_RESULTS_DIR="$TRD" TRENDS_DIR=${TMPDIR:-/tmp}/t06-hook-out bash trends.sh --alert 70 --webhook https://127.0.0.1:1/h 2>&1 | grep -c "webhook 未推送\|推送失败")
 [ "$HW2" -ge 1 ] && ok "推送失败时降级提示" || notok "推送失败时静默"
 rm -rf "$TRD" ${TMPDIR:-/tmp}/t06-hook-out "$HOOKSTUB"
+
+echo "═══ compare.sh：报告转义 + SVG 脏数据兜底 ═══"
+# 提供商标签可被 DEFAULT_DNS_NAME_CSV 覆盖 → 必须转义后再内插（报告要分享/归档）
+rm -f results/report.html
+# 用 2 个 DNS：这样还会触发「综合推荐卡」（单 DNS 不生成推荐，覆盖不到那条内插路径）
+DEFAULT_DNS_CSV='10.0.0.9,10.0.0.10' DEFAULT_DNS_NAME_CSV='<img src=x onerror=alert(1)>,安全名' bash compare.sh default --html >/dev/null 2>&1
+grep -q '<img src=x onerror' results/report.html 2>/dev/null && notok "HTML 报告未转义提供商标签（注入）" || ok "HTML 报告转义了提供商标签"
+rm -f results/report.html
+# 脏数据（空 score）不得让折线坐标飞出画布（原先把空值当 0，实测 y=11840 而 viewBox 高 200）
+TRD4=${TMPDIR:-/tmp}/t06-dirty; rm -rf "$TRD4" ${TMPDIR:-/tmp}/t06-dirty-out; mkdir -p "$TRD4"
+for i in 1 2; do
+  cat > "$TRD4/compare-2026-08-1${i}-080000.json" <<EOF7
+{"tool":"x","timestamp":"2026-08-1${i} 08:00:00 +0800","mode":"lite","dns":[
+ {"addr":"223.5.5.5","score":"","stab":"","delay_ms":20,"reachable":true},
+ {"addr":"119.29.29.29","score":"80","stab":"95","delay_ms":30,"reachable":true}]}
+EOF7
+done
+COMPARE_RESULTS_DIR="$TRD4" TRENDS_DIR=${TMPDIR:-/tmp}/t06-dirty-out bash trends.sh --html >/dev/null 2>&1
+grep -oE "points='[^']*'" ${TMPDIR:-/tmp}/t06-dirty-out/report.html 2>/dev/null | grep -qE ',[0-9]{4,}' \
+  && notok "SVG 折线坐标越界（脏数据未兜底）" || ok "SVG 折线坐标未越界（脏数据已兜底）"
+rm -rf "$TRD4" ${TMPDIR:-/tmp}/t06-dirty-out
 
 # --- tar 可用性预检 ---
 # 部分环境（Termux/精简容器）tar 的压缩通道不可用（tar.real 无法 exec 压缩器），

@@ -41,7 +41,7 @@ _dns-test() {
     release.sh)
       _values 'option' --version --help ;;
     lite.sh|full.sh)
-      _values 'DNS' "${dns_words[@]}" --version --help ;;
+      _values 'DNS' "${dns_words[@]}" --version --help --emit-kv ;;
     *)
       ;;
   esac

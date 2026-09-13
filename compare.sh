@@ -34,7 +34,12 @@ source lib/core.sh || { echo "❌ 无法加载 lib/core.sh（请确认脚本在�
 install_exit_traps
 
 # SAVE_LOG：输出落盘（实现见 lib/compat.sh 的 save_log_init）
-save_log_init "$0"
+# --json 时 stdout 是机器可读契约，跳过日志（save_log_init 会把 stderr 并入 stdout；
+# 与 trends.sh --json 同策略）。这里按"参数逐个精确匹配"判断，不用 `case " $* "` 子串匹配
+# —— 否则某个参数的值里含 " --json " 就会误跳过日志。
+_gen_json_pre=0
+for _a in "$@"; do [ "$_a" = "--json" ] && _gen_json_pre=1; done
+[ "$_gen_json_pre" = "1" ] || save_log_init "$0"
 
 VERSION="${PROJECT_VERSION}"
 GEN_HTML=0
@@ -168,6 +173,12 @@ if [ "${GEN_JSON_OUT:-0}" = "1" ] && [ "$SAVE_JSON" = "0" ]; then
     [ "$ca" != "--no-save" ] && CA1+=("$ca")
   done
   CLEAN_ARGS=("${CA1[@]}")
+fi
+# --json 的 stdout 契约：机器可读 JSON 独占 stdout，其余人类可读输出全部改道 stderr。
+# fd 3 = 启动时的原 stdout（只有最终 JSON 写它）。原先 JSON 前后都夹着人读文本，
+# `compare.sh --json | jq .` 必然在第一行 parse error（审阅 M1；与 trends.sh 同款 fd 技巧）。
+if [ "${GEN_JSON_OUT:-0}" = "1" ]; then
+  exec 3>&1 1>&2
 fi
 if [ -n "$WATCH_N" ]; then
   # 分钟数必须为正整数（与 STAB_ROUNDS 校验同风格）
@@ -365,6 +376,7 @@ done
 # ============================================================================
 SCORE_VAL=()
 STAB_VAL=()
+ITEMS_TOTAL=()   # 每 DNS 的项数（来自 lite/full --emit-kv 的 total=；写进 JSON 便于跨模式/跨版本对比口径）
 MAXC="${COMPARE_MAX_CONCURRENCY:-3}"
 [[ "$MAXC" =~ ^[1-9][0-9]*$ ]] || MAXC=3
 echo ""
@@ -385,7 +397,8 @@ done
 
 pids=(); n=0
 for i in "${IDX_MAP[@]}"; do
-  bash "${MODE}.sh" "${DNS_ARGS[$i]}" 0 > "$TMPD/$n.out" 2>&1 &
+  # --emit-kv：让 lite/full 额外输出一行机器可读结果，取分不再依赖中文显示文案
+  bash "${MODE}.sh" "${DNS_ARGS[$i]}" 0 --emit-kv > "$TMPD/$n.out" 2>&1 &
   pids+=($!)
   n=$((n+1))
   if [ $((n % MAXC)) -eq 0 ]; then
@@ -398,8 +411,18 @@ for p in "${pids[@]}"; do wait "$p" 2>/dev/null; done
 n=0
 for i in "${IDX_MAP[@]}"; do
   out=$(cat "$TMPD/$n.out")
-  SCORE_VAL[$i]=$(echo "$out" | grep -oE "综合评分: [0-9]+" | grep -oE "[0-9]+")
-  STAB_VAL[$i]=$(echo "$out" | grep -oE "稳定性: [0-9]+%" | grep -oE "[0-9]+")
+  # 取分首选机器可读契约行 "KV addr=.. score=.. stab=.. pass=.. total=.."
+  # （lite/full --emit-kv 输出；字段名固定、值纯数字，人类文案怎么改都不影响）
+  kvline=$(printf '%s\n' "$out" | grep -m1 '^KV ')
+  if [ -n "$kvline" ]; then
+    SCORE_VAL[$i]=$(printf '%s' "$kvline" | sed -n 's/.* score=\([0-9]\{1,\}\).*/\1/p')
+    STAB_VAL[$i]=$(printf '%s' "$kvline" | sed -n 's/.* stab=\([0-9]\{1,\}\).*/\1/p')
+    ITEMS_TOTAL[$i]=$(printf '%s' "$kvline" | sed -n 's/.* total=\([0-9]\{1,\}\).*/\1/p')
+  else
+    # 兜底：旧版 lite/full（无 --emit-kv）仍从显示文案取分。仅作兼容，不作为契约
+    SCORE_VAL[$i]=$(echo "$out" | grep -oE "综合评分: [0-9]+" | grep -oE "[0-9]+")
+    STAB_VAL[$i]=$(echo "$out" | grep -oE "稳定性: [0-9]+%" | grep -oE "[0-9]+")
+  fi
   if [ -z "${SCORE_VAL[$i]}" ]; then
     # 解析不到评分：把子进程输出尾部打出来。否则失败信息被封在临时目录里、
     # 退出时又被清理，现场只剩一句"不可达"，排障零线索（审阅#17）
@@ -548,7 +571,7 @@ if [ "$SAVE_JSON" = "1" ]; then
       esc_d=$(json_enc "$d")
       [ "${SCORE_VAL[$i]}" = "不可达" ] && reachable=false || reachable=true
       comma=""; [ $i -lt $(( ${#DNS_ARGS[@]} - 1 )) ] && comma=","
-      echo "    {\"addr\": ${esc_d}, \"score\": \"${SCORE_VAL[$i]}\", \"stab\": \"${STAB_VAL[$i]}\", \"delay_ms\": ${DELAY_VAL[$i]:-0}, \"jitter_ms\": ${JITTER_VAL[$i]:-0}, \"reachable\": ${reachable}}${comma}"
+      echo "    {\"addr\": ${esc_d}, \"score\": \"${SCORE_VAL[$i]}\", \"stab\": \"${STAB_VAL[$i]}\", \"delay_ms\": ${DELAY_VAL[$i]:-0}, \"jitter_ms\": ${JITTER_VAL[$i]:-0}, \"items_total\": ${ITEMS_TOTAL[$i]:-0}, \"reachable\": ${reachable}}${comma}"
       i=$((i+1))
     done
     echo "  ]"
@@ -558,10 +581,11 @@ if [ "$SAVE_JSON" = "1" ]; then
   } > "$JF.tmp.$$" && mv -f "$JF.tmp.$$" "$JF"
   echo ""
   echo "  💾 JSON结果已保存: $JF"
-  # --json：落盘同时输出到 stdout（管道消费；jq/重定向用户自取）
+  # --json：机器可读 JSON 独占 stdout（fd 3 是启动时保存的原 stdout），
+  # 人类可读输出全部走 stderr —— 否则 `compare.sh --json | jq .` 会在第一行报 parse error
   if [ "${GEN_JSON_OUT:-0}" = "1" ]; then
-    echo "  📤 JSON 输出:"
-    cat "$JF"
+    echo "  📤 JSON 输出（stdout 仅 JSON，人类可读输出已改道 stderr）:"
+    cat "$JF" >&3
   fi
 fi
 
@@ -668,8 +692,9 @@ if [ "$GEN_HTML" = "1" ]; then
     echo "<div class='meta'>$(date '+%Y-%m-%d %H:%M:%S') ｜ $( [ "$MODE" = "full" ] && echo "完整版" || echo "lite精简版" ) ${LITE_ITEMS:+${LITE_ITEMS}项}/DNS ｜ dns-test ${VERSION} ｜ 耗时${COST}s</div>"
     if [ "$BEST_IDX" -ge 0 ]; then
       _rec_note=""; is_current_dns "$BEST" && _rec_note=" ｜ 👤 当前正在使用"
-      _rec_best="$BEST"; _rlbl=$(dns_preset_label "$BEST") && _rec_best="${_rec_best}（${_rlbl}）"
-      echo "<div class='rec'>🏆 综合推荐: <b>$_rec_best</b> — 评分${BEST_SCORE}% ｜ 延迟${BEST_DELAY}ms${_rec_note}</div>"
+      # 推荐卡内插的标签同样可被 DEFAULT_DNS_NAME_CSV 覆盖 → 必须转义（报告要分享/归档）
+      _rec_best="$BEST"; _rlbl=$(dns_preset_label "$BEST") && _rec_best="${_rec_best}（$(html_escape "$_rlbl")）"
+      echo "<div class='rec'>🏆 综合推荐: <b>$(html_escape "$_rec_best")</b> — 评分${BEST_SCORE}% ｜ 延迟${BEST_DELAY}ms${_rec_note}</div>"
     else
       echo "<div class='rec bad-rec'>💀 全部DNS不可达，请检查网络/加速器状态后重试</div>"
     fi
@@ -737,7 +762,9 @@ if [ "$GEN_HTML" = "1" ]; then
       # 当前系统 DNS 徽章（命中才渲染，不破坏 addr 列等宽字体排版）
       cur_b=""; is_current_dns "${DNS_ARGS[$oi]}" && cur_b=" <span class='bdg bg-n'>👤当前</span>"
       # 提供商标签（预设内的 DNS 才有，地址下方小字副行）
-      pl_b=""; _pl=$(dns_preset_label "${DNS_ARGS[$oi]}") && pl_b="<span class='pname'>${_pl}</span>"
+      # _pl 来自 dns_preset_label，而名字可被 DEFAULT_DNS_NAME_CSV 等环境变量覆盖 →
+      # 必须转义后再内插，否则报告会被注入/破版（报告是要分享、归档的产物；审阅 M4）
+      pl_b=""; _pl=$(dns_preset_label "${DNS_ARGS[$oi]}") && pl_b="<span class='pname'>$(html_escape "$_pl")</span>"
       echo "<tr${rowcls}><td class='rank'>$mk</td><td class='addr'>${DNS_ARGS[$oi]}${cur_b}${pl_b}</td><td><span class='bdg $bcls'>$sv</span></td>${ds_cell}<td><span class='bdg $dcls' title='中位数±抖动(ms)'>$dvs</span></td>${dd_cell}<td><span class='bdg $tcls'>$tvs</span></td><td>$st</td></tr>"
     done
     echo "</tbody></table></div></div>"

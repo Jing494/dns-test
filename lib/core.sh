@@ -1009,6 +1009,15 @@ run_common_tests() {
     printf "  ┃ 🔑 关键指标: A记录%d%% 稳定性%d%%\n" "$a_rate" "$stab_rate"
   fi
   echo "  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"
+
+  # ===== 机器可读结果行（lite/full 的 --emit-kv，或 EMIT_KV=1） =====
+  # 为什么需要：compare.sh 原先是从"📊 综合评分: N%"这类**中文显示文案**里 grep 取分的
+  # （见 compare.sh 的取分处），一次文案美化就会让整轮评分静默变 0，而测试无从发现。
+  # 这一行是给机器读的契约：字段名固定、值纯数字，人类文案怎么改都不影响。
+  if [ "${EMIT_KV:-0}" = "1" ]; then
+    printf 'KV addr=%s mode=%s score=%d stab=%d pass=%d total=%d\n' \
+      "$addr" "$mode" "$overall" "$stab_rate" "$success_all" "$total_all"
+  fi
 }
 
 # ============================================================================

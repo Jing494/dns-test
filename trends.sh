@@ -38,10 +38,11 @@ source lib/trends_lib.sh
 
 # SAVE_LOG：--json 模式下 stdout 是机器可读契约（供 jq/Grafana 消费），
 # 而 save_log_init 会把 stderr 并入 stdout 破坏该契约 —— 该模式跳过日志保存
-case " $* " in
-  *" --json "*) : ;;
-  *) save_log_init "$0" ;;
-esac
+# 逐个参数精确匹配：原先 `case " $* " in *" --json "*)` 子串匹配，
+# 某个参数的值里含 " --json "（如带路径的 webhook URL）就会误跳过日志保存
+_trends_has_json=0
+for _a in "$@"; do [ "$_a" = "--json" ] && _trends_has_json=1; done
+[ "$_trends_has_json" = "1" ] || save_log_init "$0"
 
 # 异常退出时统一清理 mktemp 临时目录（--export 的 EXP_STAGE 等；与 lite/compare 同款）
 # INT/TERM 显式 exit，避免"清理完继续跑完整报告"（审阅#16；实现见 lib/core.sh）
@@ -448,7 +449,12 @@ while IFS= read -r f; do
       for fd in "${FILTER[@]}"; do [ "$fd" = "$addr" ] && in=1; done
       [ "$in" = "0" ] && continue
     fi
-    ix=$(raw_idx "$addr")
+    # 下标内联查找：原先 $(raw_idx ...) 是每条记录一次命令替换（一个子 shell）
+    ix=-1; _rk=0
+    for _ra in "${RAW_ADDR[@]}"; do
+      [ "$_ra" = "$addr" ] && { ix=$_rk; break; }
+      _rk=$((_rk+1))
+    done
     if [ "$ix" = "-1" ]; then
       RAW_ADDR+=("$addr"); RAW_VAL+=("")
       ix=$(( ${#RAW_ADDR[@]} - 1 ))
@@ -581,8 +587,9 @@ trend_stats() {
   score_mean=$(printf '%s\n' "$ok_lines" | awk -F'|' '{s+=$2} END{printf "%.1f", s/NR}')
   stab_mean=$(printf '%s\n' "$ok_lines" | awk -F'|' '{s+=$3} END{printf "%.1f", s/NR}')
   delay_mean=$(printf '%s\n' "$ok_lines" | awk -F'|' '{s+=$4} END{printf "%.1f", s/NR}')
-  score_last=$(printf '%s\n' "$ok_lines" | tail -1 | cut -d'|' -f2)
-  delay_last=$(printf '%s\n' "$ok_lines" | tail -1 | cut -d'|' -f4)
+  # 首/尾样本也只取一次、read 一次（原先 4 条 printf|tail|cut 管道 = 12 个子进程）
+  _last_line=$(printf '%s\n' "$ok_lines" | tail -1)
+  IFS='|' read -r _ _f_score_last _ _f_delay_last <<< "$_last_line"
   # 延迟分位数：P50 中位 / P95 长尾上界（均值被长尾拉高时，P50 更接近体感）
   # 纯函数在 lib/trends_lib.sh（tests/08 覆盖）；样本<2 函数自回 "-"
   local p50 p95 _delays
@@ -594,15 +601,15 @@ trend_stats() {
     score_slope=$(printf '%s\n' "$ok_lines" | awk -F'|' '{n++;sx+=n-1;sy+=$2;sxx+=(n-1)*(n-1);sxy+=(n-1)*$2} END{d=n*sxx-sx*sx; printf "%.4f", (d==0)?0:(n*sxy-sx*sy)/d}')
     delay_slope=$(printf '%s\n' "$ok_lines" | awk -F'|' '{n++;sx+=n-1;sy+=$4;sxx+=(n-1)*(n-1);sxy+=(n-1)*$4} END{d=n*sxx-sx*sx; printf "%.4f", (d==0)?0:(n*sxy-sx*sy)/d}')
   fi
-  local score_first delay_first
-  score_first=$(printf '%s\n' "$ok_lines" | head -1 | cut -d'|' -f2)
-  delay_first=$(printf '%s\n' "$ok_lines" | head -1 | cut -d'|' -f4)
+  # 首/尾样本改为 _f_* 变量（见下方 read），原 local 声明已无用——SC2034
+  _first_line=$(printf '%s\n' "$ok_lines" | head -1)
+  IFS='|' read -r _ _f_score_first _ _f_delay_first <<< "$_first_line"
 
   # 趋势判定（纯函数在 lib/trends_lib.sh，tests/08 覆盖；回归为主，首尾为辅）
   local score_t delay_t
-  score_t=$(trends_slope_judge "$score_slope" "$score_first" "$score_last" score)
-  delay_t=$(trends_slope_judge "$delay_slope" "$delay_first" "$delay_last" delay)
-  echo "$score_t|$delay_t|$score_mean|$stab_mean|$delay_mean|$score_last|$delay_last|$n_ok|$n_un|$p50|$p95"
+  score_t=$(trends_slope_judge "$score_slope" "$_f_score_first" "$_f_score_last" score)
+  delay_t=$(trends_slope_judge "$delay_slope" "$_f_delay_first" "$_f_delay_last" delay)
+  echo "$score_t|$delay_t|$score_mean|$stab_mean|$delay_mean|$_f_score_last|$_f_delay_last|$n_ok|$n_un|$p50|$p95"
 }
 
 # ============================================================================
@@ -645,15 +652,22 @@ svg_chart() {
     return
   fi
   local col=2; [ "$metric" = "delay" ] && col=4
+  # Y 轴值域只统计"整数值"样本：脏数据（空/"-"/"1.2.3"）原先会被 awk 当 0 参与极值，
+  # 把坐标轴压扁；无法解析时退回 0..1，避免后面除零
   local minv maxv
-  minv=$(printf '%s\n' "$data" | awk -F'|' -v c=$col 'NR==1{m=$c} {if($c<m)m=$c} END{print m}')
-  maxv=$(printf '%s\n' "$data" | awk -F'|' -v c=$col 'NR==1{m=$c} {if($c>m)m=$c} END{print m}')
+  minv=$(printf '%s\n' "$data" | awk -F'|' -v c=$col 'BEGIN{m=""} $c ~ /^-?[0-9]+$/ { if (m=="" || $c+0 < m+0) m=$c } END{print (m=="" ? 0 : m)}')
+  maxv=$(printf '%s\n' "$data" | awk -F'|' -v c=$col 'BEGIN{m=""} $c ~ /^-?[0-9]+$/ { if (m=="" || $c+0 > m+0) m=$c } END{print (m=="" ? 0 : m)}')
   [ "$minv" = "$maxv" ] && maxv=$((minv + 1))
   local pts="" dots="" labels="" i=0
   while IFS='|' read -r ts sc st dl; do
     local v=""; [ "$metric" = "score" ] && v=$sc || v=$dl
+    # 非整数值跳过该点（不可达行已在调用方过滤，此处兜底脏数据）
+    case "$v" in ''|*[!0-9]*) i=$((i+1)); continue ;; esac
     local x=$((pad_l + i * plot_w / (n - 1)))
     local y=$((pad_t + (maxv - v) * plot_h / (maxv - minv)))
+    # 夹到绘图区内：越界值不再让点线飞出画布（曾出现 y=11840 而 viewBox 高只有 200）
+    [ "$y" -lt "$pad_t" ] && y=$pad_t
+    [ "$y" -gt "$((pad_t + plot_h))" ] && y=$((pad_t + plot_h))
     pts="$pts $x,$y"
     dots="$dots<circle cx='$x' cy='$y' r='3' fill='$color'/>"
     if [ $i -eq 0 ] || [ $i -eq $((n - 1)) ] || [ "$n" -le 10 ]; then
@@ -685,15 +699,18 @@ svg_multi_chart() {
   local w=660 h=200 pad_l=44 pad_r=14 pad_t=14 pad_b=40
   local plot_w=$((w - pad_l - pad_r)) plot_h=$((h - pad_t - pad_b))
   # Y 轴值域：所有DNS该指标的全局 min/max（不可达轮不参与，天然留缺口）
+  # 只统计整数值样本：脏数据（空/"-"/"1.2.3"）原先会被 bash 当 0 参与比较，导致某点算出
+  # y=11840 而 viewBox 高只有 200（审阅 P2-1）
   local gmin="" gmax=""
   for k in "${!RAW_ADDR[@]}"; do
     while IFS='|' read -r ts sc st dl; do
       [ -z "$ts" ] && continue
       local v; [ "$metric" = "score" ] && v="$sc" || v="$dl"
+      case "$v" in ''|*[!0-9]*) continue ;; esac
       [ -z "$gmin" ] && gmin="$v"
       [ -z "$gmax" ] && gmax="$v"
-      [ "$v" -lt "$gmin" ] 2>/dev/null && gmin="$v"
-      [ "$v" -gt "$gmax" ] 2>/dev/null && gmax="$v"
+      [ "$v" -lt "$gmin" ] && gmin="$v"
+      [ "$v" -gt "$gmax" ] && gmax="$v"
     done <<< "$(printf '%s\n' "${RAW_VAL[$k]}" | grep -v UNREACH)"
   done
   [ -z "$gmin" ] && return 0
@@ -717,10 +734,18 @@ svg_multi_chart() {
     while IFS='|' read -r ts sc st dl; do
       [ -z "$ts" ] && continue
       local v; [ "$metric" = "score" ] && v="$sc" || v="$dl"
-      local ri; ri=$(round_idx "$ts")
+      case "$v" in ''|*[!0-9]*) continue ;; esac   # 脏数据跳过（否则算术报错/坐标飞出画布）
+      # 轮次下标内联查找（原先 $(round_idx) 是每个数据点一次命令替换 = 一个子 shell）
+      local ri=-1 _rk=0 _rr
+      for _rr in "${ROUNDS_TS[@]}"; do
+        [ "$_rr" = "$ts" ] && { ri=$_rk; break; }
+        _rk=$((_rk+1))
+      done
       [ "$ri" = "-1" ] && continue
       local x=$((pad_l + ri * plot_w / (n_rounds - 1)))
       local y=$((pad_t + (gmax - v) * plot_h / (gmax - gmin)))
+      [ "$y" -lt "$pad_t" ] && y=$pad_t
+      [ "$y" -gt "$((pad_t + plot_h))" ] && y=$((pad_t + plot_h))
       if [ "$first" = "1" ]; then pts="$x,$y"; first=0; else pts="$pts $x,$y"; fi
       dots="$dots<circle cx='$x' cy='$y' r='2.5' fill='$color'/>"
     done <<< "$(printf '%s\n' "${RAW_VAL[$k]}" | grep -v UNREACH)"
@@ -767,17 +792,8 @@ for k in "${!RAW_ADDR[@]}"; do
   addr="${RAW_ADDR[$k]}"
   lines="${RAW_VAL[$k]}"
   stats=$(trend_stats "$lines")
-  score_t=$(echo "$stats" | cut -d'|' -f1)
-  delay_t=$(echo "$stats" | cut -d'|' -f2)
-  score_mean=$(echo "$stats" | cut -d'|' -f3)
-  stab_mean=$(echo "$stats" | cut -d'|' -f4)
-  delay_mean=$(echo "$stats" | cut -d'|' -f5)
-  score_last=$(echo "$stats" | cut -d'|' -f6)
-  delay_last=$(echo "$stats" | cut -d'|' -f7)
-  n_ok=$(echo "$stats" | cut -d'|' -f8)
-  n_un=$(echo "$stats" | cut -d'|' -f9)
-  p50=$(echo "$stats" | cut -d'|' -f10)
-  p95=$(echo "$stats" | cut -d'|' -f11)
+  # 一次 read 取全部 11 个字段：原先 11 次 `echo "$stats" | cut -d'|' -fN` = 每记录 22 个子进程
+  IFS='|' read -r score_t delay_t score_mean stab_mean delay_mean score_last delay_last n_ok n_un p50 p95 <<< "$stats"
 
   # 提供商标签（预设内 DNS 才有，与 compare.sh 报告同口径）
   addr_show="$addr"
@@ -981,8 +997,11 @@ if [ -n "$VS_A" ]; then
   wins_a=0; wins_b=0; draws=0; duel_n=0
   for r in "${ROUNDS_TS[@]}"; do
     # 该轮两方评分（RAW_VAL 行= "ts|score|stab|delay"；不可达行尾标 UNREACH 已排除）
-    sa=$(printf '%s\n' "${RAW_VAL[$va_idx]}" | grep -F "$r|" | grep -v UNREACH | head -1 | cut -d'|' -f2)
-    sb=$(printf '%s\n' "${RAW_VAL[$vb_idx]}" | grep -F "$r|" | grep -v UNREACH | head -1 | cut -d'|' -f2)
+    # 每轮取分也只走一次管道、一次 read（原先 3 级管道 + cut 每轮 ×2）
+    _la=$(printf '%s\n' "${RAW_VAL[$va_idx]}" | grep -F "$r|" | grep -v UNREACH | head -1)
+    _lb=$(printf '%s\n' "${RAW_VAL[$vb_idx]}" | grep -F "$r|" | grep -v UNREACH | head -1)
+    IFS='|' read -r _ sa _ _ <<< "$_la"
+    IFS='|' read -r _ sb _ _ <<< "$_lb"
     [ -z "$sa" ] || [ -z "$sb" ] && continue
     duel_n=$((duel_n+1))
     if [ "$sa" -gt "$sb" ]; then wins_a=$((wins_a+1))
@@ -991,15 +1010,16 @@ if [ -n "$VS_A" ]; then
   done
   if [ "$duel_n" -gt 0 ]; then
     # 均值对比（复用 trend_stats 的均值口径）
-    va_mean=$(trend_stats "${RAW_VAL[$va_idx]}" | cut -d'|' -f3)
-    vb_mean=$(trend_stats "${RAW_VAL[$vb_idx]}" | cut -d'|' -f3)
-    va_dmean=$(trend_stats "${RAW_VAL[$va_idx]}" | cut -d'|' -f5)
-    vb_dmean=$(trend_stats "${RAW_VAL[$vb_idx]}" | cut -d'|' -f5)
+    # 每址只算一次 trend_stats（原先 4 次调用 + 4 条 cut 管道），一次 read 取出均值与延迟均值
+    IFS='|' read -r _ _ va_mean _ va_dmean _ _ _ _ _ _ <<< "$(trend_stats "${RAW_VAL[$va_idx]}")"
+    IFS='|' read -r _ _ vb_mean _ vb_dmean _ _ _ _ _ _ <<< "$(trend_stats "${RAW_VAL[$vb_idx]}")"
     va_show="$VS_A"; _vl=$(dns_preset_label "$VS_A") && va_show="${VS_A}·$_vl"
     vb_show="$VS_B"; _vl=$(dns_preset_label "$VS_B") && vb_show="${VS_B}·$_vl"
     vs_verdict="势均力敌"
-    [ "$wins_a" -gt $((duel_n * 2 / 3)) ] && vs_verdict="🏆 ${va_show} 占优"
-    [ "$wins_b" -gt $((duel_n * 2 / 3)) ] && vs_verdict="🏆 ${vb_show} 占优"
+    # 「≥2/3 局数」才算占优：整数比较 wins*3 >= duel_n*2。
+    # 原先 `[ wins -gt $((duel_n*2/3)) ]` 向下取整，会把 2:1（66.7%）判成"不占优"（只有 3:0 算）
+    [ $((wins_a * 3)) -ge $((duel_n * 2)) ] && [ "$wins_a" -gt "$wins_b" ] && vs_verdict="🏆 ${va_show} 占优"
+    [ $((wins_b * 3)) -ge $((duel_n * 2)) ] && [ "$wins_b" -gt "$wins_a" ] && vs_verdict="🏆 ${vb_show} 占优"
     VS_TEXT="⚔️  头对头（同轮对决 ${duel_n} 局）: ${va_show} 胜${wins_a} ｜ ${vb_show} 胜${wins_b} ｜ 平${draws} ｜ ${vs_verdict}
     全期均值: 评分 ${va_mean}% vs ${vb_mean}% ｜ 延迟 ${va_dmean}ms vs ${vb_dmean}ms
 "
