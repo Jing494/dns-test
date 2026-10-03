@@ -417,13 +417,26 @@ par_run() {
   PARR_COUNT=$i
 }
 
-# 将DNS地址格式化为 dig @target 的地址形式：IPv6 需加方括号避免解析歧义，IPv4 原样返回
+# 将DNS地址格式化为 dig @target 的地址形式：IPv4 / IPv6 一律原样返回（dig 的 @server 只接受裸地址或主机名）
+# 历史坑（本轮修复）：曾给 IPv6 加方括号避免"解析歧义"，但 dig 会把 `[240e:...]` 当成**主机名**去解析：
+#   $ dig "@[240e:52:4800::8888]" www.baidu.com        → dig: couldn't get address for '[240e:52:4800::8888]': not found（rc=1）
+#   $ dig "@240e:52:4800::8888"  www.baidu.com        → 正常应答（rc=0）
+# 后果：dns_health_check 对所有 IPv6 DNS 恒判"不可达"，主入口/lite/full/compare 全部跳过 v6 DNS
+# （默认组首个地址就是 v6，实测 dns-test.sh 非交互跑默认组 → 该项被跳过、退出码 2）。
+# 方括号只在 URI/DoH 场景有意义，dig 命令行并不需要；裸地址在所有 bind 版本都成立。
 dig_target() {
-  local a="$1"
-  case "$a" in
-    *:*) printf '%s' "[$a]" ;;
-    *)   printf '%s' "$a" ;;
-  esac
+  printf '%s' "$1"
+}
+
+# 从 resolv.conf 形态的文件里取 nameserver 地址（行首空白/多空格/制表符均容忍、去注释、排序去重）
+# 只读、无副作用：文件不存在/不可读/没有 nameserver 行时输出空。
+# 用途：compare.sh 的"当前系统 DNS"检测 —— 既读系统 /etc/resolv.conf，也读 Android/Termux 下
+#       BIND 系工具实际使用的 $PREFIX/etc/resolv.conf（该环境下 /etc 是只读 /system/etc 且无此文件）。
+# 纯函数，单测见 tests/04。
+resolv_conf_servers() {
+  [ -n "${1:-}" ] || return 0
+  [ -r "$1" ] || return 0
+  sed -n 's/^[[:space:]]*nameserver[[:space:]]\{1,\}\([0-9a-fA-F.:][0-9a-fA-F.:]*\).*/\1/p' "$1" | sort -u
 }
 
 # 在三组预设地址中反查 DNS 的提供商标签（如 223.5.5.5→阿里DNS-v4-1），未知地址返回非0
@@ -575,7 +588,7 @@ print_header() {
 # 供 full.sh/lite.sh 调用；run_full_test/run_lite_test 为薄包装（见文末）
 run_common_tests() {
   local addr="$1"
-  # 目标DNS的 dig @ 形式（IPv6 加方括号）只算一次，避免每处重复调用 dig_target（审阅#5）
+  # 目标DNS的 dig @ 形式（裸地址，见 dig_target 注释）只算一次，避免每处重复调用 dig_target（审阅#5）
   local t=$(dig_target "$addr")
   local name="$2"
   local mode="${3:-full}"

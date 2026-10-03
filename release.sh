@@ -58,7 +58,7 @@ mkdir -p results
 # 都会匹配掉（* 可匹配空），导致包内没有 results/ 条目、下面的自检必然报"results目录=0"；
 # 要求斜杠后至少一个字符后，两种 tar 都只排内容、保留空目录。
 tar czf "$OUT" --exclude='.git' --exclude='results/?*' --exclude='trends' --exclude='*.tar.gz' \
-  --exclude='.trae-html-share-packages' --exclude='./env.sh' . 2>/dev/null
+  --exclude='.trae-html-share-packages' --exclude='.t06-backup' --exclude='./env.sh' . 2>/dev/null
 
 echo "════ 打包完成 ════"
 echo "  文件: $OUT ($(du -h "$OUT" | cut -f1))"

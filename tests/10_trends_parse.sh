@@ -109,6 +109,8 @@ grep -q "SHOULD-NOT-REACH" "$STUB/probe.out" 2>/dev/null && notok "TERM 后脚�
 grep -q 'cp -a results' tests/06_compare_e2e.sh && ok "tests/06 以 cp 备份用户 results/（mv 会让唯一副本离开原位）" || notok "tests/06 未用 cp 备份 results/"
 grep -q 'cp -a trends' tests/06_compare_e2e.sh && ok "tests/06 同时备份用户 trends/（原先从未备份却无条件删）" || notok "tests/06 未备份 trends/"
 grep -qE '(^|[^a-z])mv results ' tests/06_compare_e2e.sh && notok "tests/06 仍以 mv 移动用户 results/" || ok "tests/06 不再以 mv 移动用户数据"
+grep -q 'BAK=".t06-backup"' tests/06_compare_e2e.sh && ok "tests/06 备份落在仓库内固定路径（强杀后仍在原地）" || notok "tests/06 备份路径非固定（强杀即丢）"
+grep -q '发现上次运行遗留的备份' tests/06_compare_e2e.sh && ok "tests/06 启动时自动恢复上次遗留备份（强杀自愈）" || notok "tests/06 无强杀恢复逻辑"
 
 echo "═══ D. 变量紧邻中文的写法守卫（macOS bash 3.2 实测翻车点） ═══"
 # 为什么需要：`$f（含…` 这种「变量紧跟多字节字符」的写法，在 macOS 自带的 bash 3.2 +
