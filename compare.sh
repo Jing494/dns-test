@@ -317,20 +317,38 @@ echo "  测试并发: ${COMPARE_MAX_CONCURRENCY:-3}（设1为串行最稳）"
 T0=$(date +%s)
 
 # ---------- 当前系统 DNS 检测（只读展示用：对比表 👤 标记；读取失败静默跳过，不影响测试） ----------
-# macOS scutil --dns 优先；systemd 环境用 resolvectl dns；兜底解析 /etc/resolv.conf（WSL/普通Linux）
-CUR_DNS_LIST=()
-if [ "$(uname -s)" = "Darwin" ] && command -v scutil >/dev/null 2>&1; then
-  for _ns in $(scutil --dns 2>/dev/null | sed -n 's/^ *nameserver\[[0-9][0-9]*\] : \([0-9a-fA-F.:]*\)$/\1/p' | sort -u); do
-    CUR_DNS_LIST+=("$_ns")
-  done
-elif command -v resolvectl >/dev/null 2>&1 && resolvectl dns >/dev/null 2>&1; then
-  for _ns in $(resolvectl dns 2>/dev/null | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}|([0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{0,4}' | sort -u); do
-    CUR_DNS_LIST+=("$_ns")
-  done
+# 优先级：macOS scutil --dns → systemd resolvectl dns → resolv.conf 候选（依序取第一个含 nameserver 的文件）：
+#   ① /etc/resolv.conf —— WSL / 普通 Linux
+#   ② $PREFIX/etc/resolv.conf —— Android/Termux：/etc 是只读的 /system/etc 且通常没有该文件，
+#      BIND 系工具（dig/host/nslookup）读的正是前缀里这一份 —— 也正是本脚本全部测量所用的解析器
+# 逐级兜底而非并集：高优先级来源命中就不再读低优先级，免得把 systemd 的 127.0.0.53 stub 之类噪声混进列表。
+# CUR_DNS_RESOLV_CONFS 非空时**跳过平台探针**，直接按它（空格分隔的文件清单）取，用于测试/容器/显式固定。
+CUR_DNS_LIST=(); CUR_SRC=""
+if [ -n "${CUR_DNS_RESOLV_CONFS:-}" ]; then
+  CUR_CONF_CANDIDATES="$CUR_DNS_RESOLV_CONFS"
+else
+  CUR_CONF_CANDIDATES="/etc/resolv.conf ${PREFIX:-}/etc/resolv.conf"
+  if [ "$(uname -s)" = "Darwin" ] && command -v scutil >/dev/null 2>&1; then
+    for _ns in $(scutil --dns 2>/dev/null | sed -n 's/^ *nameserver\[[0-9][0-9]*\] : \([0-9a-fA-F.:]*\)$/\1/p' | sort -u); do
+      CUR_DNS_LIST+=("$_ns")
+    done
+    [ ${#CUR_DNS_LIST[@]} -gt 0 ] && CUR_SRC="scutil --dns"
+  fi
+  if [ ${#CUR_DNS_LIST[@]} -eq 0 ] && command -v resolvectl >/dev/null 2>&1 && resolvectl dns >/dev/null 2>&1; then
+    for _ns in $(resolvectl dns 2>/dev/null | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}|([0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{0,4}' | sort -u); do
+      CUR_DNS_LIST+=("$_ns")
+    done
+    [ ${#CUR_DNS_LIST[@]} -gt 0 ] && CUR_SRC="resolvectl dns"
+  fi
 fi
-if [ ${#CUR_DNS_LIST[@]} -eq 0 ] && [ -r /etc/resolv.conf ]; then
-  for _ns in $(sed -n 's/^nameserver \([0-9a-fA-F.:][0-9a-fA-F.:]*\).*/\1/p' /etc/resolv.conf | sort -u); do
-    CUR_DNS_LIST+=("$_ns")
+if [ ${#CUR_DNS_LIST[@]} -eq 0 ]; then
+  for _src in $CUR_CONF_CANDIDATES; do
+    [ -n "$_src" ] || continue
+    _got=$(resolv_conf_servers "$_src")
+    [ -n "$_got" ] || continue
+    for _ns in $_got; do CUR_DNS_LIST+=("$_ns"); done
+    CUR_SRC="$_src"
+    break
   done
 fi
 # is_current_dns <addr>：该地址是否为当前系统在用 DNS（线性查，兼容bash 3.2）
@@ -341,6 +359,7 @@ is_current_dns() {
 }
 if [ ${#CUR_DNS_LIST[@]} -gt 0 ]; then
   echo "  👤 当前系统DNS: ${CUR_DNS_LIST[*]}"
+  [ -n "$CUR_SRC" ] && echo "     来源: ${CUR_SRC}"
 fi
 
 # dns_preset_label 已下沉 lib/core.sh（compare/trends 共用，报告口径一致）
@@ -572,6 +591,13 @@ if [ "$BEST_IDX" -ge 0 ]; then
     SWITCH_OS="WSL"
     SWITCH_LINES+=("sudo sh -c 'echo nameserver ${BEST} > /etc/resolv.conf'")
     SWITCH_LINES+=("# WSL 自动重生成时: /etc/wsl.conf 加 [network] generateResolvConf=false 后 wsl --shutdown 重启")
+  elif [ -n "${PREFIX:-}" ] && [ -d "$PREFIX/etc" ]; then
+    # Android/Termux：/etc 是只读的 /system/etc（通常也没有 resolv.conf），sudo 也不存在，
+    # 照抄"sudo … > /etc/resolv.conf"必然失败。BIND 系工具（dig/host/nslookup）读的是前缀里这一份。
+    SWITCH_OS="Android/Termux"
+    SWITCH_LINES+=("echo 'nameserver ${BEST}' > \"\$PREFIX/etc/resolv.conf\"")
+    SWITCH_LINES+=("# 系统层 DNS（curl/ping/App 走的 Android netd）在 设置→网络→私人DNS / 各 WiFi 详情里改")
+    SWITCH_LINES+=("# 追加备用而不是覆盖: printf 'nameserver %s\\n' '${BEST}' >> \"\$PREFIX/etc/resolv.conf\"")
   elif command -v nmcli >/dev/null 2>&1; then
     SWITCH_OS="Linux (NetworkManager)"
     SWITCH_LINES+=("nmcli con mod \"<连接名>\" ipv4.dns \"${BEST}\" && nmcli con up \"<连接名>\"")

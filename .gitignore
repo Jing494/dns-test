@@ -1,4 +1,5 @@
 /results/
+/.t06-backup/
 *.log
 *报告*
 *.tmp

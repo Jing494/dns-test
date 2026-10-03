@@ -168,8 +168,8 @@ fi
 # "10"/"DNSKEY"/"300" 等，导致第 6~15 项全部 dig @错误目标（见 core.sh 审阅#11）
 rm -f "$STUB/full.log"
 MOCK_DIG_LOG="$STUB/full.log" PATH="$STUB:$PATH" run_common_tests 8.8.8.8 "mockDNS" full >/dev/null 2>&1
-# 白名单：@8.8.8.8=被测地址；@[2400:3200::1]/@223.5.5.5=[14]劫持对比基准（mock 下基准可达不降级，降级也放行）
-bad_at=$(grep -oE '@[^ ]+' "$STUB/full.log" 2>/dev/null | grep -vxF -e '@8.8.8.8' -e '@[2400:3200::1]' -e '@223.5.5.5' | head -3)
+# 白名单：@8.8.8.8=被测地址；@2400:3200::1/@223.5.5.5=[14]劫持对比基准（dig 的 @server 用裸地址，方括号会被当主机名）（mock 下基准可达不降级，降级也放行）
+bad_at=$(grep -oE '@[^ ]+' "$STUB/full.log" 2>/dev/null | grep -vxF -e '@8.8.8.8' -e '@2400:3200::1' -e '@223.5.5.5' | head -3)
 if [ -s "$STUB/full.log" ] && [ -z "$bad_at" ]; then
   ok "full 模式 @server 恒为被测地址/对比基准（for t 遮蔽回归）"
 else

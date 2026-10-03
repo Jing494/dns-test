@@ -6,6 +6,7 @@
 
 | 日期式版本 | 语义式版本 |
 |-----------|-----------|
+| v2026.10.1 | v1.24（IPv6 DNS 判不可达修复 + Android/Termux 当前DNS与切换建议） |
 | v2026.09.5 | v1.23（取分纯函数化 + CI 真出包 + 插件参数透传） |
 | v2026.09.4 | v1.22（报告模板去重 + 计数/竞态小修） |
 | v2026.09.3 | v1.21（compare 契约 + 取分解耦 + 性能） |
@@ -40,6 +41,22 @@
 
 > 注：① `v2026.08.9` 与 `v2026.08.10` 历史上均标记为 `v1.7.0`（版本管理疏漏，未影响代码与下载名），当前实际版本 **v1.7.1 = v2026.08.11**；② 早期 `v2026.08.8/.9` 等日期式版本号未加前导零，为历史遗留，与 git tag / 下载文件名保持一致，未改动。
 
+- 2026-10-03（第一百一十轮）：**IPv6 修复轮：`dig_target` 给 v6 加方括号导致所有 IPv6 DNS 被判"不可达"（真机才暴露）；顺带补上 Android/Termux 的当前 DNS 检测与切换建议（lib/core.sh / compare.sh / tools/network/doh_dot_check.sh / tests/03 / tests/04 / tests/05 / tests/06 / verify.sh / smoke.yml / 文档，发布 v2026.10.1，语义版 v1.24）**
+  - **IPv6 DNS 全线误判"不可达"（本轮起点，真机实测复现）**：`dig_target` 自引入起就给 IPv6 地址加方括号（注释理由是"避免 dig 解析歧义"），但 dig 的 `@server` 只接受**裸地址或主机名**——同一台机器实测：
+    `dig "@[240e:52:4800::8888]" www.baidu.com` → `dig: couldn't get address for '[240e:52:4800::8888]': not found`（rc=1）
+    `dig "@240e:52:4800::8888"  www.baidu.com` → 正常应答（rc=0）
+    后果：`dns_health_check` 对**所有** IPv6 DNS 恒判不可达 → 主入口/lite/full/compare/预设组全部跳过 v6 DNS。默认组首个地址就是 v6，实测 `printf '0\n' | bash dns-test.sh`（非交互跑默认组）只打印「DNS不可达（预检失败），已跳过该DNS」并以**退出码 2** 结束；`smoke_test.sh` 结尾推荐用户执行的示例（`bash full.sh 240e:52:4800::8888 0`）同样必挂。CI 抓不到：tests/03 只断言字符串形态，其余测试用 IPv4 或 mock dig。
+    修法：`dig_target` 改为原样透传（方括号只在 URI/DoH 场景有意义）。tests/03 的 IPv6 断言改为"不加方括号"，并新增**第 5 条 dig 语法自检**：用不可路由文档前缀 `2001:db8::1` 触发 dig 的 server 解析路径，断言不得出现 `couldn't get address`（不需要 IPv6 连通性；无真实 dig 时自动跳过）。tests/05 的 `@server` 回归白名单同步为 `@2400:3200::1`。
+    同根问题：`tools/network/doh_dot_check.sh` 的 DoT 分支同样给 IPv6 包了方括号 → **IPv6 DNS 的 DoT 检测恒显示"未提供DoT"（假阴性）**；已改裸地址（DoH 走 URL，方括号保留）。
+    修复后实测：`dns_health_check` 对默认组两个 v6 地址返回可达；`bash lite.sh 2400:3200::1 0` → 100%（54/54）；`bash full.sh 2400:3200::1 0` → 97%（76/78）；`bash dns-preset.sh ali lite 2` 正常；`doh_dot_check.sh 240e:52:4800::8888` → DoT ✅（此前恒 ⚠️）。
+  - **Android/Termux 下"当前系统 DNS"三级全读不到**：原检测链 scutil(macOS) → resolvectl(systemd) → `/etc/resolv.conf`。Termux 前缀环境里 `/etc` 是只读的 `/system/etc` 且没有 resolv.conf，BIND 系工具（dig/host/nslookup）读的是 `$PREFIX/etc/resolv.conf`——于是 👤 徽章与"当前正在使用，无需切换"提示整体失效（真机报告里连"当前系统DNS"那一行都没有）。
+    修法：候选清单改为 `/etc/resolv.conf` + `$PREFIX/etc/resolv.conf` **逐级兜底**（取第一个含 nameserver 的文件；不做并集，免得把 systemd 的 127.0.0.53 stub 之类混进列表）；取址逻辑下沉 `lib/core.sh` 纯函数 `resolv_conf_servers`（容忍行首空白/制表符/行尾注释、排序去重）；新增环境变量 `CUR_DNS_RESOLV_CONFS`（非空即**跳过平台探针**、按该清单取），既给容器/自定义环境一个确定入口，也让 tests/06 能跨平台确定性断言；报告头部新增「来源: <文件路径>」一行。
+    修复后实测：`bash compare.sh 223.5.5.5 119.29.29.29` → `👤 当前系统DNS: …（6 个）…` + `来源: …/usr/etc/resolv.conf`，推荐 223.5.5.5 时打出"当前正在使用，无需切换"。
+  - **Android 上的切换建议不可执行**：原"通用兜底"给的是 `sudo sh -c 'echo nameserver X > /etc/resolv.conf'`——本机既无 sudo，`/etc` 又是只读 `/system/etc`，照抄必然失败。新增 Android/Termux 分支：`echo 'nameserver X' > "$PREFIX/etc/resolv.conf"`，并附"系统层 DNS 在 设置→网络 里改"与"追加备用而非覆盖"两行注释。
+  - **测试套件自身的数据安全加固（本轮审计附带，实测踩到过一次）**：tests/06 用 `cp -a` 备份用户 `results/`+`trends/`，但备份放在 `$STUB`（`mktemp -d`）里 —— 进程被外部强杀（SIGKILL / 超时强杀）时两个 trap 都不执行，真数据留在临时目录、`results/` 里留下本测试的夹具 `compare-20260814-000000.json`，还会被 doctor 当成"已积累 1 份采集数据"、被 trends 当成真实历史。修法：备份改到仓库内**固定路径** `.t06-backup/`（已加入 `.gitignore` 与 `release.sh` 排除），启动时若发现上次遗留的备份就先自动恢复（强杀自愈）；另外"本来没有用户数据"（`*_BAKED=0`）时不再把夹具留在 `results/` 里。tests/10 加两条静态守卫（固定路径 + 自愈逻辑）并同步计数。
+  - **顺带修一处 IPv6 展示歧义**：`tools/network/01_port_test.pl` 自定目标打印成 `udp://2400:3200::1:53`（IPv6 不加方括号，端口边界与地址分辨不出）。新增 `fmt_hostport()`（仅展示用，不参与连接），IPv6 输出 `udp://[2400:3200::1]:53`；smoke 第 16 项加一条 IPv6 方括号断言（仍是 1 个检查点）。
+  - **测试**：tests/03 4→5（IPv6 不加方括号 + dig 语法自检）；tests/04 33→39（`resolv_conf_servers` 六条：提取去重/制表符/脏行/IPv6/缺文件/空参数）；tests/05 白名单同步；tests/06 130→137（Android/Termux：指定来源生效、来源标注、跳过平台探针、默认候选静态守卫、切换建议三分支）；tests/10 15→17（备份固定路径 + 强杀自愈守卫）；总单测 408→424
+  - **文档**：CODE_WIKI §5.2 补 `resolv_conf_servers`、环境变量表补 `CUR_DNS_RESOLV_CONFS`、§4.1 compare 行补逐级兜底与分支口径；README/AI_GUIDE/SANDBOX_GUIDE/CONTRIBUTING/verify.sh/smoke.yml 计数与描述同步；版本升 `v2026.10.1 = v1.24`
 - 2026-09-13（第一百零九轮）：**收尾轮：取分兜底路径纯函数化（终于可测）、CI 加"真出包"门禁、trends 解析再压一层子进程、插件参数透传（lib/core.sh / compare.sh / trends.sh / lib/plugins.sh / tools/manifest.sh / dns-test.sh / smoke.yml / tests/02 / tests/04 / tests/06 / 文档，发布 v2026.09.5，语义版 v1.23）**
   - **取分双路径下沉为纯函数 `parse_test_output`**（core.sh）：上一轮只能给兜底路径加静态守卫（要人工构造旧版 lite/full 才能跑通，等于没测）。现在主路径（`--emit-kv` 契约行）与兜底路径（旧版中文文案）都由同一纯函数处理，tests/04 直接喂样本断言：KV 取分、旧版文案兜底、KV 优先于文案、垃圾输入输出空字段。tests/06 的 2 条静态守卫随之撤掉。
   - **CI 新增 `release.sh` 真出包门禁**：此前 CI 只跑过 release.sh 的参数分支（--help/非法版本），打包这条路径本地与 CI 都没跑过 —— 而它恰好是"沙箱里 tar/gzip 坏掉、包是 0 字节却没人发现"的地方。现在在干净 checkout 里真打一次包，并断言包非空、条目数 > 50、设备专用 `env.sh` 未混入。

@@ -73,15 +73,27 @@ MOCK_CUR_DNS="10.99.99.99"
 # 必须 cp 而非 mv：mv 会让"唯一副本"在测试运行期间只存在于临时目录里，一旦进程被 SIGKILL
 # （EXIT/TERM 两个 trap 都不会执行）就永久丢失 —— 2026-09-13 真实事故即为此。
 # cp 保证任何时刻磁盘上都有完整副本；且备份目录**不登记**进 TMPDIR_LIST，避免被清理逻辑连带删除。
+# 备份路径固定为仓库内 .t06-backup/（而不是 $STUB 临时目录）：万一进程被 SIGKILL（两个 trap 都不执行），
+# 备份仍在原地可被下一次运行自动恢复 —— 实测过一次"$STUB 路径 + 外部超时强杀"导致假数据留在 results/、
+# 真数据留在临时目录的情形（.gitignore 与 release.sh 均已排除该目录）。
+BAK=".t06-backup"
+if [ -d "$BAK/results" ] || [ -d "$BAK/trends" ]; then
+  echo "⚠️  发现上次运行遗留的备份 $BAK/（上次被强杀未恢复），先把用户数据还回去"
+  [ -d "$BAK/results" ] && { rm -rf results; cp -a "$BAK/results" results; }
+  [ -d "$BAK/trends" ]  && { rm -rf trends;  cp -a "$BAK/trends"  trends; }
+fi
+rm -rf "$BAK"
 RESULTS_BAKED=0; TRENDS_BAKED=0
-[ -d results ] && { cp -a results "$STUB/results-backup" && RESULTS_BAKED=1; }
-[ -d trends ]  && { cp -a trends  "$STUB/trends-backup"  && TRENDS_BAKED=1; }
+[ -d results ] && { mkdir -p "$BAK"; cp -a results "$BAK/results" && RESULTS_BAKED=1; }
+[ -d trends ]  && { mkdir -p "$BAK"; cp -a trends  "$BAK/trends"  && TRENDS_BAKED=1; }
 restore_results() {
   trap - EXIT INT TERM   # 先摘掉 trap：否则中断路径会被 EXIT 再触发一次
   rm -rf results trends
-  if [ "$RESULTS_BAKED" = "1" ]; then cp -a "$STUB/results-backup" results; fi
-  if [ "$TRENDS_BAKED" = "1" ]; then cp -a "$STUB/trends-backup" trends; fi
-  rm -rf "$STUB"
+  # 本来就没有（*_BAKED=0）就不还原 —— 连本测试自己的夹具一起清掉，不在用户目录里留痕
+  # （否则 results/ 会永久留着 compare-20260814-000000.json 这种假数据，污染 doctor 的"已积累 N 份"与 trends）
+  if [ "$RESULTS_BAKED" = "1" ]; then cp -a "$BAK/results" results; fi
+  if [ "$TRENDS_BAKED" = "1" ]; then cp -a "$BAK/trends" trends; fi
+  rm -rf "$BAK" "$STUB"
 }
 # 中断也必须恢复后**显式退出**：bash 执行完 INT/TERM 的 trap 会继续往下跑，
 # 那样测试体里的 rm -rf results 会立刻把刚恢复的数据再删一次（审阅#16）
@@ -139,6 +151,31 @@ grep -q "\`$CUR\` 👤" results/report.md && ok "MD 含 👤 标记" || notok "M
 grep -q "当前正在使用" results/report.md && ok "MD 推荐行含注记" || notok "MD 推荐行无注记"
 echo "$OUT" | grep -q "环比上次采集" && ok "环比输出存在" || notok "环比输出缺失"
 grep -q "Δ评分" results/report.html && ok "HTML Δ列存在" || notok "HTML Δ列缺失"
+
+echo "═══ compare.sh e2e: Android/Termux（前缀 resolv.conf 来源 + 切换建议分支） ═══"
+# 背景：Android/Termux 下 /etc 是只读的 /system/etc 且通常没有 resolv.conf，BIND 系工具
+# （dig/host/nslookup）读的是 $PREFIX/etc/resolv.conf —— 也是本脚本全部测量用的解析器。
+PFX_DNS="10.98.98.98"
+mkdir -p "$STUB/pfx/etc"
+printf '# test\nnameserver %s\n' "$PFX_DNS" > "$STUB/pfx/etc/resolv.conf"
+# ① 显式来源（CUR_DNS_RESOLV_CONFS 跳过平台探针）：确定性断言，不依赖本机 /etc/resolv.conf 有无
+OUTP=$(CUR_DNS_RESOLV_CONFS="$STUB/pfx/etc/resolv.conf" bash compare.sh 223.5.5.5 119.29.29.29 --no-save 2>&1)
+echo "$OUTP" | grep -q "👤 当前系统DNS:.*$PFX_DNS" && ok "CUR_DNS_RESOLV_CONFS 指定来源被采用" || notok "指定来源未被采用"
+echo "$OUTP" | grep -q "来源:.*pfx/etc/resolv.conf" && ok "头部标注检测来源（文件路径）" || notok "头部未标来源"
+echo "$OUTP" | grep -q "$MOCK_CUR_DNS" && notok "指定来源时仍读平台探针（应跳过）" || ok "指定来源时跳过平台探针"
+# ② 默认候选清单必须同时含系统与前缀两份 resolv.conf（静态守卫：防 Termux 兜底被误删）
+grep -qE 'CUR_CONF_CANDIDATES="/etc/resolv\.conf \$\{PREFIX:-\}/etc/resolv\.conf"' compare.sh \
+  && ok "默认候选含系统+前缀两份 resolv.conf" || notok "默认候选清单被改动（Termux 兜底丢失）"
+# ③ 切换建议：PREFIX 存在时给前缀路径（macOS 走 networksetup 分支，故仅非 Darwin 断言）
+if [ "$(uname -s)" = "Darwin" ]; then
+  echo "  ⏭️  跳过切换建议分支断言（macOS 优先 networksetup）"
+else
+  OUTP2=$(PREFIX="$STUB/pfx" bash compare.sh 223.5.5.5 119.29.29.29 --no-save 2>&1)
+  echo "$OUTP2" | grep -q "Android/Termux" && ok "切换建议识别 Android/Termux 环境" || notok "切换建议未识别 Android/Termux"
+  echo "$OUTP2" | grep -qF '$PREFIX/etc/resolv.conf' && ok "切换建议写前缀路径" || notok "切换建议未用前缀路径"
+  echo "$OUTP2" | grep -qF "sudo sh -c 'echo nameserver" \
+    && notok "切换建议仍给出不可用的 sudo 写只读 /etc" || ok "不再建议 sudo 写只读 /etc"
+fi
 
 echo "═══ compare.sh e2e: 提供商标签 + 延迟抖动 ═══"
 # 预设内 DNS（223.5.5.5=阿里）应带标签；自定义 DNS 不带

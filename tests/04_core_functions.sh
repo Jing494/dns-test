@@ -210,6 +210,38 @@ KV addr=x mode=lite score=99 stab=98 pass=1 total=2")
 R=$(parse_test_output "MOCK-ERR: dig 缺少 @server")
 [ "$R" = "||" ] && ok "无法解析时输出空字段（不误报分数）" || notok "垃圾输入异常: [$R]"
 
+echo "═══ resolv_conf_servers 单测（当前系统DNS 取址：Android/Termux 前缀兜底共用） ═══"
+RC="$STUB/resolv.conf"
+cat > "$RC" <<'EOF'
+# 注释行与空行
+nameserver 223.5.5.5
+  nameserver   240e:52:4800::8888   # 行首空格 + 多空格 + 行尾注释
+search example.com
+nameserver 223.5.5.5
+
+options timeout:2 attempts:2
+EOF
+R=$(resolv_conf_servers "$RC" | tr '\n' ' ')
+[ "$R" = "223.5.5.5 240e:52:4800::8888 " ] && ok "提取+去重+容忍行首空格/行尾注释" || notok "解析异常: [$R]"
+
+printf 'nameserver\t1.1.1.1\n' > "$RC"
+R=$(resolv_conf_servers "$RC")
+[ "$R" = "1.1.1.1" ] && ok "制表符分隔容忍" || notok "制表符解析异常: [$R]"
+
+printf 'nameserver\nnameserver   \n#nameserver 9.9.9.9\n;nameserver 8.8.4.4\n' > "$RC"
+R=$(resolv_conf_servers "$RC")
+[ -z "$R" ] && ok "脏行/注释行不产出" || notok "脏行处理异常: [$R]"
+
+printf 'nameserver 2001:DB8::1\n' > "$RC"
+R=$(resolv_conf_servers "$RC")
+[ "$R" = "2001:DB8::1" ] && ok "IPv6 原样保留（不加方括号）" || notok "IPv6 解析异常: [$R]"
+
+R=$(resolv_conf_servers "$STUB/not-exist.conf")
+[ -z "$R" ] && ok "文件不存在 → 空（不报错）" || notok "缺文件处理异常: [$R]"
+
+R=$(resolv_conf_servers "")
+[ -z "$R" ] && ok "空参数 → 空（不报错）" || notok "空参数处理异常: [$R]"
+
 echo ""
 echo "════ 结果: $PASS 通过 / $FAIL 失败 ════"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

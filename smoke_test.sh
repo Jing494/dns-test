@@ -97,7 +97,10 @@ else
 fi
 
 echo "--- 16. 端口测试（专项4）"
-timeout 15 perl tools/network/01_port_test.pl 223.5.5.5 53 udp 2>&1 | grep -q "测试:" && check "端口测试" 0 || check "端口测试" 1
+# IPv4 走通基础输出；IPv6 额外断言展示形式带方括号（`[2400:3200::1]:53`，否则 host:port 歧义）
+timeout 15 perl tools/network/01_port_test.pl 223.5.5.5 53 udp 2>&1 | grep -q "测试:" \
+  && timeout 15 perl tools/network/01_port_test.pl 2400:3200::1 53 udp 2>&1 | grep -qF "[2400:3200::1]:53" \
+  && check "端口测试" 0 || check "端口测试" 1
 
 echo "--- 17. 示例01 基础查询"
 timeout 15 perl examples/01_dns_query.pl 223.5.5.5 2>&1 | grep -q "A记录" && check "示例01" 0 || check "示例01" 1

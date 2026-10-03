@@ -40,6 +40,12 @@ USAGE
 
 my $TIMEOUT = 5;
 
+# 展示用 host:port —— IPv6 必须带方括号，否则 "2400:3200::1:53" 无法判断端口边界（纯展示，不参与连接）
+sub fmt_hostport {
+    my ($host, $port) = @_;
+    return $host =~ /:/ ? "[$host]:$port" : "$host:$port";
+}
+
 # 测试目标
 my @targets;
 if (@ARGV) {
@@ -52,7 +58,7 @@ if (@ARGV) {
             ip => $ARGV[$i],
             port => $ARGV[$i+1],
             proto => $ARGV[$i+2] || "udp",
-            name => "自定义测试 $ARGV[$i]:$ARGV[$i+1]/$ARGV[$i+2]"
+            name => "自定义测试 " . fmt_hostport($ARGV[$i], $ARGV[$i+1]) . "/$ARGV[$i+2]"
         };
     }
 } else {
@@ -71,7 +77,7 @@ print "ePDG服务器端口连通性测试\n";
 print "=" x 70 . "\n\n";
 
 foreach my $t (@targets) {
-    printf "测试: %-30s %s://%s:%d\n", $t->{name}, $t->{proto}, $t->{ip}, $t->{port};
+    printf "测试: %-30s %s://%s\n", $t->{name}, $t->{proto}, fmt_hostport($t->{ip}, $t->{port});
     
     # v4/v6 自动识别（复用dns_sockaddr双栈）
     my ($dest_addr, $family, $err) = dns_sockaddr($t->{ip}, $t->{port});
